@@ -18,7 +18,7 @@ Then install any plugin from the table below:
 
 | Plugin | Version | What it does |
 |--------|---------|--------------|
-| [`jira-bug-triage`](./plugins/jira-bug-triage/) | 0.1.0 | Subagent that triages Jira bug tickets end-to-end: assigns, investigates (Slack/Confluence/Jira/Datadog), refines the description, sets severity-based due dates, and DMs you a summary. |
+| [`jira-bug-triage`](./plugins/jira-bug-triage/) | 0.2.0 | Subagent that triages Jira bug tickets end-to-end: assigns, investigates (Slack/Confluence/Jira/Datadog), refines the description, sets severity-based due dates, and DMs you a summary. Bundles the `issue-investigator` skill. |
 
 ## Roadmap
 
@@ -26,7 +26,6 @@ These plugins are planned but not yet shipped. The `jira-bug-triage` plugin refe
 
 | Plugin | What it will do | Status |
 |--------|-----------------|--------|
-| `issue-investigator` | Search Slack, Confluence, Jira, then code if needed; produces an evidence-tagged investigation report. | Planned |
 | `jira-ticket-refiner` | Restructure poorly written Jira tickets into clear, self-contained documents. | Planned |
 | `prose-style` | Apply writing rules (no em dashes, no LLM vocabulary, lead with the answer) to text the model produces. | Planned |
 
