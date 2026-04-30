@@ -272,3 +272,7 @@ Standard MIT license, copyright `Taha Bikanerwala`, year `2026`.
 - Renaming the sibling skills to new names. The agent references them by current names; renaming happens when they ship.
 - Any non-Jira issue trackers (Linear, GitHub Issues, ServiceNow). Future enhancement.
 - Multi-language support for the agent body.
+
+## Architectural revision (2026-04-30)
+
+`issue-investigator` is no longer a separate-plugin item on the roadmap; it now ships nested inside `jira-bug-triage` at `plugins/jira-bug-triage/skills/issue-investigator/`. The bug-triage agent still calls it by name via the `Skill` tool. The other two sibling skills (`jira-ticket-refiner`, `prose-style`) remain planned as separate plugins. See `docs/superpowers/specs/2026-04-30-issue-investigator-design.md` for the full spec of the bundled skill.
