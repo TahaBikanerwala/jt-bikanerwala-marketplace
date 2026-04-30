@@ -188,7 +188,7 @@ Rules for all three templates:
 - State explicitly that you're moving the ticket to `waiting_reply` so the reporter knows what to expect.
 - Tag only the reporter (or their EM). Do not add other tags in the question comment.
 
-**Mention syntax.** Every comment is ADF. Mentions are `mention` nodes (`type: "mention"`, `attrs.id: "<accountId>"`) inside a paragraph — never `[~accountid:XXXXX]` wiki-markup or any string form. Markdown escapes the brackets, the mention fails to render, and the reporter or EM never gets the notification.
+**Mention syntax.** Every comment is ADF. Mentions are `mention` nodes (`type: "mention"`, `attrs.id: "<accountId>"`) inside a paragraph, never `[~accountid:XXXXX]` wiki-markup or any string form. Markdown escapes the brackets, the mention fails to render, and the reporter or EM never gets the notification.
 
 ### EM-tagged follow-up: extra preamble
 

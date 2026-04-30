@@ -30,7 +30,7 @@ Investigation runs four levels top to bottom. Each level has a gate: if it produ
 
 Before running the levels, fetch the ticket data once and cache it for the rest of the skill.
 
-1. Identify the ticket key from the invocation context (e.g., `BUG-12345` from a pasted URL or a parameter passed by the caller). If the calling context (such as the bug-triage agent) has already fetched the ticket and exposed the payload, reuse that payload — don't fetch again.
+1. Identify the ticket key from the invocation context (e.g., `BUG-12345` from a pasted URL or a parameter passed by the caller). If the calling context (such as the bug-triage agent) has already fetched the ticket and exposed the payload, reuse that payload; don't fetch again.
 2. If no payload is available, call `getJiraIssue` with the ticket key and `responseContentFormat: "markdown"`. Request these fields at minimum: `summary`, `description`, `status`, `priority`, `labels`, `components`, `assignee`, `reporter`, `created`, `updated`, `issuelinks`.
 3. Cache the response. Reference it as "the ticket payload" throughout the skill — `summary`, `description`, `created`, `issuelinks`, `reporter`, etc.
 
@@ -164,7 +164,7 @@ No tables in this section. No code snippets unless the snippet itself is the fin
 
 2-5 tool-by-tool items. Each item:
 
-- Names the tool (code search, Slack search, admin URL, Sentry, Datadog, etc.). The list reflects tools the engineer should use after reading the report — not tools this skill itself queried.
+- Names the tool (code search, Slack search, admin URL, Sentry, Datadog, etc.). The list reflects tools the engineer should use after reading the report, not tools this skill itself queried.
 - Gives the exact ready-to-paste query, URL, or file path.
 - Says in one phrase what a hit or miss tells you.
 - Datadog items appear here only if Datadog returned usable results during Level 3. The Level 3 suppression rule overrides this whenever Datadog was unavailable.
