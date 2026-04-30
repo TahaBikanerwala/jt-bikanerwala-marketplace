@@ -1,0 +1,15 @@
+{
+  "name": "jt-bikanerwala-marketplace",
+  "description": "Taha Bikanerwala's Claude Code plugins.",
+  "owner": {
+    "name": "Taha Bikanerwala",
+    "url": "https://github.com/TahaBikanerwala"
+  },
+  "plugins": [
+    {
+      "name": "jira-bug-triage",
+      "source": "./plugins/jira-bug-triage",
+      "description": "End-to-end Jira bug triage subagent."
+    }
+  ]
+}
