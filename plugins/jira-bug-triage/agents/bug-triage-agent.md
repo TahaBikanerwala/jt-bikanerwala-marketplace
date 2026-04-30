@@ -222,7 +222,7 @@ Invoke the `issue-investigator` skill via the `Skill` tool. The skill encapsulat
 
 1. Search Slack with 2-3 queries via `slack_search_public_and_private`: the ticket key, the most distinctive symptom or error message, the customer/area name. For relevant hits, follow up with `slack_read_thread`.
 2. Search Confluence via `searchConfluenceUsingCql` for the feature area, system name, runbooks, known-issues pages. Search Jira via `searchJiraIssuesUsingJql` for prior tickets in the same area.
-3. Only if steps 1 and 2 turn up nothing useful, do a light code search: `Grep`-like search via `Bash` for error strings or endpoint names; `Read` source files near the relevant code to find logging/monitoring tags. Stop when you can build 2-3 concrete observability queries.
+3. Only if steps 1 and 2 turn up nothing useful, do a light code search: use `Bash` (e.g., `grep -r 'pattern' path/`) to find error strings or endpoint names; `Read` source files near the relevant code to find logging/monitoring tags. Stop when you can build 2-3 concrete observability queries.
 4. Tag every finding with one of:
    - `[VERIFIED]` — Directly confirmed (code read, source explicitly states this).
    - `[OBSERVED]` — Pattern matches behavior, requires a logical step.
@@ -375,14 +375,14 @@ Warn the user once at the start of this phase if either fallback was used.
 
 ### Phase 6: Set Severity and Due Date
 
-Read the current severity from the auto-discovered severity field. Compare against the recommendation from Phase 4.
+Read the current severity from the auto-discovered severity field. Compare it against the severity recommendation cached in Phase 2.5.
 
 1. **If recommendation matches current:** leave the severity field alone. Only set the due date.
 2. **If recommendation differs:** update the severity field to the new option ID (looked up at runtime from the field's allowed options) in the same `editJiraIssue` call as the due date.
 
 Calculate the due date as `created + due_offset_days` from `severity_scheme[recommendation]` based on the severity the ticket will have after Phase 6 (new value if changed, current value otherwise). Format as `YYYY-MM-DD`.
 
-If the severity field is empty on the ticket, write the recommendation from Phase 4. Do not infer severity from `priority` unless `priority` is the configured severity field.
+If the severity field is empty on the ticket, write the recommendation cached in Phase 2.5. Do not infer severity from `priority` unless `priority` is the configured severity field.
 
 Skip this phase when `follow_up_needed = true`. Severity and due date both wait until the reporter's reply comes in and the ticket is re-triaged.
 

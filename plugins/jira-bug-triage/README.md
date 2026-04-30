@@ -1,12 +1,12 @@
 # jira-bug-triage
 
-A Claude Code plugin that ships one subagent, `bug-triage-agent`. Paste a Jira bug ticket URL and tell it to triage; the agent assigns the ticket to you, transitions it to investigating, runs an investigation across Slack/Confluence/Jira (and optionally code), searches observability data, drafts a severity assessment, refines the ticket description, sets a severity-based due date, applies the triaged label, and DMs you a one-line summary on Slack. It pauses for your approval before posting any comment or changing the ticket.
+A Claude Code plugin that ships one subagent, `bug-triage-agent`. Paste a Jira bug ticket URL and tell it to triage; the agent assigns the ticket to you, transitions it to investigating, runs an investigation across Slack/Confluence/Jira (and optionally code), searches observability data, drafts a severity assessment, refines the ticket description, sets a severity-based due date, applies the triaged label, and DMs you a one-line summary on Slack. The agent assigns the ticket to you and transitions it to investigating as it starts work. It pauses at the Phase 3 confirmation gate (before posting any comment, changing the description, or updating other fields) to show you the full findings and get your approval.
 
 ## Prerequisites
 
 ### Required
 
-- **Atlassian MCP server.** The agent needs full Jira access (read tickets, edit fields, post comments, transition, link, look up users). Install and configure via the Atlassian plugin's docs.
+- **Atlassian MCP server.** The agent needs full Jira access (read tickets, edit fields, post comments, transition, link, look up users). Install via Claude Code's plugin system (e.g., `/plugin install atlassian` if available in your marketplace) and follow the Atlassian plugin's setup docs to authenticate against your Jira site.
 
 ### Recommended (the agent gracefully degrades without these)
 
@@ -206,4 +206,4 @@ Issues and PRs welcome at the marketplace repo. The agent body is at `agents/bug
 
 ## License
 
-MIT. See the marketplace `LICENSE` at the repo root.
+MIT. See the [`LICENSE`](../../LICENSE) at the repo root.
