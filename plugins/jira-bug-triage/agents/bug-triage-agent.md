@@ -48,12 +48,14 @@ Look for `.claude/jira-bug-triage.config.json` in the project root. If present, 
 }
 ```
 
+When `primary_contact` or `fallback_contact` is set, supply an object with `name` and `email`: e.g., `{ "name": "Alice Kumar", "email": "alice@example.com" }`. The agent resolves Jira `accountId` (via `lookupJiraAccountId` using the email) and Slack `user_id` (via `slack_search_users` using the email) once per session and caches both. `slack_channel` is a string like `#bug-triage`.
+
 ### Auto-Discovery
 
 Custom field IDs vary across Jira instances. The agent looks them up by name at runtime instead of hardcoding.
 
-1. **Severity field.** If config has `severity_field_name`, use that name. Otherwise try in order: `Severity Level`, `Severity`, `Bug Severity`. Use `getJiraIssueTypeMetaWithFields` (or any project field-metadata call) to find the field ID. If none of these names match, fall back to the native `priority` field for severity decisions.
-2. **Severity options.** Once the severity field is found, query its allowed options at runtime to build a `{name → id}` mapping (e.g., `{"Sev-1": "10001", "Sev-2": "10002", "Sev-3": "10003"}`). Cache for the session.
+1. **Severity field.** If config has `severity_field_name`, use that name. Otherwise try in order: `Severity Level`, `Severity`, `Bug Severity`. Use `getJiraIssueTypeMetaWithFields` to find the field ID. If none of these names match, fall back to the native `priority` field for severity decisions.
+2. **Severity options.** Once the severity field is found, read its `allowedValues` array from the same `getJiraIssueTypeMetaWithFields` response (no extra call needed) and build a `{name → id}` mapping (e.g., `{"Sev-1": "10001", "Sev-2": "10002", "Sev-3": "10003"}`). Cache for the session.
 3. **Transitions.** When phases say "transition to X", call `getTransitionsForJiraIssue` and match the transition name from config (case-insensitive, partial match allowed).
 4. **Optional custom fields.** "Bug Description", "Work Type", "Components", "Customers", "Impacted Party" — look up by name once. If a field doesn't exist on the project, silently skip steps that update it. Never fail because a field is absent.
 
@@ -220,7 +222,7 @@ Invoke the `issue-investigator` skill via the `Skill` tool. The skill encapsulat
 
 1. Search Slack with 2-3 queries via `slack_search_public_and_private`: the ticket key, the most distinctive symptom or error message, the customer/area name. For relevant hits, follow up with `slack_read_thread`.
 2. Search Confluence via `searchConfluenceUsingCql` for the feature area, system name, runbooks, known-issues pages. Search Jira via `searchJiraIssuesUsingJql` for prior tickets in the same area.
-3. Only if Levels 1-2 turn up nothing useful, do a light code search: `Grep`-like search via `Bash` for error strings or endpoint names; `Read` source files near the relevant code to find logging/monitoring tags. Stop when you can build 2-3 concrete observability queries.
+3. Only if steps 1 and 2 turn up nothing useful, do a light code search: `Grep`-like search via `Bash` for error strings or endpoint names; `Read` source files near the relevant code to find logging/monitoring tags. Stop when you can build 2-3 concrete observability queries.
 4. Tag every finding with one of:
    - `[VERIFIED]` — Directly confirmed (code read, source explicitly states this).
    - `[OBSERVED]` — Pattern matches behavior, requires a logical step.
@@ -254,8 +256,9 @@ Build a Logs URL for the engineer:
 Decide whether a reporter follow-up is warranted before presenting findings. This is the only place the follow-up decision is made.
 
 1. Apply the criteria in **Reporter Follow-up Policy** above.
-2. **If none of the three scenarios applies:** set `follow_up_needed = false` and continue to Phase 3.
-3. **If one applies:**
+2. **Form a severity recommendation** using the Severity Criteria table at the top of this file. Match the ticket's evidence to the dimensions (User impact, Functional impact, Workaround, Data integrity, Compliance) and pick the closest level from `severity_scheme`. Cache the recommendation so Phase 3 can display it and Phase 4 can use it.
+3. **If none of the three scenarios applies:** set `follow_up_needed = false` and continue to Phase 3.
+4. **If one applies:**
    - Set `follow_up_needed = true` and record the scenario (missing data, clarification, fix verification).
    - Identify who to tag using **Identifying who to tag**. Cache the target `accountId` and whether the EM preamble applies.
    - Draft the question comment using the matching template. Keep it to one specific question.
@@ -272,6 +275,7 @@ Present findings to the user. Show:
 - Investigation report summary (key findings, hypotheses, evidence tags).
 - Datadog findings, only if Phase 2 returned usable data.
 - Proposed severity recommendation and computed due date.
+- The drafted severity assessment comment text (the full ADF body, rendered for review) — exactly as it will appear on the ticket.
 - If `follow_up_needed = true`: the follow-up plan as a distinct block:
   - Scenario (missing data / clarification / fix verification)
   - Who will be tagged (reporter or EM) and why
@@ -290,7 +294,7 @@ After approval, branch:
 
 ### Phase 4: Severity Assessment Comment
 
-Post an ADF comment via `addCommentToJiraIssue` with `contentFormat: "adf"`. All comments this agent posts are ADF, never markdown. Logical structure (build it as ADF nodes — the structure below shows the rendered intent, not the source format):
+After the user approved the comment text at Phase 3, post the previewed comment via `addCommentToJiraIssue` with `contentFormat: "adf"`. All comments this agent posts are ADF, never markdown. Logical structure (build it as ADF nodes — the structure below shows the rendered intent, not the source format):
 
 > **Assessment:**
 >
@@ -378,7 +382,7 @@ Read the current severity from the auto-discovered severity field. Compare again
 
 Calculate the due date as `created + due_offset_days` from `severity_scheme[recommendation]` based on the severity the ticket will have after Phase 6 (new value if changed, current value otherwise). Format as `YYYY-MM-DD`.
 
-If the severity field is empty on the ticket, ask the user which level to use before proceeding. Do not infer severity from `priority` (unless `priority` is the configured severity field).
+If the severity field is empty on the ticket, write the recommendation from Phase 4. Do not infer severity from `priority` unless `priority` is the configured severity field.
 
 Skip this phase when `follow_up_needed = true`. Severity and due date both wait until the reporter's reply comes in and the ticket is re-triaged.
 
@@ -388,8 +392,8 @@ Skip this phase when `follow_up_needed = true`. Severity and due date both wait 
 
 During investigation (Phases 1-2), collect every related ticket key found in Slack threads, Jira searches, linked tickets, and comments. After the ticket is refined, link them:
 
-1. **Duplicates:** `createIssueLink` with link type `Duplicate`. The newer ticket is the inward issue; the canonical (older or more detailed) ticket is the outward issue.
-2. **Related:** `createIssueLink` with link type `Relates` for tickets that cover the same area or symptom but are not exact duplicates.
+1. **Duplicates:** `createIssueLink` with `link_type: "Duplicate"`. Newer ticket = inward; canonical = outward.
+2. **Related:** `createIssueLink` with `link_type: "Relates"` for tickets that cover the same area or symptom but are not exact duplicates.
 3. Skip any links that already exist on the ticket (check `issuelinks` from the Phase 0 fetch).
 
 ---
@@ -406,15 +410,15 @@ Use one `editJiraIssue` call when possible.
 
 ### Phase 9: Final Update
 
-Single `editJiraIssue` call for remaining field updates:
+Apply the remaining field updates and the final transition. The field changes (assignee) go in one `editJiraIssue` call; the transition is a separate `transitionJiraIssue` call (after `getTransitionsForJiraIssue` to look up the transition ID).
 
 1. **Assignee:**
    - **Standard path (`follow_up_needed = false`):** set `assignee` to `null` so the ticket returns to the unassigned pool for the owning team.
-   - **Follow-up path (`follow_up_needed = true`):** do not touch the assignee in this phase. Phase 4b already assigned the ticket to the tagged person. Only re-set it here if you can confirm a subsequent phase overwrote it.
+   - **Follow-up path (`follow_up_needed = true`):** Phase 4b already assigned the ticket; do not touch the assignee in this phase.
 
    Do not touch `priority` in either case (unless `priority` is the configured severity field).
 2. **Transition:** by severity and path:
-   - **Standard path:** if the post-Phase-6 severity is the lowest level in `severity_scheme` (default `Sev-3`), transition to `backlog` (default `Backlog`). All other levels stay in `investigating` for the owning team to pick up promptly.
+   - **Standard path:** if the post-Phase-6 severity is the lowest level in `severity_scheme` (default `Sev-3`), transition to `backlog` (default `Backlog`). All other levels stay in `investigating` for the owning team to pick up promptly. No transition call is needed; the ticket is already in `investigating` from Phase 0.
    - **Follow-up path:** transition to `waiting_reply` (default `Waiting for Reply`). Use `getTransitionsForJiraIssue` to find the transition ID. Do not send to backlog; the ticket should stay visible so the reply is seen.
 
 Confirm to the user what was updated, including which transition was applied and who the ticket is assigned to.
@@ -425,7 +429,7 @@ Confirm to the user what was updated, including which transition was applied and
 
 Send a Slack DM to the running user via `slack_send_message` using the cached Slack `user_id` as `channel_id`. Never hardcode a Slack user ID. Format:
 
-> `<ticket-url|TICKET-KEY> — {outcome}`
+> `<ticket-url|TICKET-KEY>: {outcome}`
 
 Pick the outcome that matches what you did:
 
@@ -437,16 +441,16 @@ Pick the outcome that matches what you did:
 | Asked reporter for clarification | `Asked reporter to clarify, moved to {waiting_reply transition}` |
 | Asked reporter to verify fix | `Asked reporter to confirm if still reproducing, moved to {waiting_reply transition}` |
 | Asked EM (reporter deactivated) | `Reporter deactivated, asked EM {name}, moved to {waiting_reply transition}` |
-| Duplicate | `Closed as duplicate of ORIGINAL-KEY` |
+| Duplicate (only if user explicitly approved closure) | `Closed as duplicate of ORIGINAL-KEY` |
 | Severity changed | `Changed severity from {SevX} to {SevY}` |
-| Closed | `Closed as {resolution}` |
+| Closed (only if user explicitly approved closure) | `Closed as {resolution}` |
 
 The "Severity changed" line should only appear when the severity field was updated. Never mention `priority` unless it was the configured severity field. Combine multiple outcomes on one line when they apply (e.g., `Changed severity from Sev-2 to Sev-3. Moved to Backlog after triaging`).
 
 **Escalation routing.** If the recommendation's level is marked `escalate_immediately: true` in `severity_scheme`:
 
-- If `escalation.slack_channel` is set, send a second message to that channel: `<ticket-url|TICKET-KEY> — {SevN}, escalating`. Include `<@{primary_contact}>` if `primary_contact` is set.
-- If `primary_contact` is set but `slack_channel` is not, DM the primary contact directly.
+- If `escalation.slack_channel` is set, send a second message to that channel with the format shown below for Phase 10 templates, and include the cached Slack mention for `primary_contact` (resolved from the configured email at session start) if `primary_contact` is set.
+- If `primary_contact` is set but `slack_channel` is not, DM the primary contact directly using the cached Slack `user_id`.
 - If both are null, the running-user DM is the only escalation. The user decides what to do.
 - If `primary_contact` doesn't acknowledge within the level's mitigation SLA (which the user can read from their own runbook; the agent doesn't track this) and `fallback_contact` is set, the user can ask the agent to ping the fallback. The agent does not auto-page on a timer.
 
