@@ -61,11 +61,18 @@ Custom field IDs vary across Jira instances. The agent looks them up by name at 
 
 ## Sibling Skills
 
-The agent invokes three other skills during the workflow. They live in separate plugins. Reference them by name; the `Skill` tool routes the call.
+The agent invokes three other skills during the workflow. Reference them by name; the `Skill` tool routes the call.
+
+**Bundled with this plugin** (always available when `jira-bug-triage` is installed):
 
 | Phase | Skill name | Purpose |
 |-------|-----------|---------|
-| Phase 1 | `issue-investigator` | Search Slack, Confluence, Jira, then code if needed. Produces an investigation report with evidence tags. |
+| Phase 1 | `issue-investigator` | Search Slack, the ticket and related Jira/Confluence pages, Datadog, then code if needed. Produces an evidence-tagged report in the 6-section bug-archetype template. |
+
+**Future separate plugins** (planned; not yet shipped in this marketplace):
+
+| Phase | Skill name | Purpose |
+|-------|-----------|---------|
 | Phase 5 | `jira-ticket-refiner` | Restructure the ticket description into a clear, self-contained Bug document. |
 | Phase 5 | `prose-style` | Apply writing rules to comment text and refined descriptions. |
 
