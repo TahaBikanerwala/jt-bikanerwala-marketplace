@@ -4,7 +4,7 @@ Read this when you reach the report-writing step in `requirements-investigator`.
 
 The report template differs by archetype. Pick the matching template based on the archetype passed by the caller (the agent in Phase 1) or inferred from the issue type when running standalone (Story / Feature / Enhancement -> Feature; Task / Sub-task / Chore / Tech Debt -> Task; Spike / Research / Investigation -> Spike).
 
-Each template has a fixed section list and order. If a section has nothing meaningful to say, write a one-line note ("Not applicable for this ticket" or "Nothing prior found") rather than skip the section. The absence is itself signal.
+Each template has a fixed section list and order. Do not omit a section heading. If a section has nothing meaningful to say, write a one-line note under the heading ("Not applicable for this ticket" or "Nothing prior found"). The absence is itself signal, and keeping the heading lets a reader scan for the section even when it is empty.
 
 ## Feature Template
 
@@ -145,4 +145,4 @@ Example:
 
 ## Section Order
 
-Sections appear in the order shown for each archetype. Skipping a section is allowed only when the section legitimately has nothing to say AND the absence itself is documented in the Lead (e.g., Lead: "...no design refs were found in the ticket; see Design Refs section below").
+Sections appear in the order shown for each archetype. Never omit a section heading. When a section legitimately has nothing to say, keep the heading and write the brief placeholder line described at the top of this file. If the absence is itself important context (e.g., a Feature ticket with no design refs), call it out in the Lead in addition to the placeholder line in the empty section.

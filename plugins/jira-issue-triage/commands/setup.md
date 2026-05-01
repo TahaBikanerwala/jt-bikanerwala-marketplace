@@ -23,7 +23,7 @@ Best-effort auto-discovery to suggest defaults. Failures are non-fatal; fall bac
 
 1. Call `getAccessibleAtlassianResources` to get the cloudId and the list of accessible Atlassian sites.
 2. Call `atlassianUserInfo` to get the user's account info.
-3. From the user's accessible sites, pick the first site as the suggested default for project key inference. If a single project is detected, suggest its key as the Q1 default; otherwise fall back to "infer".
+3. From the user's accessible sites, pick the first site as the suggested Atlassian/Jira context for later operations. The two calls above do not return a Jira project list, so the wizard does not auto-detect a project key. Keep the Q1 default as `infer` and only switch to a real key if the user types one in.
 4. Pre-populate the severity field name auto-discovery order: `Severity Level` -> `Severity` -> `Bug Severity` -> `priority`. The wizard surfaces these as Q2 options.
 
 ### 3. Walk through the eight wizard questions
@@ -88,7 +88,7 @@ Options:
 - `5-tier (Sev-1, Sev-1.5, Sev-2, Sev-2.5, Sev-3)`
 - `Custom (specify each level)`
 
-On "5-tier", use the static 5-tier scheme: `Sev-1` (3 days, escalate), `Sev-1.5` (5 days, escalate), `Sev-2` (10 days), `Sev-2.5` (30 days), `Sev-3` (90 days).
+On "5-tier", use the static 5-tier scheme that strictly extends the 3-tier defaults so users do not get surprise SLA changes when they switch tiers: `Sev-1` (7 days, escalate), `Sev-1.5` (7 days, escalate), `Sev-2` (14 days), `Sev-2.5` (30 days), `Sev-3` (90 days). This matches the 5-tier example in the plugin README.
 
 On "Custom", walk through each level: ask for the level name, the `due_offset_days` integer, and via `AskQuestion` whether `escalate_immediately` is `Yes` or `No`. Loop until the user types `done` for the level name.
 
