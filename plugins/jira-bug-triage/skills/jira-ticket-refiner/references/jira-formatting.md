@@ -8,9 +8,21 @@ The Atlassian MCP server takes plain markdown for the description and converts i
 
 `editJiraIssue` and `createJiraIssue` both accept the description as a markdown **string**. Always pass markdown. Never pass an ADF JSON object: the server still tries to convert it as markdown, fails to parse the JSON, and returns `Failed to convert markdown to adf`.
 
+The description content the markdown converter receives must contain real line breaks. Construct it like this:
+
+```markdown
+## Heading
+
+Paragraph with **bold**.
 ```
-"fields": { "description": "## Heading\n\nParagraph with **bold**." }
+
+When that string is sent through a JSON-encoded API request, the JSON encoder represents each real newline as the two-character sequence `\n` inside the wire payload. The JSON parser on the server side decodes those escapes back to real newlines before the markdown converter runs. That is fine and expected:
+
+```json
+{ "fields": { "description": "## Heading\n\nParagraph with **bold**." } }
 ```
+
+The forbidden case (covered in the Forbidden table below) is when the description content itself contains a literal backslash followed by the letter `n` after JSON decoding. That shows up on the rendered ticket as the two characters `\n` instead of a line break.
 
 When calling `editJiraIssue`, set `contentFormat: "markdown"` if the parameter is required by the MCP version in use. Some Jira custom fields (e.g., a "Bug Description" rich-text field) reject markdown and require raw ADF; that case is handled by a separate `editJiraIssue` call and is not the subject of this reference.
 
@@ -57,7 +69,7 @@ These either crash the API or render as literal text on the ticket. Avoid them.
 | Raw ADF JSON in the description field | Server tries to parse the JSON as markdown, fails, returns `Failed to convert markdown to adf`. |
 | HTML tags (`<details>`, `<summary>`, `<br>`, `<sup>`, etc.) | Escaped to literal text. The angle brackets show up on the ticket. |
 | Wiki markup (`{code}`, `{panel}`, `h1.`, `\|\|header\|\|`) | Jira Cloud deprecated wiki markup. Renders as literal text. |
-| Escaped newline literals (`\n` inside the markdown string) | Jira renders `\n` as backslash-n, not a line break. Use real line breaks in the string. |
+| Literal `\n` characters inside the description content (after JSON decoding) | Jira renders them as the two characters backslash-n, not a line break. Build the description with real newlines; the JSON `\n` escape sequence on the wire is a different layer and is handled by the JSON parser before this rule applies. |
 | Nested blockquotes (`> > text`) | Inconsistent rendering; some render as a single quote, some as nested. Avoid. |
 
 ## ADF Content-Loss Warning

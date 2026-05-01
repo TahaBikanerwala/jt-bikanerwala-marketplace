@@ -95,11 +95,17 @@ Preview before posting. The preview is the user's only chance to catch a mistake
 **Render the preview as inline markdown.** The refined description contains its own fenced code blocks (errors, queries, JSON). Wrapping the whole preview in an outer code fence breaks every inner block. Use this exact layout:
 
 1. A horizontal rule.
-2. The new title on a single line: `**Title:** \`{the rewritten summary}\``.
+2. The new title on its own line, formatted as bold `Title:` followed by the rewritten summary inside an inline-code span. The literal markdown to emit is shown below.
 3. A blank line.
 4. The full refined description rendered as plain markdown, no outer fence.
 5. A horizontal rule.
 6. A short prompt asking the user to approve or request changes.
+
+The title line in step 2 looks like this when emitted as markdown:
+
+```markdown
+**Title:** `{the rewritten summary}`
+```
 
 Do not pad the preview with workflow notes (`Archetype:`, `ADF warning:`, `Previous state:`). The preview is what will appear on the ticket. If the rewrite carries a real risk of losing ADF-only content (panels with substantive text, mentions, task lists with checked items, expand sections, embedded media, complex tables), say so in one sentence outside the preview. Do not warn for cosmetic-only losses such as a smart-link card becoming a plain URL.
 

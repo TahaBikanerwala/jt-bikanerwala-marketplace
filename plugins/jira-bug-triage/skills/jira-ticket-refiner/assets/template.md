@@ -73,7 +73,7 @@ Table example (four or more parties):
 
 ### Reproduction, Expected, Actual
 
-Bug-only. Three subheadings under one parent section:
+Bug-only. Three top-level sections that always travel together. Use these exact headings, in this order, with no shared parent heading above them:
 
 ```
 ## Reproduction Steps
@@ -87,6 +87,8 @@ What should happen.
 ## Actual Behavior
 What does happen. Include the exact error message verbatim, in a fenced code block when it has formatting.
 ```
+
+The Section Order list below treats the trio as a single slot (position 5) because they only make sense as a unit, not because they share a parent heading.
 
 When the bug is not reproducible on demand, replace the steps with: `Not reproducible on demand. The reporter saw it once at {timestamp}; subsequent attempts at {follow-up timestamps} did not reproduce.`
 
@@ -119,22 +121,24 @@ Spike-only. Answers map one-to-one to the questions above, each with supporting 
 
 Artifacts from completed investigation. Include only when there is something concrete to record. Future investigation steps belong in a next-steps comment, not here.
 
-```
+The outer fence below uses four backticks so the inner code block (the captured stack trace) can stay as a plain three-backtick fence with no escaping. When you copy this into a refined ticket, drop the outer fence entirely; it exists here only because the example wraps a sample section in this template document.
+
+````
 **Observability**
 - [Datadog: 500s on /payments endpoint, 14:00 to 16:00 UTC](https://app.datadoghq.com/logs?query=...)
 
 **Errors**
 
-\`\`\`
+```
 Stripe::APIConnectionError: Connection refused (errno: ECONNREFUSED)
   at lib/stripe/client.rb:88
-\`\`\`
+```
 
 **Relevant IDs**
 - Tenant: `mt-01`
 - Customer: `cus_O12abc34`
 - Failing payment intent: `pi_3OabcDEF456`
-```
+````
 
 ### Working Hypotheses
 
