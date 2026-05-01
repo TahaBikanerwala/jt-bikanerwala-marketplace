@@ -415,3 +415,7 @@ The Copilot reviewer found two issues that were genuinely contradictions in the 
 - Non-Jira issue trackers (Linear, GitHub Issues, ServiceNow). Future enhancement.
 - Automatic re-fetch detection beyond "calling agent passed a payload" / "ran standalone" branching.
 - Restructuring the four reference files into a different split. Re-evaluate if any single reference grows past ~250 lines.
+
+## Update (2026-05-01b): v1.0.0 rename impact
+
+In plugin v1.0.0, the agent that calls this skill in Phase 5 was renamed from `bug-triage-agent` to `jira-issue-triage`, and the plugin folder was renamed from `plugins/jira-bug-triage` to `plugins/jira-issue-triage`. This skill's body was updated to reflect the new agent name (Calling Convention, Step 1, Comment posting note, and `references/gathering-guide.md`). No archetype-handling or template changes; the skill was already general-purpose. See `docs/superpowers/plans/2026-05-01-jira-issue-triage.md` for the v1.0.0 plan.

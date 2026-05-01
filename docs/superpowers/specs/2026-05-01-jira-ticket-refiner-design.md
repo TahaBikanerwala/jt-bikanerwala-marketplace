@@ -245,3 +245,7 @@ After implementation:
 - Non-Jira issue trackers (Linear, GitHub Issues, ServiceNow). Future enhancement.
 - Automatic re-fetch detection beyond "calling agent passed a payload" / "ran standalone" branching.
 - Restructuring the four reference files into a different split. Re-evaluate if any single reference grows past ~250 lines.
+
+## Update (2026-05-01b)
+
+The agent that calls this skill in Phase 5 was renamed from `bug-triage-agent` to `jira-issue-triage` in plugin v1.0.0. The skill body was updated in three places (Calling Convention paragraph, Step 1 reuse-the-payload note, Comment posting note) and one reference file (`references/gathering-guide.md`) to use the new agent name. No template, archetype, or workflow changes; the skill was already archetype-aware. See `docs/superpowers/specs/2026-05-01-jira-issue-triage-design.md` for the v1.0.0 spec.

@@ -21,7 +21,7 @@ Pull every artifact in parallel where the MCP allows it. The fetch is the founda
 
 4. **Linked tickets.** Walk every entry in `issuelinks` from step 1. For each linked ticket, capture: key, link type (`Duplicate`, `Relates`, `Blocks`, `is blocked by`), summary, and status. A linked ticket sometimes carries the scope or the workaround that the current ticket only hints at.
 
-If the calling context (the bug-triage agent in Phase 5) already passed in a fetched payload, reuse it. Do not refetch.
+If the calling context (the `jira-issue-triage` agent in Phase 5) already passed in a fetched payload, reuse it. Do not refetch.
 
 ## Fetch for Context, Not for Output
 

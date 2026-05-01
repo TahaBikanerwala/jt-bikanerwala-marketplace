@@ -14,7 +14,7 @@ This skill modifies Jira. It updates the ticket's description and title (the `fi
 
 ## Calling Convention
 
-The skill works two ways. When a user pastes a ticket key and asks to refine it, run end to end. When the bug-triage agent calls this skill in Phase 5, treat the agent's already-fetched payload and investigation findings as the source data and skip the fetch step.
+The skill works two ways. When a user pastes a ticket key and asks to refine it, run end to end. When the `jira-issue-triage` agent calls this skill in Phase 5, treat the agent's already-fetched payload and investigation findings as the source data and skip the fetch step.
 
 - **One confirmation gate.** Always preview the rewrite before calling `editJiraIssue`. The user must approve.
 - **Read-then-write.** Refuse to write before reading the description, comments, and (when relevant) changelog.
@@ -48,7 +48,7 @@ The workflow is eight ordered steps. Steps 1, 5, and 6 require reading the corre
 
 Read [references/gathering-guide.md](references/gathering-guide.md) when you reach this step. It documents which fields to request, the ADF content-loss check, and the completeness gate that blocks Step 2 until comments and changelog are read.
 
-If the calling context (the bug-triage agent in Phase 5) has already fetched the ticket and exposes the payload, reuse it. Do not refetch.
+If the calling context (the `jira-issue-triage` agent in Phase 5) has already fetched the ticket and exposes the payload, reuse it. Do not refetch.
 
 ### Step 2: Classify the Archetype
 
@@ -118,7 +118,7 @@ After the user reviews:
 
 Skip this step unless the user asks for it.
 
-When asked, post via `addCommentToJiraIssue` with `contentFormat: "adf"`. The comment body is a JSON-stringified ADF (Atlassian Document Format) doc. Never use `contentFormat: "markdown"` for comments in this plugin: markdown escapes mention brackets, link targets, and rich marks, which silently breaks notifications and renders chips as literal text. The same rule appears in the `bug-triage-agent` body so the plugin stays consistent.
+When asked, post via `addCommentToJiraIssue` with `contentFormat: "adf"`. The comment body is a JSON-stringified ADF (Atlassian Document Format) doc. Never use `contentFormat: "markdown"` for comments in this plugin: markdown escapes mention brackets, link targets, and rich marks, which silently breaks notifications and renders chips as literal text. The same rule appears in the `jira-issue-triage` agent body so the plugin stays consistent.
 
 Build the ADF doc with these nodes:
 
