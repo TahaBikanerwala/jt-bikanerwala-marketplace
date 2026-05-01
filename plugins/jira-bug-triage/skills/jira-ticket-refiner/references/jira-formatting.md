@@ -49,7 +49,7 @@ Documented as supported in [Atlassian's markdown reference](https://support.atla
 |---------|------------------|
 | Blockquotes | `>` |
 | Horizontal rules | `---` or `***` |
-| Tables | `\| col \| col \|` with the header separator row |
+| Tables | `| col | col |` with the header separator row |
 | Strikethrough | `~~text~~` |
 | Inline images | `![alt](url)` |
 | Nested lists | Indent the child list by two spaces under its parent item |
@@ -68,7 +68,7 @@ These either crash the API or render as literal text on the ticket. Avoid them.
 |---------|---------------|
 | Raw ADF JSON in the description field | Server tries to parse the JSON as markdown, fails, returns `Failed to convert markdown to adf`. |
 | HTML tags (`<details>`, `<summary>`, `<br>`, `<sup>`, etc.) | Escaped to literal text. The angle brackets show up on the ticket. |
-| Wiki markup (`{code}`, `{panel}`, `h1.`, `\|\|header\|\|`) | Jira Cloud deprecated wiki markup. Renders as literal text. |
+| Wiki markup (`{code}`, `{panel}`, `h1.`, `||header||`) | Jira Cloud deprecated wiki markup. Renders as literal text. |
 | Literal `\n` characters inside the description content (after JSON decoding) | Jira renders them as the two characters backslash-n, not a line break. Build the description with real newlines; the JSON `\n` escape sequence on the wire is a different layer and is handled by the JSON parser before this rule applies. |
 | Nested blockquotes (`> > text`) | Inconsistent rendering; some render as a single quote, some as nested. Avoid. |
 

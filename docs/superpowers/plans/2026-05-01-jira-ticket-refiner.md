@@ -282,12 +282,17 @@ Replaced hardcoded `Next Steps (2026-05-01)` with `Next Steps (YYYY-MM-DD)` plac
 
 The original said "Markdown is the only format `editJiraIssue` accepts on the way back in". Some Jira instances expose a rich-text "Bug Description" custom field that needs raw ADF, which `references/jira-formatting.md` already documents. Rescoped to the standard `description` field with a one-clause pointer to the ADF custom-field path.
 
-- [x] **Step 10: Commits**
+- [x] **Step 10: `references/jira-formatting.md` — drop backslash-escaped pipes inside inline-code spans**
 
-The polish landed across three commits:
+The "Likely Safe" table cell for Tables showed the markdown syntax as `` `\| col \| col \|` `` and the "Forbidden" table cell for Wiki markup embedded `` `\|\|header\|\|` `` inside an inline-code span. Per CommonMark, backslash escapes do not process inside code spans (backslashes render literally). Per GFM, pipes inside table-cell code spans are already preserved without escaping. The backslashes were both unnecessary and visible to the reader. Dropped them so the cells render as clean `| col | col |` and `||header||`.
+
+- [x] **Step 11: Commits**
+
+The polish landed across four commits:
 - `9a13133`: Steps 1-3 (Copilot round 1)
 - `3a17a2d`: Steps 4-6 (Copilot round 2)
 - `39358ff`: Steps 7-9 (Copilot round 3 + self-found terminology drift)
+- Round 4: Step 10 (Copilot round 4, backslash-escaped pipes inside table-cell code spans)
 
 ---
 
