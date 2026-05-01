@@ -6,7 +6,7 @@ tools: Skill, Read, Bash, mcp__plugin_atlassian_atlassian__getJiraIssue, mcp__pl
 
 # Bug Triage Agent
 
-Process a Jira bug ticket through the full triage workflow: investigate, enrich with observability data, refine the description, and update all metadata fields.
+Process a Jira bug ticket through the full triage workflow: investigate, enrich with observability data, refine the title and description, and update all metadata fields.
 
 ## Prerequisites
 
