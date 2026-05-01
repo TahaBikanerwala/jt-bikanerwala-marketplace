@@ -1,6 +1,6 @@
 ---
 name: issue-investigator
-description: "Investigates a Jira bug ticket by searching Slack, the ticket and related Jira/Confluence pages, Datadog, and the codebase, then writes an evidence-tagged report in the bug-archetype template. Use when a Jira bug ticket needs an investigation report before triage decisions are made."
+description: "Investigates a Jira Bug or Incident ticket by searching Slack, the ticket and related Jira/Confluence pages, Datadog, and the codebase, then writes an evidence-tagged report in the bug-archetype template. Use when a Bug or Incident ticket needs an investigation report before triage decisions are made. For Feature, Task, or Spike tickets, see `requirements-investigator`."
 metadata:
   author: Taha Bikanerwala
 tools: Read, Bash, Grep, mcp__plugin_atlassian_atlassian__getJiraIssue, mcp__plugin_atlassian_atlassian__searchJiraIssuesUsingJql, mcp__plugin_atlassian_atlassian__searchConfluenceUsingCql, mcp__plugin_slack_slack__slack_search_public_and_private, mcp__plugin_slack_slack__slack_read_thread, mcp__datadog__search_datadog_logs
@@ -10,11 +10,13 @@ tools: Read, Bash, Grep, mcp__plugin_atlassian_atlassian__getJiraIssue, mcp__plu
 
 Produce a structured report that orients an engineer for a Jira bug ticket. The report names what is broken, ranks 2-3 hypotheses, lists concrete next-step queries, and tags every claim with its evidence level.
 
+**Scope:** Bug and Incident archetypes. For Feature, Task, or Spike tickets, the `jira-issue-triage` agent calls `requirements-investigator` instead.
+
 This skill investigates. It does not solve, post, or modify anything.
 
 ## Calling Convention
 
-This skill runs without user interaction. The constraints below let it work cleanly inside the bug-triage agent (which has its own confirmation gate) and standalone.
+This skill runs without user interaction. The constraints below let it work cleanly inside the `jira-issue-triage` agent (which has its own confirmation gate) and standalone.
 
 - **Non-interactive.** Never ask the user a question. Inputs are inferred from the ticket and search results.
 - **Predictable structure.** Same six section headers every run, in the same order, with one allowed reorder for production incidents (see Adaptation Rules).
@@ -30,7 +32,7 @@ Investigation runs four levels top to bottom. Each level has a gate: if it produ
 
 Before running the levels, fetch the ticket data once and cache it for the rest of the skill.
 
-1. Identify the ticket key from the invocation context (e.g., `BUG-12345` from a pasted URL or a parameter passed by the caller). If the calling context (such as the bug-triage agent) has already fetched the ticket and exposed the payload, reuse that payload; don't fetch again.
+1. Identify the ticket key from the invocation context (e.g., `BUG-12345` from a pasted URL or a parameter passed by the caller). If the calling context (such as the `jira-issue-triage` agent) has already fetched the ticket and exposed the payload, reuse that payload; don't fetch again.
 2. If no payload is available, call `getJiraIssue` with the ticket key and `responseContentFormat: "markdown"`. Request these fields at minimum: `summary`, `description`, `status`, `priority`, `labels`, `components`, `assignee`, `reporter`, `created`, `updated`, `issuelinks`.
 3. Cache the response. Reference it as "the ticket payload" throughout the skill — `summary`, `description`, `created`, `issuelinks`, `reporter`, etc.
 
