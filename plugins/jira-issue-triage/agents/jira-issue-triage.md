@@ -89,14 +89,9 @@ The agent invokes other skills during the workflow. Reference them by name; the 
 | Phase 1 (Bug, Incident) | `issue-investigator` | Search Slack, the ticket and related Jira/Confluence pages, Datadog, then code if needed. Produces an evidence-tagged report in the 6-section bug-archetype template. |
 | Phase 1 (Feature, Task, Spike) | `requirements-investigator` | Search Slack and Confluence for prior decisions, read linked design and product docs, search related Jira tickets. Produces an evidence-tagged report in the matching archetype template (Feature, Task, or Spike). |
 | Phase 5 (any archetype) | `jira-ticket-refiner` | Restructure the ticket description into a clear, self-contained document. Works for any archetype. Updates the title and description via the Atlassian MCP and never deletes original content. |
+| Phase 5 (any archetype) | `prose-style` | Audit and rewrite the refined description, the assessment or scope comment, and any reporter-facing follow-up so the output reads like a person wrote it. Strips AI tells: em dashes, opener phrases, LLM vocabulary, bullet sprawl. |
 
-**Future separate plugins** (planned; not yet shipped in this marketplace):
-
-| Phase | Skill name | Purpose |
-|-------|-----------|---------|
-| Phase 5 | `prose-style` | Apply writing rules to comment text and refined descriptions. |
-
-If a skill is not installed when the agent tries to call it, the `Skill` tool returns an error. Fall back to the brief inline summary in the relevant phase and warn the user once at the start of that phase.
+All four bundled skills install with the plugin. The defensive fallbacks below fire only on rare runtime load failures; they are not the expected execution path and never need user attention in normal operation.
 
 ## Connections
 

@@ -28,15 +28,16 @@ The config file moves from `.claude/jira-bug-triage.config.json` to `.claude/jir
 
 ### Bundled skills
 
-The agent calls three skills during the workflow. All three ship bundled with this plugin and install automatically.
+The agent calls four skills during the workflow. All four ship bundled with this plugin and install automatically.
 
 | Skill name | Phase | Used for | Status |
 |-----------|-------|----------|--------|
 | `issue-investigator` | Phase 1 (Bug, Incident) | Slack/Jira/Confluence/Datadog/code investigation with evidence tags | Bundled, ready to use |
 | `requirements-investigator` | Phase 1 (Feature, Task, Spike) | Slack/Jira/Confluence search for prior decisions, design refs, scope; per-archetype report templates | Bundled, ready to use |
 | `jira-ticket-refiner` | Phase 5 (any archetype) | Title and description rewrite. Already archetype-aware (Bug, Feature, Task, Incident, Spike). | Bundled, ready to use |
+| `prose-style` | Phase 5 (any archetype) | Writing-rule application: strips em dashes, opener phrases, LLM vocabulary, bullet sprawl. Runs after `jira-ticket-refiner` and before the user-facing preview, plus on every comment the agent drafts. | Bundled, ready to use |
 
-The `prose-style` skill (writing-rule application) is planned as a separate plugin in the same marketplace. Until it ships, the agent uses an inline fallback that enforces the same writing rules and warns you once at the start of Phase 5.
+The agent body retains short defensive fallbacks for all four bundled skills. They fire only on rare runtime load failures (corrupted install, mid-session uninstall, etc.) and never need user attention in normal operation.
 
 ## Quick start
 
