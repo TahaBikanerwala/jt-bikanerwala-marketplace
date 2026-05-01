@@ -181,3 +181,7 @@ After implementation:
 - The other two sibling plugins (`jira-ticket-refiner`, `prose-style`). Each gets its own design when their time comes.
 - Non-Jira issue trackers. Future enhancement.
 - Splitting the SKILL.md into reference files. Re-evaluate if the file grows past ~400 lines.
+
+## Update (2026-05-01)
+
+`jira-ticket-refiner` followed the same bundling path in plugin v0.3.0 and now ships nested at `plugins/jira-bug-triage/skills/jira-ticket-refiner/`. The "future separate plugins" claims above (Architectural revision section, Architecture-update side effects table, Out of scope list) are accurate as of 2026-04-30 but stale today: only `prose-style` remains as a planned separate plugin. See `2026-05-01-jira-ticket-refiner-design.md` for the full spec of the second bundled skill, and the matching `## Architectural revision (2026-05-01)` section appended to `2026-04-30-claude-marketplace-design.md`.
