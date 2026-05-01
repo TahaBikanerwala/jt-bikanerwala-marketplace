@@ -15,22 +15,22 @@ A Claude Code plugin that ships one subagent, `bug-triage-agent`. Paste a Jira b
 
 ### Sibling skills
 
-The agent calls three other skills during the workflow. One ships bundled with this plugin; the other two are planned as separate plugins in the same marketplace.
+The agent calls three other skills during the workflow. Two ship bundled with this plugin; the third is planned as a separate plugin in the same marketplace.
 
 **Bundled with this plugin** (installed automatically when you install `jira-bug-triage`):
 
 | Skill name | Purpose | Status |
 |-----------|---------|--------|
 | `issue-investigator` | Phase 1 investigation (Slack/Jira/Confluence/Datadog/code with evidence tags) | Bundled, ready to use |
+| `jira-ticket-refiner` | Phase 5 title and description rewrite. Works for any archetype (Bug, Feature, Task, Incident, Spike). | Bundled, ready to use |
 
 **Future separate plugins** (planned; not yet shipped):
 
 | Skill name | Purpose | Status |
 |-----------|---------|--------|
-| `jira-ticket-refiner` | Phase 5 description and title rewrite into a clear Bug document | Coming soon |
 | `prose-style` | Writing-rule application (no em dashes, no LLM vocabulary, lead with the answer) | Coming soon |
 
-The agent ships with a brief inline fallback for `jira-ticket-refiner` and `prose-style`. If a sibling skill isn't installed, the agent uses the fallback and warns you once at the start of the affected phase. The fallbacks are intentionally short; install the sibling plugins when they ship for full quality.
+The agent ships with a brief inline fallback for `prose-style`. If `prose-style` isn't installed, the agent uses the fallback rules and warns you once at the start of Phase 5. The fallback is intentionally short; install the sibling plugin when it ships for full quality.
 
 ## Quick start
 

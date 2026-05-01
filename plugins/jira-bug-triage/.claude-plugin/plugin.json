@@ -1,7 +1,7 @@
 {
   "name": "jira-bug-triage",
-  "version": "0.2.0",
-  "description": "End-to-end Jira bug triage subagent (assigns, investigates, refines, sets severity-based due dates, updates ticket fields). Bundles the issue-investigator skill for read-only investigation reports.",
+  "version": "0.3.0",
+  "description": "End-to-end Jira bug triage subagent (assigns, investigates, refines, sets severity-based due dates, updates ticket fields). Bundles two skills: issue-investigator for read-only investigation reports and jira-ticket-refiner for description and title rewrites across all ticket archetypes.",
   "author": {
     "name": "Taha Bikanerwala",
     "url": "https://github.com/TahaBikanerwala"

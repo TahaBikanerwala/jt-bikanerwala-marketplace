@@ -276,3 +276,13 @@ Standard MIT license, copyright `Taha Bikanerwala`, year `2026`.
 ## Architectural revision (2026-04-30)
 
 `issue-investigator` is no longer a separate-plugin item on the roadmap; it now ships nested inside `jira-bug-triage` at `plugins/jira-bug-triage/skills/issue-investigator/`. The bug-triage agent still calls it by name via the `Skill` tool. The other two sibling skills (`jira-ticket-refiner`, `prose-style`) remain planned as separate plugins. See `docs/superpowers/specs/2026-04-30-issue-investigator-design.md` for the full spec of the bundled skill.
+
+## Architectural revision (2026-05-01)
+
+`jira-ticket-refiner` is no longer a separate-plugin item on the roadmap. It now ships nested inside `jira-bug-triage` at `plugins/jira-bug-triage/skills/jira-ticket-refiner/`, alongside `issue-investigator`. The bug-triage agent still calls it by name via the `Skill` tool in Phase 5. The Phase 5 fallback in the agent body is retained as defensive coding for the rare case where the bundled skill fails to load.
+
+Scope difference from the original Roadmap entry: the bundled skill works for any archetype (Bug, Feature, Task, Incident, Spike), not just Bugs. The bug-triage agent's Phase 5 still calls it on Bug-archetype tickets, but the skill itself is general-purpose and can be invoked standalone for any ticket type.
+
+File layout: a multi-file structure with `SKILL.md` plus four reference files (`gathering-guide.md`, `classification-guide.md`, `jira-formatting.md`, `title-guide.md`) and one asset (`template.md`). This differs from `issue-investigator`'s single-file layout because the refiner has substantially more reference material that benefits from progressive disclosure.
+
+The plugin manifest version bumps to `0.3.0` to reflect the second bundled skill. `prose-style` remains the only sibling skill still planned as a separate plugin.
