@@ -24,7 +24,7 @@ These features have been tested through the MCP markdown-to-ADF converter and su
 | Bold | `**text**` | |
 | Italic | `*text*` or `_text_` | |
 | Inline code | `` `code` `` | |
-| Fenced code blocks | ``` ```language ``` | Language tags supported (`sql`, `json`, `python`, `bash`, `yaml`, etc.) |
+| Fenced code blocks | Triple backticks with optional language tag (e.g. ` ```sql ` ... ` ``` `) | Language tags supported: `sql`, `json`, `python`, `bash`, `yaml`, and others. |
 | Numbered lists | `1.`, `2.`, ... | |
 | Bullet lists | `-` or `*` | |
 | Links | `[text](url)` | |

@@ -32,6 +32,8 @@ The agent calls three other skills during the workflow. Two ship bundled with th
 
 The agent ships with a brief inline fallback for `prose-style`. If `prose-style` isn't installed, the agent uses the fallback rules and warns you once at the start of Phase 5. The fallback is intentionally short; install the sibling plugin when it ships for full quality.
 
+The agent body also retains short defensive fallbacks for the **bundled** skills (`issue-investigator`, `jira-ticket-refiner`). These fallbacks fire only in the rare case where a bundled skill fails to load at runtime. You should never need to think about them; they are kept as belt-and-suspenders for the `Skill` tool.
+
 ## Quick start
 
 1. Add the marketplace and install the plugin:

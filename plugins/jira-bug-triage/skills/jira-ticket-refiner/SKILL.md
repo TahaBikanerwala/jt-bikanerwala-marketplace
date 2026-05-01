@@ -112,12 +112,46 @@ After the user reviews:
 
 Skip this step unless the user asks for it.
 
-When asked, post via `addCommentToJiraIssue` with actual newlines in the markdown body, not escaped `\n` literals. Format the comment with:
+When asked, post via `addCommentToJiraIssue` with `contentFormat: "adf"`. The comment body is a JSON-stringified ADF (Atlassian Document Format) doc. Never use `contentFormat: "markdown"` for comments in this plugin: markdown escapes mention brackets, link targets, and rich marks, which silently breaks notifications and renders chips as literal text. The same rule appears in the `bug-triage-agent` body so the plugin stays consistent.
 
-- A date-stamped header. Use parentheses for the date so the heading does not need a separator: `## Next Steps (2026-05-01)`.
-- A numbered list, one item per action.
-- An owner or team named on every action.
-- Concrete verbs only. Write `Verify token rotation schedule with Platform team` rather than `Look into auth`.
+Build the ADF doc with these nodes:
+
+- A `heading` node (`attrs.level: 2`) whose text is `Next Steps (YYYY-MM-DD)`. Use parentheses for the date so the heading does not need a separator.
+- An `orderedList` node containing one `listItem` per action. Each `listItem` wraps a `paragraph` whose `content` is one or more `text` nodes.
+- Every action names an owner or team (as plain text, not a `mention` node, unless the user explicitly approved tagging that account).
+- Use concrete verbs. Write `Verify token rotation schedule with Platform team` rather than `Look into auth`.
+
+A minimal skeleton:
+
+```json
+{
+  "type": "doc",
+  "version": 1,
+  "content": [
+    {
+      "type": "heading",
+      "attrs": { "level": 2 },
+      "content": [{ "type": "text", "text": "Next Steps (2026-05-01)" }]
+    },
+    {
+      "type": "orderedList",
+      "content": [
+        {
+          "type": "listItem",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                { "type": "text", "text": "Verify token rotation schedule with Platform team." }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
 
 Comment body actions belong here, not in the description. The description records what is known and unknown. The comment records what happens next.
 
