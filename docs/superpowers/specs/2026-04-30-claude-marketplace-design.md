@@ -286,3 +286,9 @@ Scope difference from the original Roadmap entry: the bundled skill works for an
 File layout: a multi-file structure with `SKILL.md` plus four reference files (`gathering-guide.md`, `classification-guide.md`, `jira-formatting.md`, `title-guide.md`) and one asset (`template.md`). This differs from `issue-investigator`'s single-file layout because the refiner has substantially more reference material that benefits from progressive disclosure.
 
 The plugin manifest version bumps to `0.3.0` to reflect the second bundled skill. `prose-style` remains the only sibling skill still planned as a separate plugin.
+
+## Architectural revision (2026-05-01b)
+
+The plugin was renamed from `jira-bug-triage` to `jira-issue-triage` and expanded to handle all Jira archetypes (Bug, Incident, Feature, Task, Spike), not just Bugs. The agent was renamed from `bug-triage-agent` to `jira-issue-triage`. A new bundled skill `requirements-investigator` joins `issue-investigator` and `jira-ticket-refiner` so the plugin now ships three bundled skills. A `/jira-issue-triage:setup` slash command and an in-agent first-run wizard fallback let new users configure the plugin without hand-editing JSON.
+
+The plugin manifest version bumps to `1.0.0`. The legacy config file path (`.claude/jira-bug-triage.config.json`) keeps working for one minor version (1.x) with a deprecation warning. `prose-style` remains the only sibling skill still planned as a separate plugin. See `docs/superpowers/specs/2026-05-01-jira-issue-triage-design.md` for the full v1.0.0 spec and `docs/superpowers/plans/2026-05-01-jira-issue-triage.md` for the bite-sized plan.

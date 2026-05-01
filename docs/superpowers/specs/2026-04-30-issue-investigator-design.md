@@ -185,3 +185,9 @@ After implementation:
 ## Update (2026-05-01)
 
 `jira-ticket-refiner` followed the same bundling path in plugin v0.3.0 and now ships nested at `plugins/jira-bug-triage/skills/jira-ticket-refiner/`. The "future separate plugins" claims above (Architectural revision section, Architecture-update side effects table, Out of scope list) are accurate as of 2026-04-30 but stale today: only `prose-style` remains as a planned separate plugin. See `2026-05-01-jira-ticket-refiner-design.md` for the full spec of the second bundled skill, and the matching `## Architectural revision (2026-05-01)` section appended to `2026-04-30-claude-marketplace-design.md`.
+
+## Update (2026-05-01b)
+
+The skill's frontmatter description was tightened from "Investigates a Jira bug ticket..." to "Investigates a Jira Bug or Incident ticket..." to make scope explicit now that a sibling skill (`requirements-investigator`) ships in the same plugin for Feature, Task, and Spike tickets. A one-line scope note was added at the top of the body pointing at `requirements-investigator` for non-bug archetypes. Two body references to "the bug-triage agent" were updated to "the `jira-issue-triage` agent". The 6-section report template, search ladder, and writing rules are unchanged.
+
+The plugin housing this skill was renamed from `jira-bug-triage` to `jira-issue-triage` in v1.0.0. See `docs/superpowers/specs/2026-05-01-jira-issue-triage-design.md` for the full v1.0.0 spec.
