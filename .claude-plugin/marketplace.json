@@ -9,7 +9,7 @@
     {
       "name": "jira-bug-triage",
       "source": "./plugins/jira-bug-triage",
-      "description": "End-to-end Jira bug triage subagent. Bundles the issue-investigator skill."
+      "description": "End-to-end Jira bug triage subagent. Bundles the issue-investigator skill (read-only investigation reports) and jira-ticket-refiner (title and description rewrites for any ticket archetype)."
     }
   ]
 }
