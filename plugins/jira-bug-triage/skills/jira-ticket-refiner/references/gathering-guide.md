@@ -13,7 +13,7 @@ Pull every artifact in parallel where the MCP allows it. The fetch is the founda
    components, assignee, reporter, created, updated, parent, issuelinks
    ```
 
-   Use `responseContentFormat: "markdown"` so the description comes back as markdown rather than ADF JSON. Markdown is the only format `editJiraIssue` accepts on the way back in.
+   Use `responseContentFormat: "markdown"` so the description comes back as markdown rather than ADF JSON. Markdown is the format `editJiraIssue` expects when writing the standard `description` field back. Some rich-text custom fields (notably a "Bug Description" field on Jira instances configured for it) require raw ADF instead and are written via a separate `editJiraIssue` call; see `references/jira-formatting.md` for that path.
 
 2. **Comments.** Fetch the full comment thread. Comments are where decisions, status updates, customer back-channels, and investigation artifacts go to die. Pulling the description without the comments is the single most common failure mode of a ticket refiner.
 

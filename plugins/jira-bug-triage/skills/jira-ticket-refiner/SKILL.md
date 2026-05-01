@@ -10,7 +10,7 @@ tools: Read, mcp__plugin_atlassian_atlassian__getAccessibleAtlassianResources, m
 
 Take a Jira ticket that is hard to read and turn it into a document a stranger can open cold, in a year, and act on. Reorganize the content. Never delete it. Every fact in the original survives the rewrite, just placed somewhere it can be found.
 
-This skill modifies Jira. It updates the ticket's description and summary via the Atlassian MCP, and posts an optional next-steps comment when the user asks for one.
+This skill modifies Jira. It updates the ticket's description and title (the `fields.summary` API field) via the Atlassian MCP, and posts an optional next-steps comment when the user asks for one.
 
 ## Calling Convention
 
@@ -95,7 +95,7 @@ Preview before posting. The preview is the user's only chance to catch a mistake
 **Render the preview as inline markdown.** The refined description contains its own fenced code blocks (errors, queries, JSON). Wrapping the whole preview in an outer code fence breaks every inner block. Use this exact layout:
 
 1. A horizontal rule.
-2. The new title on its own line, formatted as bold `Title:` followed by the rewritten summary inside an inline-code span. The literal markdown to emit is shown below.
+2. The new title on its own line, formatted as bold `Title:` followed by the rewritten title text inside an inline-code span. "Title" here means the user-facing label and the value that will land in the Jira `fields.summary` field. The literal markdown to emit is shown below.
 3. A blank line.
 4. The full refined description rendered as plain markdown, no outer fence.
 5. A horizontal rule.
@@ -104,7 +104,7 @@ Preview before posting. The preview is the user's only chance to catch a mistake
 The title line in step 2 looks like this when emitted as markdown:
 
 ```markdown
-**Title:** `{the rewritten summary}`
+**Title:** `{the rewritten title}`
 ```
 
 Do not pad the preview with workflow notes (`Archetype:`, `ADF warning:`, `Previous state:`). The preview is what will appear on the ticket. If the rewrite carries a real risk of losing ADF-only content (panels with substantive text, mentions, task lists with checked items, expand sections, embedded media, complex tables), say so in one sentence outside the preview. Do not warn for cosmetic-only losses such as a smart-link card becoming a plain URL.
@@ -122,12 +122,12 @@ When asked, post via `addCommentToJiraIssue` with `contentFormat: "adf"`. The co
 
 Build the ADF doc with these nodes:
 
-- A `heading` node (`attrs.level: 2`) whose text is `Next Steps (YYYY-MM-DD)`. Use parentheses for the date so the heading does not need a separator.
+- A `heading` node (`attrs.level: 2`) whose text is `Next Steps (YYYY-MM-DD)`. Substitute today's date in `YYYY-MM-DD` form. Use parentheses for the date so the heading does not need a separator.
 - An `orderedList` node containing one `listItem` per action. Each `listItem` wraps a `paragraph` whose `content` is one or more `text` nodes.
 - Every action names an owner or team (as plain text, not a `mention` node, unless the user explicitly approved tagging that account).
 - Use concrete verbs. Write `Verify token rotation schedule with Platform team` rather than `Look into auth`.
 
-A minimal skeleton:
+The skeleton below is the structure to build, shown as a JSON object for readability. Before passing it to `addCommentToJiraIssue`, serialize it with `JSON.stringify(adfDoc)` and put the resulting string in `commentBody`. The `YYYY-MM-DD` token is a placeholder; substitute the real date.
 
 ```json
 {
@@ -137,7 +137,7 @@ A minimal skeleton:
     {
       "type": "heading",
       "attrs": { "level": 2 },
-      "content": [{ "type": "text", "text": "Next Steps (2026-05-01)" }]
+      "content": [{ "type": "text", "text": "Next Steps (YYYY-MM-DD)" }]
     },
     {
       "type": "orderedList",
@@ -156,6 +156,15 @@ A minimal skeleton:
       ]
     }
   ]
+}
+```
+
+The full call shape (with the structure above stringified into `commentBody`):
+
+```json
+{
+  "contentFormat": "adf",
+  "commentBody": "{\"type\":\"doc\",\"version\":1,\"content\":[ ... ]}"
 }
 ```
 
