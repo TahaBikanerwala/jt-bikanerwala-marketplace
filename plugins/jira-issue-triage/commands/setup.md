@@ -38,6 +38,8 @@ Free-text prompt:
 
 Default: `infer`. Validate that the answer is either `infer` or a non-empty alphanumeric string (uppercase Jira keys allowed).
 
+**Serialization rule.** `infer` is a UI sentinel, not a saved value. When the user answers `infer` (or accepts the default), write `"project_key": null` in the saved JSON config. The agent's Phase 0 inspects `project_key` and infers from each ticket URL when the value is `null`; saving the literal string `"infer"` would be treated as a real Jira project key in JQL and break ticket lookups. When the user types a real key, save it as a JSON string (e.g., `"project_key": "ENG"`).
+
 #### Q2: Severity field name
 
 Use `AskQuestion`:
@@ -68,6 +70,8 @@ Free-text prompt:
 > Comma-separated list of label prefixes that should skip triage entirely (e.g., `applause,external-vendor`). Press Enter for none.
 
 Default: empty list. Parse the answer by splitting on `,` and trimming whitespace; reject any entry containing whitespace inside the value (warn and re-prompt).
+
+**Serialization rule.** Save as a JSON array of strings, even when empty. An empty answer (Enter pressed) writes `"skip_labels": []`, not `null` and not `""`.
 
 #### Q5: Transition names
 
@@ -101,6 +105,8 @@ Three free-text sub-prompts. Each accepts an empty answer (Enter for none).
 3. > Fallback escalation contact? Same format. Press Enter for none.
 
 Parse the contact strings into `{ "name": "Alice Kumar", "email": "alice@example.com" }`. If the format does not match, warn and re-prompt.
+
+**Serialization rule.** Empty answers map to JSON `null`, not empty strings or empty objects. Specifically: an empty Slack channel writes `"slack_channel": null`; an empty primary contact writes `"primary_contact": null`; an empty fallback contact writes `"fallback_contact": null`. The agent treats `null` on any of these three fields as "no escalation configured for this slot".
 
 #### Q8: Save?
 
