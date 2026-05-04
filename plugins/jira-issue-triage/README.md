@@ -120,7 +120,8 @@ Configuration is **optional**. The agent uses sensible defaults if no config fil
     "Feature": "self",
     "Task": "self",
     "Spike": "self"
-  }
+  },
+  "description_preview_pause_seconds": 3
 }
 ```
 
@@ -220,7 +221,8 @@ Five optional fields tune the agent's behavior. They are not asked by the setup 
 | `sprint_field_name` | Custom Jira field name (e.g., `Sprint`). When set, Phase 6 (on Feature/Task/Spike tickets) places the ticket into the active sprint of the configured project. | Your team uses sprints and triage should auto-place new tickets into the current sprint. |
 | `story_points_field_name` | Custom Jira field name (e.g., `Story Points`). When set, the Phase 3 confirmation gate prompts you for a point estimate, and Phase 6 writes it. | Your team estimates non-bug tickets at triage time. |
 | `non_bug_transitions.ready` | Transition name (e.g., `Ready for Development`). When set, Phase 9 transitions Feature/Task/Spike tickets to this state instead of leaving them in `investigating`. | Your workflow has a distinct "ready to pick up" state for non-bug work. |
-| `archetype_assignment_after_triage` | Object mapping each archetype (`Bug`, `Incident`, `Feature`, `Task`, `Spike`) to either `"unassign"` (return to the team pool) or `"self"` (keep assigned to the running user). Defaults: `Bug = "unassign"`, all others `"self"`. | Your team's ownership rule differs from the default. Sev-1 incidents that auto-route to on-call: set `"Incident": "unassign"`. Bug-fix ownership stays with triager: set `"Bug": "self"`. |
+| `archetype_assignment_after_triage` | Object mapping each archetype (`Bug`, `Incident`, `Feature`, `Task`, `Spike`) to either `"unassign"` (return to the team pool) or `"self"` (keep assigned to the running user). Defaults: `Bug = "unassign"`, all others `"self"`. Missing keys are filled from defaults; unknown values fall back to the archetype default and warn at the start of Phase 0. | Your team's ownership rule differs from the default. Sev-1 incidents that auto-route to on-call: set `"Incident": "unassign"`. Bug-fix ownership stays with triager: set `"Bug": "self"`. |
+| `description_preview_pause_seconds` | Integer seconds to pause between the Phase 5 informational preview and the `editJiraIssue` write. Default `3`. Set higher (`5`-`10`) if you want more time to read the preview before the write commits. Set to `0` to write immediately (not recommended). | Your team wants more time to skim the rendered description before it lands on the ticket. |
 
 When any of these is null (or omitted, in the case of `archetype_assignment_after_triage`), the agent uses the default behavior described above.
 

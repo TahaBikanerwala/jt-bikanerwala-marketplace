@@ -22,9 +22,17 @@ Then install any plugin from the table below:
 
 ## What changed in 1.3.0
 
-UX pass on the 1.2.0 confirmation gate. The Phase 3 main panel now batches its decisions into a single `AskUserQuestion` call instead of asking 3-5 sequential questions; the user sees up to 4 yes/no choices side by side and approves all writes from one panel. Phase 5 stops asking for approval a second time after the description is refined: the Phase 3 yes is the gate, and the cleaned output renders inline as an informational preview before the write so the user can interrupt if something looks wrong. Phase 9's assignment behavior is now configurable per archetype via `archetype_assignment_after_triage`. Defaults match 1.2.0 (Bug unassigns, others stay with you), but teams can override per archetype: Sev-1 incidents that should auto-route to on-call set `"Incident": "unassign"`; teams whose triager keeps bug-fix ownership set `"Bug": "self"`.
+UX pass on the 1.2.0 confirmation gate. Three changes you'll notice as you triage tickets:
 
-No migration steps. Re-install the plugin to pick up the new behavior. Existing configs without `archetype_assignment_after_triage` get the 1.2.0 defaults.
+- **Faster Phase 3.** The confirmation panel now shows up to 4 decisions side by side in one `AskUserQuestion` call instead of 3-5 sequential modals. One read, one set of clicks.
+- **One approval per decision, not two.** Phase 5 no longer re-asks "approve the refined description?" after Phase 3's "should I refine?". The cleaned output renders inline as an informational preview, then writes after a configurable pause (default 3 seconds; set `description_preview_pause_seconds` to taste). Users who want a second checkpoint can opt in per run via the "Other" channel on Phase 3 question 2.
+- **Per-archetype assignment is yours to set.** New `archetype_assignment_after_triage` config maps each archetype (`Bug`, `Incident`, `Feature`, `Task`, `Spike`) to either `"unassign"` (return to team pool) or `"self"` (keep with the triager). Defaults match 1.2.0. Common overrides:
+  - **On-call team for incidents:** `"Incident": "unassign"` — Sev-1 tickets auto-route to whoever's on-call instead of staying with the triager.
+  - **Triager owns bug fixes:** `"Bug": "self"` — when bug triage and bug fixing are the same person.
+
+Other refinements in this release: invalid `archetype_assignment_after_triage` values fall back to defaults with a warning instead of breaking the run; the Phase 3 revision loop caps at 3 rounds with an explicit "approve as-is or abort" exit; the agent body now leads with a Working State glossary and a Skill calling-context conventions section so the runtime LLM tracks state as concrete values; the setup wizard's saved JSON now includes the new advanced config keys with their defaults so the file is browsable; and the Phase 5 jira-ticket-refiner invocation uses a `Calling context: skip_preview=true.` prefix to suppress the skill's own gate, removing the third confirmation that previously snuck in.
+
+No migration steps. Existing configs without `archetype_assignment_after_triage` or `description_preview_pause_seconds` get the 1.2.0 defaults applied at runtime.
 
 ## What changed in 1.2.0
 

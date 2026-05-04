@@ -68,7 +68,8 @@ The default config (used as the merge target for parsed values, and as-is when t
     "Feature": "self",
     "Task": "self",
     "Spike": "self"
-  }
+  },
+  "description_preview_pause_seconds": 3
 }
 ```
 
@@ -77,6 +78,13 @@ When `primary_contact` or `fallback_contact` is set, supply an object with `name
 The four trailing optional fields (`scope_summary_field_name`, `sprint_field_name`, `story_points_field_name`, `non_bug_transitions.ready`) are all null by default. When null, the agent skips the steps that reference them. Documented in the plugin README's Advanced Configuration section.
 
 `archetype_assignment_after_triage` controls Phase 9's assignee behavior per archetype. Valid values per archetype: `"unassign"` (return to the team pool by setting `assignee` to null) or `"self"` (leave the running user assigned, since Phase 0 already assigned them). The defaults match the 1.2.0 behavior: Bug routes back to the pool; Incident, Feature, Task, and Spike stay with the triager. Override per archetype when your team uses a different rule (for example, Sev-1 incidents auto-routing to on-call: set `"Incident": "unassign"` and have your on-call rotation pick the ticket up).
+
+**Config merge and validation rules:**
+
+- **Missing keys.** When `archetype_assignment_after_triage` is omitted entirely, the full default object (Bug → unassign, others → self) applies. When the object is present but missing some archetype keys, fill the missing keys from defaults — the user does not need to list every archetype to override one.
+- **Unknown values.** When a value is anything other than `"unassign"` or `"self"` (typo, future-version value the agent doesn't understand, wrong type), warn the user once at the start of Phase 0 with the offending archetype name and value, then fall back to the default for that archetype. Do not abort the run; bad config in one slot should not block triage.
+- **Unknown archetype keys.** When the object carries a key that is not one of the five archetypes (typo like `"Bg"` or `"Outage"` from a future-version mapping), warn once and ignore that key. Do not raise an error.
+- **Future values.** The agent treats any value other than `"unassign"` or `"self"` as unknown (per the rule above). When a future plugin version adds a new value (e.g., `"oncall"` resolved via Slack), 1.3.0 installs gracefully fall back to the default and warn rather than crashing.
 
 ### Auto-Discovery
 
@@ -101,6 +109,45 @@ The agent invokes other skills during the workflow. Reference them by name; the 
 | Phase 2.5 + Phase 5 (any archetype) | `prose-style` | Audit and rewrite drafted text so it reads like a person wrote it. Phase 2.5 invocation: clean the assessment/scope comment draft and any reporter follow-up before the Phase 3 preview gate. Phase 5 invocation: clean the refined title and description after `jira-ticket-refiner` runs and before the user-facing preview. Strips AI tells: em dashes, opener phrases, LLM vocabulary, bullet sprawl. |
 
 All four bundled skills install with the plugin. The defensive fallbacks below fire only on rare runtime load failures; they are not the expected execution path and never need user attention in normal operation.
+
+### Skill calling-context conventions
+
+When the agent invokes a skill via the `Skill` tool, it can pass instructions to the skill by including a leading `Calling context:` line in the prompt. The convention:
+
+- The first line of the agent's prompt to the skill is `Calling context: <key>=<value>[, <key>=<value>...].`
+- The skill body recognizes this prefix and interprets the keys it knows about.
+- Unknown keys are ignored by the skill — forwards-compat for new flags.
+
+Currently defined keys:
+
+| Key | Value | Recognized by | Effect |
+|-----|-------|---------------|--------|
+| `skip_preview` | `true` / `false` | `jira-ticket-refiner` (Phase 5) | When `true`, skill skips its Step 7 preview-and-write; returns the refined title and description as plain text for the agent to write. |
+
+Future skills that need agent-driven invocation modes should follow this convention rather than inventing their own.
+
+## Working State
+
+The agent tracks a small set of named caches across phases. Treat these as concrete values; do not reconstruct the contract from prose at each phase boundary.
+
+| Cache key | Set in | Read in | Type | Default if not yet set |
+|-----------|--------|---------|------|------------------------|
+| `ticket_payload` | Phase 0 step 2 | All phases that need ticket data | object | n/a (must be set before Phase 1) |
+| `archetype` | Phase 0 step 4 | All phases that branch on archetype | enum (Bug / Incident / Feature / Task / Spike) | n/a |
+| `severity_recommendation` | Phase 2.5 step 2 (Bug/Incident) | Phase 3 display, Phase 4a body, Phase 6 due-date calc | string (severity scheme key) or `null` | `null` |
+| `scope_summary_draft` | Phase 2.5 step 2 (Feature/Task/Spike) | Phase 3 display, Phase 4b body | string or `null` | `null` |
+| `comment_draft` | Phase 2.5 step 4 | Phase 3 display, Phase 4a/4b/4c body | string (markdown) | `null` |
+| `follow_up_needed` | Phase 2.5 step 3; flipped at Phase 3 on tag decline | Phase 4a/4b/4c branch, Phase 6 skip rule, Phase 9 transition | boolean | `false` |
+| `followup_target_accountId` | Phase 2.5 step 3 | Phase 4c | string or `null` | `null` |
+| `approved_post_comment` | Phase 3 main panel question 1 | Phase 4a/4b/4c entry guards | boolean | `false` |
+| `approved_refine_description` | Phase 3 main panel question 2 | Phase 5 entry guard | boolean | `false` |
+| `story_point_estimate` | Phase 3 main panel question 3 | Phase 6 step 3 | number or `null` | `null` |
+| `approved_followup_tag` | Phase 3 main panel question 4 | Phase 3 post-panel downgrade rule | boolean | `false` |
+| `comment_change_request` | "Other" channel of Phase 3 question 1 | Phase 3 revision loop | string or empty | empty |
+| `refine_change_request` | "Other" channel of Phase 3 question 2 | Phase 5 invocation guidance | string or empty | empty |
+| `assignment_outcome` | Phase 9 step 1 | Phase 10 DM placeholder `{assignment outcome}` | enum (`unassigned` / `kept assigned to you` / `tagged-followup`) | `null` |
+
+Phase 3 reproduces the gate-relevant subset of this table inline for context, but this is the canonical glossary.
 
 ## Connections
 
@@ -355,30 +402,45 @@ Present findings to the user. Show:
   - The prose-style-cleaned markdown draft of the question comment from Phase 2.5, shown inline as plain markdown. Phase 4c will convert this same text to ADF on post.
   - What transition will happen (`waiting_reply`), who the ticket will be assigned to (the tagged person), and what will still run (refine, link, label) vs. skipped (the archetype-specific Phase 4 content, severity + due date for Bug/Incident, sprint placement for Feature/Task/Spike).
 
-Ask the user via `AskUserQuestion`. The decisions are independent (each gates a different write), so put them in one panel as a multi-question call. `AskUserQuestion` accepts up to 4 questions per panel; pick the ones that apply to this run and batch them into a single call so the user sees all the decisions side by side instead of clicking through sequential modals.
+**Working state used by this gate (excerpt of the Working State table at the top of this file).** The full canonical list lives in the Working State section above; this is a focused view for the gate's six in-scope flags:
+
+| Cache key | Set in | Read in | Type |
+|-----------|--------|---------|------|
+| `follow_up_needed` | Phase 2.5 step 3; flipped here on tag decline | Phase 4a/4b/4c branch, Phase 6 skip rule, Phase 9 transition | boolean |
+| `approved_post_comment` | Phase 3 main panel question 1 | Phase 4a/4b/4c entry guards | boolean |
+| `approved_refine_description` | Phase 3 main panel question 2 | Phase 5 entry guard | boolean |
+| `story_point_estimate` | Phase 3 main panel question 3 | Phase 6 step 3 | number or `null` |
+| `approved_followup_tag` | Phase 3 main panel question 4 | Phase 3 post-panel downgrade rule | boolean |
+| `comment_change_request` | "Other" channel of question 1 | Phase 3 revision loop | string or empty |
+| `refine_change_request` | "Other" channel of question 2 | Phase 5 invocation guidance | string or empty |
+
+Ask the user via `AskUserQuestion`. The decisions are independent (each gates a different write), so put them in one panel as a multi-question call. `AskUserQuestion` accepts up to 4 questions per panel and 2-4 options per question; pick the ones that apply to this run and batch them into a single call so the user sees all the decisions side by side instead of clicking through sequential modals.
 
 **Pre-gate (separate call, only when applicable).** Run BEFORE the main panel:
 
-- **When the archetype detection is non-obvious** (issue type and content disagree): ask **"Detected archetype is {X}; is that right?"** as a standalone `AskUserQuestion` call. If the user picks a different archetype, redo Phase 2.5 against the correction and re-enter Phase 3. The pre-gate runs first because the archetype changes the draft content for the main panel.
+- **When the archetype detection is non-obvious** (issue type and content disagree): ask **"Detected archetype is {X}; is that right?"** as a standalone `AskUserQuestion` call with the detected archetype and the next-most-likely alternative as options (the runtime adds an "Other" channel automatically for any free-text override). If the user picks a different archetype, redo Phase 2.5 against the correction and re-enter Phase 3. **Cap the correction loop at one round:** if the user corrects a second time, accept the second answer without re-asking and proceed; the agent's archetype-detection table gives at most two reasonable readings of any one ticket, and a third disagreement is the user's call to make.
 
-**Main panel (one `AskUserQuestion` call with up to 4 questions in `questions[]`).** Always include questions 1 and 2; include 3 and 4 only when their preconditions hold. If all four apply, the panel has 4 side-by-side questions. If only the standard path applies, the panel has 2.
+**Main panel (one `AskUserQuestion` call with up to 4 questions in `questions[]`).** Always include questions 1 and 2; include 3 and 4 only when their preconditions hold. The story-points question (3) and the follow-up tag question (4) are mutually exclusive at runtime — story-points fires only on `follow_up_needed = false` and tag fires only on `follow_up_needed = true` — so the panel never carries both. The maximum question count is therefore 3 (comment + refine + one of story-points or tag); the schema's 4-question cap leaves one slot of headroom for future expansion.
 
-1. **Post the proposed Phase 4 comment?** Options: `Yes, post it`, `No, skip the comment`. The "Other" channel lets the user say "post it after these edits: ...". Cache the answer as `approved_post_comment` (boolean) and any free-text feedback as `comment_change_request`.
-2. **Refine the title and description?** Options: `Yes, refine and write`, `No, leave as-is`. The "Other" channel lets the user say "refine but skip the title" or similar. Cache the answer as `approved_refine_description` (boolean) and any free-text as `refine_change_request`. The user is approving the refinement up front; Phase 5 will render the cleaned output inline before writing but does not ask again. If the user wants a second checkpoint they say so via "Other" here ("yes refine but show me before writing").
-3. **(Conditional)** When `story_points_field_name` is configured AND the archetype is Feature, Task, or Spike AND `follow_up_needed = false`: **"Story-point estimate?"** Options: `1`, `2`, `3`, `5`, `8`, `13`, `Skip` (a Fibonacci-ish set covers most teams; "Other" accepts any number). Cache the numeric answer as `story_point_estimate` or `null` on Skip. Phase 6 reads this cache; if no estimate was captured, Phase 6 silently skips the story-point write.
+1. **Post the proposed Phase 4 comment?** Options: `Yes, post it`, `No, skip the comment` (2 options; the runtime adds an "Other" channel automatically for free-text). The "Other" channel lets the user say "post it after these edits: ...". Cache the boolean answer as `approved_post_comment`; cache any free-text feedback as `comment_change_request` (empty string if the user picked Yes/No without elaborating).
+2. **Refine the title and description?** Options: `Yes, refine and write`, `No, leave as-is`. The "Other" channel lets the user say "refine but skip the title" or similar. Cache the boolean answer as `approved_refine_description`; cache any free-text as `refine_change_request`. The user is approving the refinement up front; Phase 5 will render the cleaned output inline before writing but does not ask again. If the user wants a second checkpoint they say so via "Other" here ("yes refine but show me before writing"); the agent then keeps Phase 5's render but adds an explicit confirmation prompt back for this run.
+3. **(Conditional)** When `story_points_field_name` is configured AND the archetype is Feature, Task, or Spike AND `follow_up_needed = false`: **"Story-point estimate?"** Options (cap at 4 to fit `AskUserQuestion`'s per-question option limit): `1`, `3`, `5`, `Skip`. The "Other" channel accepts any other number (e.g., `2`, `8`, `13`, `21`). Cache the answer as `story_point_estimate`: numeric value when the user picked or typed a number; `null` when the user picked `Skip` or returned an empty/non-numeric "Other" answer. **`null` semantics: "no estimate captured" — Phase 6 step 3 silently skips the story-point write. It does not mean "estimated zero".**
 4. **(Conditional)** When a follow-up is proposed: **"Approve tagging {reporter or EM name} with this question?"** Options: `Yes, tag {name}`, `No, switch to standard path`. Cache as `approved_followup_tag`.
 
-If the user feedback (the free-text "Other" channels on questions 1 and 2) requests changes, adjust the affected draft, regenerate prose-style, and re-present the same panel. Loop until the user's free-text channels are empty or the user explicitly approves the latest draft.
+**Revision loop (when the user's free-text "Other" channels request changes).** If `comment_change_request` is non-empty, re-draft the comment via Phase 2.5 step 4 with the user's free-text added as guidance, then re-run prose-style on the new draft. If `refine_change_request` is non-empty, the agent does not redraft yet — Phase 5 is where the refinement actually runs — so the agent attaches the change request to the Phase 5 invocation as guidance for the refiner and continues. Re-present the main panel with the updated comment draft after each comment-side revision. **Cap the loop at 3 revision rounds.** After the third round, if the user still requests changes via "Other", present a final two-option `AskUserQuestion`: `Approve as-is` or `Abort this triage run`. Abort skips Phases 4-9, posts no further writes, leaves the ticket assigned and in the `investigating` transition (the side effects from Phase 0 stay), and ends with a Phase 10 DM noting the abort and quoting the user's last comment.
 
 **After the main panel returns:**
 
-- If `approved_followup_tag = false` (the user said No to tagging): the run downgrades to the standard path. Drop the cached follow-up scenario and target `accountId`, flip `follow_up_needed = false`, re-draft the standard-path comment per Phase 2.5 step 4, run `prose-style` on it, and re-enter Phase 3 with the standard-path plan in view. Build a fresh main panel against the new draft. The user must see the standard-path Phase 4 comment, severity recommendation, due date, and any sprint or story-point proposal before any of those writes happen.
+- If question 4 was answered No (the user declined the follow-up tag): the run downgrades to the standard path. Drop the cached follow-up scenario and target `accountId`, flip `follow_up_needed = false`, re-draft the standard-path comment per Phase 2.5 step 4 (assessment for Bug/Incident, scope summary for Feature/Task/Spike), run `prose-style` on it, and re-enter Phase 3 with the standard-path plan in view. Build a fresh main panel (questions 1, 2, and possibly the story-points question 3) against the new draft. The user must see the standard-path Phase 4 comment, severity recommendation, due date, and any sprint or story-point proposal before any of those writes happen. The downgrade re-run counts as a fresh Phase 3 entry; the revision-loop cap resets.
 - Otherwise the gate is closed and the run continues with the cached flags.
 
-After approval, branch by `follow_up_needed` and the cached approval flags:
-- `follow_up_needed = false`, archetype Bug or Incident: continue to Phase 4a if `approved_post_comment = true`; otherwise skip Phase 4a and go straight to Phase 5.
-- `follow_up_needed = false`, archetype Feature, Task, or Spike: continue to Phase 4b if `approved_post_comment = true`; otherwise skip Phase 4b and go straight to Phase 5.
-- `follow_up_needed = true` (any archetype): jump to Phase 4c if `approved_post_comment = true` AND question 5 (the tag-approval question) was answered Yes. If question 5 was answered No, the agent has already downgraded the run to the standard path during the gate (drop scenario + accountId, flip `follow_up_needed`, re-draft standard-path comment, re-run Phase 3 with the new plan). At this point the run continues exactly as a fresh `follow_up_needed = false` branch using the new approval flags from the re-run gate. The user has now reviewed the severity / due date / sprint / story-point / final-transition / final-assignee plan that the standard path will execute, so Phase 6 and Phase 9 may proceed.
+**Branch table after the gate is closed:**
+
+| `follow_up_needed` | Archetype | Next phase by `approved_post_comment` |
+|--------------------|-----------|---------------------------------------|
+| `false` | Bug or Incident | `true` → Phase 4a → Phase 5; `false` → Phase 5 (skip 4a) |
+| `false` | Feature, Task, or Spike | `true` → Phase 4b → Phase 5; `false` → Phase 5 (skip 4b) |
+| `true` | any | Always `true` here (a `false` would have triggered the downgrade above and re-entered the gate as `follow_up_needed = false`). Continue to Phase 4c → Phase 5. |
 
 Phase 5 honors `approved_refine_description`: when `false`, skip the `jira-ticket-refiner` invocation, the `prose-style` styling pass, the preview, and the `editJiraIssue` write entirely; the title and description on the ticket stay untouched. When `true`, run Phase 5 as written.
 
@@ -499,9 +561,9 @@ This phase runs two skills in sequence. First, invoke `jira-ticket-refiner` via 
 **Fallback (when `prose-style` is not installed):** apply at minimum these rules to the refined title + description before previewing: no em dashes, no spaced hyphens as separators, no LLM vocabulary (delve, leverage, robust, seamlessly, comprehensive, nuanced, elevate, foster, paradigm, ecosystem, holistic, innovative, synergy, empower, facilitate), lead with the answer, no opener phrases, no trailing summaries on short sections, prose over bullet lists when content flows naturally as sentences.
 
 Steps:
-1. Build the refined title and description (`jira-ticket-refiner` invocation, or its fallback above). When invoking the skill from this phase, pass `skip_preview: true` in the calling context so the skill's own Step 7 preview-and-confirm is suppressed; the agent owns the user-facing surface for the run, and the skill should treat the agent-owned approval at Phase 3 as the gate.
+1. Build the refined title and description (`jira-ticket-refiner` invocation, or its fallback above). The agent communicates the `skip_preview` instruction by including a leading line in the prompt it passes to the `Skill` tool: `Calling context: skip_preview=true. The orchestrator owns the user gate; do not run Step 7 preview or write via editJiraIssue. Return the refined title and description as your final output.` The skill's body recognizes this prefix and short-circuits Step 7 (no AskUserQuestion, no editJiraIssue). The skill returns the refined title + description as plain text for the agent to consume.
 2. Invoke the `prose-style` skill via the `Skill` tool, passing the refined title and description from step 1 as input. Replace the title and description with the cleaned versions returned by the skill (or run the inline fallback rule list above when the skill does not load).
-3. Render the cleaned refined title + description to the user as inline markdown (not wrapped in an outer code fence). This is **informational, not a question** — Phase 3 already captured the user's approval to refine. The render gives the user a chance to interrupt (Ctrl+C) if something looks egregiously wrong before the write happens. Do not call `AskUserQuestion` here. Frame the output with one line above the render: "Writing the following to `{TICKET-KEY}` (interrupt within a few seconds to abort):". After rendering, proceed immediately to step 4.
+3. Render the cleaned refined title + description to the user as inline markdown (not wrapped in an outer code fence). This is **informational, not a question** — Phase 3 already captured the user's approval to refine. The render gives the user a chance to interrupt (Ctrl+C) if something looks egregiously wrong before the write happens. Do not call `AskUserQuestion` here. Frame the output with one line above the render: ``Writing the following to `{TICKET-KEY}` in {N} seconds (interrupt to abort):``. The pause length `{N}` reads from `description_preview_pause_seconds` in config (default 3). When the user explicitly opted in to a second checkpoint (via the "Other" channel on Phase 3 question 2 — `refine_change_request` mentions "show me before writing" or similar), DO call `AskUserQuestion` here with options `Approve and write`, `Request changes` instead of pausing. After rendering and pausing (or after the optional confirmation), proceed to step 4.
 4. Update via `editJiraIssue` with `contentFormat: "markdown"`.
 5. If a "Bug Description" custom field was discoverable in prerequisites, write the same content to that field as raw ADF (`type: "doc"`, `version: 1`) in a separate `editJiraIssue` call. Some Jira instances reject markdown for that field type. If the field doesn't exist, skip this step silently.
 
@@ -609,6 +671,9 @@ Pick the outcome that matches what you did:
 | Asked EM (reporter deactivated) | `Reporter deactivated, asked EM {name}, moved to {waiting_reply transition}` |
 | Comment skipped at Phase 3 | (append) `No comment posted (skipped at confirmation gate)` |
 | Description skipped at Phase 3 | (append) `Title and description left as-is (skipped at confirmation gate)` |
+| Aborted at Phase 3 (3-revision cap reached) | `Aborted triage at confirmation gate after 3 revision rounds. Last user comment: "{quoted comment}". Ticket stays assigned to you in {investigating transition}.` |
+| Config field-resolution misses (Phase 0 auto-discovery couldn't find a configured field) | (append) `Skipped {field name} write: configured field not found on this project.` |
+| Invalid archetype_assignment_after_triage entry (warned at Phase 0) | (append) `Ignored invalid archetype_assignment_after_triage entry: {key} = {value}. Used default for that archetype.` |
 | Duplicate (only if user explicitly approved closure) | `Closed as duplicate of ORIGINAL-KEY` |
 | Severity changed | `Changed severity from {SevX} to {SevY}` |
 | Closed (only if user explicitly approved closure) | `Closed as {resolution}` |
