@@ -224,7 +224,13 @@ Six optional fields tune the agent's behavior. The setup wizard writes them into
 | `archetype_assignment_after_triage` | Object mapping each archetype (`Bug`, `Incident`, `Feature`, `Task`, `Spike`) to either `"unassign"` (return to the team pool) or `"self"` (keep assigned to the running user). Defaults: `Bug = "unassign"`, all others `"self"`. Missing keys are filled from defaults; unknown values fall back to the archetype default and warn at the start of Phase 0. | Your team's ownership rule differs from the default. Sev-1 incidents that auto-route to on-call: set `"Incident": "unassign"`. Bug-fix ownership stays with triager: set `"Bug": "self"`. |
 | `description_preview_pause_seconds` | Integer seconds to pause between the Phase 5 informational preview and the `editJiraIssue` write. Default `3`. Set higher (`5`-`10`) if you want more time to read the preview before the write commits. Set to `0` to write immediately (not recommended). | Your team wants more time to skim the rendered description before it lands on the ticket. |
 
-When any of these is null (or omitted, in the case of `archetype_assignment_after_triage`), the agent uses the default behavior described above.
+**Backwards compatibility.** When any of these is null, the agent uses the default behavior described above. The two keys with non-null defaults (`archetype_assignment_after_triage`, `description_preview_pause_seconds`) also backfill on omission: existing 1.2.0 configs that don't include either key get `archetype_assignment_after_triage = {Bug: "unassign", Incident: "self", Feature: "self", Task: "self", Spike: "self"}` and `description_preview_pause_seconds = 3` applied at runtime. No migration steps required; the saved JSON does not need to be edited to upgrade.
+
+**Validation.** The agent normalizes invalid values at session start and warns once via the Phase 10 DM rather than failing the run:
+
+- `description_preview_pause_seconds`: must be a non-negative integer. Negative, float, string, or null falls back to `3`.
+- `archetype_assignment_after_triage`: must be an object whose values are `"unassign"` or `"self"`. A non-object value (string, array, null) is treated as omitted and the full default object applies. Per-key invalid values warn and use the archetype default. Unknown archetype keys (typos like `"Bg"`) are ignored with a warning.
+- `scope_summary_field_name`, `sprint_field_name`, `story_points_field_name`, `non_bug_transitions.ready`: must be strings or null. Non-string values are treated as null with a warning, and the steps that reference them are skipped.
 
 ## Workflow phases
 
