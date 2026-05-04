@@ -9,7 +9,7 @@
     {
       "name": "jira-issue-triage",
       "source": "./plugins/jira-issue-triage",
-      "description": "End-to-end Jira issue triage subagent across all archetypes. Bundles issue-investigator (Bug/Incident), requirements-investigator (Feature/Task/Spike), and jira-ticket-refiner (any archetype). Ships a /jira-issue-triage:setup wizard."
+      "description": "End-to-end Jira issue triage subagent across all archetypes. Bundles issue-investigator (Bug/Incident), requirements-investigator (Feature/Task/Spike), jira-ticket-refiner (any archetype), and prose-style (writing-rule application on refined output and comments). Ships a /jira-issue-triage:setup wizard."
     }
   ]
 }

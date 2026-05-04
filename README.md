@@ -18,7 +18,13 @@ Then install any plugin from the table below:
 
 | Plugin | Version | What it does |
 |--------|---------|--------------|
-| [`jira-issue-triage`](./plugins/jira-issue-triage/) | 1.0.0 | Subagent that triages Jira issues across all archetypes (Bug, Incident, Feature, Task, Spike): assigns, runs the matching investigation skill, refines the title and description, posts an archetype-appropriate assessment comment, and DMs you a summary. Bundles `issue-investigator` (Bug/Incident), `requirements-investigator` (Feature/Task/Spike), and `jira-ticket-refiner` (any archetype). Ships a `/jira-issue-triage:setup` wizard for first-time configuration. |
+| [`jira-issue-triage`](./plugins/jira-issue-triage/) | 1.1.0 | Subagent that triages Jira issues across all archetypes (Bug, Incident, Feature, Task, Spike): assigns, runs the matching investigation skill, refines the title and description, posts an archetype-appropriate assessment comment, and DMs you a summary. Bundles `issue-investigator` (Bug/Incident), `requirements-investigator` (Feature/Task/Spike), `jira-ticket-refiner` (any archetype), and `prose-style` (writing-rule application on refined output and comments). Ships a `/jira-issue-triage:setup` wizard for first-time configuration. |
+
+## What changed in 1.1.0
+
+The `prose-style` skill graduates from the Roadmap into the bundled set. The triage workflow now calls a real skill instead of relying on the inline writing-rules fallback at two points: Phase 2.5 styles the assessment/scope comment draft and any reporter follow-up so the user reviews a styled version at the Phase 3 confirmation gate, and Phase 5 styles the refined title and description after `jira-ticket-refiner` runs. AI tells (em dashes, opener phrases, LLM vocabulary, bullet sprawl) get stripped on the way out. The agent body keeps a defensive inline fallback at both invocation points for the rare runtime load failure.
+
+No migration steps. Re-install the plugin to pick up the new bundled skill. See the [implementation plan](./docs/superpowers/plans/2026-05-01-prose-style-bundling.md) for the bite-sized steps.
 
 ## What changed in 1.0.0
 
@@ -28,13 +34,7 @@ Migration: `/plugin uninstall jira-bug-triage` then `/plugin install jira-issue-
 
 ## Roadmap
 
-These plugins are planned but not yet shipped. The `jira-issue-triage` plugin references them by name and falls back gracefully when they're not installed.
-
-| Plugin | What it will do | Status |
-|--------|-----------------|--------|
-| `prose-style` | Apply writing rules (no em dashes, no LLM vocabulary, lead with the answer) to text the model produces. | Planned |
-
-No timeline commitments. PRs and feature requests welcome.
+No additional plugins are planned at this time. PRs and feature requests welcome.
 
 ## Author
 
