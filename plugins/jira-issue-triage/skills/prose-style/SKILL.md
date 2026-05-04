@@ -1,6 +1,7 @@
 ---
 name: prose-style
 description: Rewrites or audits prose to eliminate AI writing patterns and produce natural human writing. Use when the user says "AI slop", "sounds generated", "too formal", "write like a human", "fix the writing", "rewrite this", "clean up the prose", or asks for writing style guidance. Also apply proactively when generating documentation, Slack messages, Confluence pages, Jira ticket text, or any long-form prose output.
+tools: Read
 metadata:
   author: Everett Morgan
   ported_by: Taha Bikanerwala
@@ -19,7 +20,14 @@ Do not proceed until both files are loaded.
 
 ## Calling Convention
 
-The skill works two ways. When a user pastes text and asks for a rewrite or audit, run end to end. When the `jira-issue-triage` agent calls this skill in Phase 5, treat the refined description and title produced by `jira-ticket-refiner` as the input and apply the rewrite pass before the user-facing preview.
+The skill works two ways. When a user pastes text and asks for a rewrite or audit, run end to end. When the `jira-issue-triage` agent calls this skill, take the input the agent passes and return the cleaned version. The agent invokes the skill at two points in the workflow:
+
+| Caller invocation point | Input the skill receives | Return value |
+|-------------------------|--------------------------|--------------|
+| Phase 2.5 (draft cleaning) | The drafted assessment comment, scope summary, or reporter follow-up question text (still in markdown shape, before ADF construction). | The same text with prose-style rules applied. The agent uses the cleaned text both for the Phase 3 preview shown to the user and as the source of the ADF nodes built in Phase 4a, 4b, or 4c. |
+| Phase 5 (refinement cleaning) | The refined title and description produced by `jira-ticket-refiner`. | The same content with prose-style rules applied, ready for the Phase 5 user-facing preview. |
+
+In both contexts, the skill never posts to Jira on its own. The agent owns the `addCommentToJiraIssue` and `editJiraIssue` calls.
 
 - **One pass over the input.** Scan, flag, rewrite, verify. No iterative back-and-forth with the user unless asked.
 - **Audit mode is read-only.** When the user asks to audit without rewriting, list violations grouped by category, one line each. Do not produce a rewrite.

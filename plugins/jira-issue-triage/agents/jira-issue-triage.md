@@ -89,7 +89,7 @@ The agent invokes other skills during the workflow. Reference them by name; the 
 | Phase 1 (Bug, Incident) | `issue-investigator` | Search Slack, the ticket and related Jira/Confluence pages, Datadog, then code if needed. Produces an evidence-tagged report in the 6-section bug-archetype template. |
 | Phase 1 (Feature, Task, Spike) | `requirements-investigator` | Search Slack and Confluence for prior decisions, read linked design and product docs, search related Jira tickets. Produces an evidence-tagged report in the matching archetype template (Feature, Task, or Spike). |
 | Phase 5 (any archetype) | `jira-ticket-refiner` | Restructure the ticket description into a clear, self-contained document. Works for any archetype. Updates the title and description via the Atlassian MCP and never deletes original content. |
-| Phase 5 (any archetype) | `prose-style` | Audit and rewrite the refined description, the assessment or scope comment, and any reporter-facing follow-up so the output reads like a person wrote it. Strips AI tells: em dashes, opener phrases, LLM vocabulary, bullet sprawl. |
+| Phase 2.5 + Phase 5 (any archetype) | `prose-style` | Audit and rewrite drafted text so it reads like a person wrote it. Phase 2.5 invocation: clean the assessment/scope comment draft and any reporter follow-up before the Phase 3 preview gate. Phase 5 invocation: clean the refined title and description after `jira-ticket-refiner` runs and before the user-facing preview. Strips AI tells: em dashes, opener phrases, LLM vocabulary, bullet sprawl. |
 
 All four bundled skills install with the plugin. The defensive fallbacks below fire only on rare runtime load failures; they are not the expected execution path and never need user attention in normal operation.
 
@@ -210,7 +210,7 @@ Use this variant when the archetype is non-bug and the ticket appears stale (no 
 
 Rules for all three templates:
 - Lead with the request or the evidence. No opener phrases, no restating the title, no apologies.
-- Apply the Writing Rules at the bottom. No em dashes, no LLM vocabulary.
+- Phase 2.5 runs the `prose-style` skill on the filled-in template before the Phase 3 preview, so the reporter or EM sees a styled draft and the user reviews it once. The Writing Rules section at the bottom of this file is the defensive fallback when the skill does not load.
 - Never chain multiple questions. If you need more than one piece of information, pick the one that unblocks triage and leave the rest for the owning team.
 - State explicitly that you're moving the ticket to `waiting_reply` so the reporter knows what to expect.
 - Tag only the reporter (or their EM). Do not add other tags in the question comment.
@@ -320,14 +320,17 @@ Decide whether a reporter follow-up is warranted before presenting findings. Thi
 
 1. Apply the criteria in **Reporter Follow-up Policy** above. On non-bug archetypes, "fix verification" reframes as "still relevant?" (the ticket may have been overtaken by other work).
 2. **For Bug or Incident: form a severity recommendation** using the Severity Criteria table at the top of this file. Match the ticket's evidence to the dimensions (User impact, Functional impact, Workaround, Data integrity, Compliance) and pick the closest level from `severity_scheme`. Cache the recommendation so Phase 3 can display it and Phase 4a can use it. **For Feature, Task, or Spike: skip this severity step** (severity does not apply); instead form a one-line scope summary that captures what the ticket covers and what is unclear, ready for Phase 4b to expand into a comment.
-3. **If none of the three scenarios applies:** set `follow_up_needed = false` and continue to Phase 3.
-4. **If one applies:**
+3. **Draft the archetype-appropriate Phase 4 comment text now** (still in markdown shape, not yet ADF). For Bug or Incident, draft the assessment body using the Phase 4a structure (Assessment, Severity Recommendation, Evidence from this ticket, Criteria matched). For Feature, Task, or Spike, draft the scope summary body using the Phase 4b structure (Scope Summary, What's in scope, Evidence from this ticket, Open questions). Cache the markdown draft.
+4. **If none of the three follow-up scenarios applies:** set `follow_up_needed = false` and skip to step 6.
+5. **If one applies:**
    - Set `follow_up_needed = true` and record the scenario (missing data, clarification, fix verification or relevance check).
    - Identify who to tag using **Identifying who to tag**. Cache the target `accountId` and whether the EM preamble applies.
    - Draft the question comment using the matching template. Keep it to one specific question.
-   - If you need to pause to ask the user for an EM, do that now before reaching Phase 3.
+   - If you need to pause to ask the user for an EM, do that now before reaching the prose pass below.
+6. **Run the `prose-style` skill on every drafted comment text from steps 3 and 5.** Pass the markdown draft as input. Replace the cached draft with the returned cleaned version. Phase 3 displays the cleaned version to the user. Phase 4a, 4b, or 4c builds the ADF nodes from the cleaned version.
+   - **Defensive fallback when `prose-style` does not load:** apply the rules from the Writing Rules section at the bottom of this file inline to the draft (no em dashes, no LLM vocabulary, lead with the answer, no opener phrases, prose over bullets). Warn the user once at the start of Phase 3 that the fallback was used.
 
-Record the decision and draft so Phase 3 can show the user both the investigation findings and the proposed follow-up in one review.
+Record the decisions and the cleaned drafts so Phase 3 can show the user the investigation findings, the proposed Phase 4 comment, and the proposed follow-up (if any) in one review.
 
 ---
 
@@ -362,7 +365,7 @@ After approval, branch by `follow_up_needed`:
 **Applies to:** Bug, Incident.
 **Skipped on:** Feature, Task, Spike (use Phase 4b instead). `follow_up_needed = true` (use Phase 4c instead).
 
-After the user approved the comment text at Phase 3, post the previewed comment via `addCommentToJiraIssue` with `contentFormat: "adf"`. All comments this agent posts are ADF, never markdown. Logical structure (build it as ADF nodes; the structure below shows the rendered intent, not the source format):
+After the user approved the comment text at Phase 3, post the comment via `addCommentToJiraIssue` with `contentFormat: "adf"`. The body uses the prose-style-cleaned draft from Phase 2.5 (the user already saw the cleaned version at the Phase 3 gate). Do not re-draft the comment here. All comments this agent posts are ADF, never markdown. Logical structure (build it as ADF nodes; the structure below shows the rendered intent, not the source format):
 
 > **Assessment:**
 >
@@ -396,7 +399,7 @@ Rules:
 **Applies to:** Feature, Task, Spike.
 **Skipped on:** Bug, Incident (use Phase 4a instead). `follow_up_needed = true` (use Phase 4c instead).
 
-After the user approved the comment text at Phase 3, post the previewed comment via `addCommentToJiraIssue` with `contentFormat: "adf"`. The comment summarizes what is in scope based on the investigation findings, named in archetype-appropriate terms.
+After the user approved the comment text at Phase 3, post the comment via `addCommentToJiraIssue` with `contentFormat: "adf"`. The body uses the prose-style-cleaned draft from Phase 2.5 (the user already saw the cleaned version at the Phase 3 gate). Do not re-draft the comment here. The comment summarizes what is in scope based on the investigation findings, named in archetype-appropriate terms.
 
 Logical structure (build it as ADF nodes; the structure below shows the rendered intent):
 
@@ -437,7 +440,7 @@ Rules:
 
 Run this phase instead of Phase 4a or 4b when the user approved a follow-up at Phase 3.
 
-1. Confirm you have the approved draft from Phase 3 and the target `accountId` (reporter or EM).
+1. Confirm you have the approved (and prose-style-cleaned, from Phase 2.5) draft from Phase 3 and the target `accountId` (reporter or EM). Do not re-draft or re-style the body here.
 2. Post the follow-up via `addCommentToJiraIssue` with `contentFormat: "adf"`. The comment body must be a JSON-stringified ADF doc. Never use `contentFormat: "markdown"` or the `[~accountid:XXXXX]` wiki-markup form. Build the ADF with:
    - A leading paragraph whose first node is a `mention` node (`type: "mention"`, `attrs.id: "<tagged-accountId>"`, `attrs.text: "@<Display Name>"`).
    - Follow-up paragraphs containing the exact body text the user approved. Inline ticket keys are `text` nodes with `link` marks. Bold uses `marks: [{"type": "strong"}]`. Bullets use `bulletList` → `listItem` → `paragraph` → `text`.

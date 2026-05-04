@@ -35,7 +35,7 @@ The agent calls four skills during the workflow. All four ship bundled with this
 | `issue-investigator` | Phase 1 (Bug, Incident) | Slack/Jira/Confluence/Datadog/code investigation with evidence tags | Bundled, ready to use |
 | `requirements-investigator` | Phase 1 (Feature, Task, Spike) | Slack/Jira/Confluence search for prior decisions, design refs, scope; per-archetype report templates | Bundled, ready to use |
 | `jira-ticket-refiner` | Phase 5 (any archetype) | Title and description rewrite. Already archetype-aware (Bug, Feature, Task, Incident, Spike). | Bundled, ready to use |
-| `prose-style` | Phase 5 (any archetype) | Writing-rule application: strips em dashes, opener phrases, LLM vocabulary, bullet sprawl. Runs after `jira-ticket-refiner` and before the user-facing preview, plus on every comment the agent drafts. | Bundled, ready to use |
+| `prose-style` | Phase 2.5 + Phase 5 (any archetype) | Writing-rule application: strips em dashes, opener phrases, LLM vocabulary, bullet sprawl. Runs at Phase 2.5 on the assessment/scope comment draft and any reporter follow-up (so the user sees a styled version at the Phase 3 confirmation gate), and at Phase 5 on the refined title and description after `jira-ticket-refiner`. | Bundled, ready to use |
 
 The agent body retains short defensive fallbacks for all four bundled skills. They fire only on rare runtime load failures (corrupted install, mid-session uninstall, etc.) and never need user attention in normal operation.
 

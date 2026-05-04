@@ -22,7 +22,7 @@ Then install any plugin from the table below:
 
 ## What changed in 1.1.0
 
-The `prose-style` skill graduates from the Roadmap into the bundled set. Phase 5 of the triage workflow now calls a real skill instead of relying on the inline writing-rules fallback. The skill audits and rewrites the refined description, the assessment or scope comment, and any reporter-facing follow-up before the user-facing preview, so AI tells (em dashes, opener phrases, LLM vocabulary, bullet sprawl) get stripped on the way out. The agent body keeps a defensive inline fallback for the rare runtime load failure.
+The `prose-style` skill graduates from the Roadmap into the bundled set. The triage workflow now calls a real skill instead of relying on the inline writing-rules fallback at two points: Phase 2.5 styles the assessment/scope comment draft and any reporter follow-up so the user reviews a styled version at the Phase 3 confirmation gate, and Phase 5 styles the refined title and description after `jira-ticket-refiner` runs. AI tells (em dashes, opener phrases, LLM vocabulary, bullet sprawl) get stripped on the way out. The agent body keeps a defensive inline fallback at both invocation points for the rare runtime load failure.
 
 No migration steps. Re-install the plugin to pick up the new bundled skill. See the [implementation plan](./docs/superpowers/plans/2026-05-01-prose-style-bundling.md) for the bite-sized steps.
 

@@ -331,3 +331,78 @@ No drift detected.
 - Splitting `prose-style` into a separate plugin in the same marketplace. The user explicitly chose to bundle it, mirroring the v0.3.0 jira-ticket-refiner pattern.
 - Auditing every existing markdown file in the repo for prose-style violations. The skill is the tool; running it across the existing docs is a follow-up if desired.
 - Adding a `/jira-issue-triage:setup` wizard question for prose-style behavior. The skill has no per-project configuration; it always applies the same rules.
+
+---
+
+## Task 9: Post-Copilot review (PR #3 round 1)
+
+Copilot opened five comments on PR #3 pointing at the same root issue: the marketplace README, marketplace.json, plugin README, and the agent body's Sibling Skills row all claimed `prose-style` runs on comments and reporter follow-ups, but the workflow only invoked the skill in Phase 5 on the refined title and description. Copilot also flagged a missing `tools:` declaration in the new SKILL.md frontmatter (the other three bundled skills declare `tools` explicitly).
+
+The user's resolution: extend the workflow rather than narrow the documentation. `prose-style` should run on comments too. The fix lands in the same PR.
+
+- [x] **Step 1: Add `tools: Read` to the prose-style SKILL.md frontmatter**
+
+Mirrors `jira-ticket-refiner`, `issue-investigator`, and `requirements-investigator`. The skill only needs `Read` (the two reference files); it does not call the Atlassian, Slack, or Datadog MCPs and does not run shell commands.
+
+- [x] **Step 2: Document the two invocation points in the SKILL.md Calling Convention**
+
+Added a 2-row table mapping each invocation point (Phase 2.5 draft cleaning, Phase 5 refinement cleaning) to its input shape and return value. The skill never posts to Jira on its own.
+
+- [x] **Step 3: Update the agent body Sibling Skills row**
+
+Phase column changes from `Phase 5 (any archetype)` to `Phase 2.5 + Phase 5 (any archetype)`. The purpose cell calls out both invocation points explicitly.
+
+- [x] **Step 4: Wire `prose-style` into Phase 2.5**
+
+Phase 2.5 step list grew from 4 steps to 6:
+
+1. Apply follow-up criteria (unchanged).
+2. Form severity recommendation (Bug/Incident) or scope summary (Feature/Task/Spike) (unchanged).
+3. **NEW:** Draft the archetype-appropriate Phase 4 comment text now (markdown shape, not yet ADF), using the Phase 4a or 4b structure.
+4. If no follow-up scenario applies, set `follow_up_needed = false` and skip to step 6.
+5. If one applies, set `follow_up_needed = true`, identify who to tag, draft the question comment using the matching template.
+6. **NEW:** Run `prose-style` on every drafted comment text from steps 3 and 5. Replace the cached draft with the cleaned version. Defensive fallback when the skill does not load: apply the Writing Rules section inline and warn the user once at Phase 3.
+
+- [x] **Step 5: Tighten Phase 4a, 4b, 4c language**
+
+Each phase now states explicitly that it posts the prose-style-cleaned draft from Phase 2.5 and does not re-draft or re-style. Removes the implicit drafting that was happening at Phase 4 and concentrates all drafting in Phase 2.5.
+
+- [x] **Step 6: Update Reporter Follow-up Policy template rules**
+
+The "Apply the Writing Rules at the bottom" rule changes to: Phase 2.5 runs the `prose-style` skill on the filled-in template before the Phase 3 preview, with the Writing Rules section as the defensive fallback when the skill does not load.
+
+- [x] **Step 7: Update plugin README and marketplace README phase labels**
+
+`Phase 5 (any archetype)` → `Phase 2.5 + Phase 5 (any archetype)` in the bundled-skills row of `plugins/jira-issue-triage/README.md`. The marketplace README's "What changed in 1.1.0" paragraph now names both invocation points instead of saying "Phase 5 calls a real skill". The marketplace.json description and the marketplace README Available plugins row already said "refined output and comments" and stay as-is (now accurate).
+
+- [x] **Step 8: Re-run validations**
+
+```bash
+python3 -c "
+import re, yaml
+content = open('plugins/jira-issue-triage/skills/prose-style/SKILL.md').read()
+m = re.match(r'^---\n(.*?)\n---', content, re.DOTALL)
+data = yaml.safe_load(m.group(1))
+assert data['name'] == 'prose-style'
+assert data['tools'] == 'Read'
+print('frontmatter OK')
+"
+python3 -m json.tool .claude-plugin/marketplace.json > /dev/null && echo OK
+python3 -m json.tool plugins/jira-issue-triage/.claude-plugin/plugin.json > /dev/null && echo OK
+```
+
+Expected: all three print success.
+
+- [x] **Step 9: Commit and push**
+
+One commit on top of the existing two:
+
+```bash
+git add -A
+git commit -m "fix(prose-style): wire skill into Phase 2.5 comment drafts and add tools field"
+git push
+```
+
+- [x] **Step 10: Reply to each Copilot comment**
+
+Five replies on PR #3, each pointing at the commit SHA and the file changes that resolve the comment. Mark resolved through the GitHub UI after replying.
