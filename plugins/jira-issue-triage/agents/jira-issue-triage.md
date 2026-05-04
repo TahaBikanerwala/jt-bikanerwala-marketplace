@@ -79,21 +79,23 @@ Six optional fields tune the agent's behavior. Each is documented in the plugin 
 
 | Field | Default when omitted | Default when explicitly `null` | Default on invalid value |
 |-------|----------------------|--------------------------------|--------------------------|
-| `scope_summary_field_name` | `null` (Phase 4b skips the side write) | `null` | treat non-string as `null`, warn once at Phase 0 |
-| `sprint_field_name` | `null` (Phase 6 skips the sprint write) | `null` | treat non-string as `null`, warn once at Phase 0 |
-| `story_points_field_name` | `null` (Phase 3 omits the story-points question; Phase 6 skips the write) | `null` | treat non-string as `null`, warn once at Phase 0 |
-| `non_bug_transitions.ready` | `null` (Phase 9 leaves Feature/Task/Spike in `investigating`) | `null` | treat non-string as `null`, warn once at Phase 0 |
-| `archetype_assignment_after_triage` | full default object: `{Bug: "unassign", Incident: "self", Feature: "self", Task: "self", Spike: "self"}` | same as omitted (treat explicit `null` or non-object as omitted; warn once) | per-key validation per the merge rules below |
-| `description_preview_pause_seconds` | `3` | `3` (treat explicit `null` as default; warn once) | `3` (treat string, negative, non-integer numeric, or anything else non-conforming as default; warn once at Phase 0). Valid values are non-negative integers. |
+| `scope_summary_field_name` | `null` (Phase 4b skips the side write) | `null` | treat non-string as `null` and emit a deferred warning |
+| `sprint_field_name` | `null` (Phase 6 skips the sprint write) | `null` | treat non-string as `null` and emit a deferred warning |
+| `story_points_field_name` | `null` (Phase 3 omits the story-points question; Phase 6 skips the write) | `null` | treat non-string as `null` and emit a deferred warning |
+| `non_bug_transitions.ready` | `null` (Phase 9 leaves Feature/Task/Spike in `investigating`) | `null` | treat non-string as `null` and emit a deferred warning |
+| `archetype_assignment_after_triage` | full default object: `{Bug: "unassign", Incident: "self", Feature: "self", Task: "self", Spike: "self"}` | same as omitted (treat explicit `null` or non-object as omitted and emit a deferred warning) | per-key validation per the merge rules below |
+| `description_preview_pause_seconds` | `3` | `3` (treat explicit `null` as default and emit a deferred warning) | `3` (treat string, negative, non-integer numeric, or anything else non-conforming as default and emit a deferred warning). Valid values are non-negative integers. |
 
-The two fields with non-null defaults (`archetype_assignment_after_triage` and `description_preview_pause_seconds`) backfill on upgrade: existing 1.2.0 configs that omit either key inherit the table's default at runtime, so the saved JSON does not need to be edited to upgrade cleanly. Phase 0's auto-discovery applies the validation rules in the third column once per session and emits any warnings as part of the Phase 10 DM (one appended line per invalid field). The `archetype_assignment_after_triage` per-key merge and validation rules are spelled out under "Config merge and validation rules" later in this section.
+The two fields with non-null defaults (`archetype_assignment_after_triage` and `description_preview_pause_seconds`) backfill on upgrade: existing 1.2.0 configs that omit either key inherit the table's default at runtime, so the saved JSON does not need to be edited to upgrade cleanly.
+
+**Where validation runs and where warnings surface.** Phase 0's auto-discovery applies the validation rules in the third column once per session. Validation never aborts the run; it always normalizes to a working default. The "deferred warning" phrase in the table means: collect the warning in a session-scoped list at Phase 0 and surface it as an appended line on the Phase 10 Slack DM (one line per invalid field). The agent does not print warnings inline at Phase 0 because the user is not yet engaged with the run output at that point; routing them to the closing DM keeps the warnings visible without interrupting the workflow. The `archetype_assignment_after_triage` per-key merge and validation rules are spelled out under "Config merge and validation rules" later in this section.
 
 `archetype_assignment_after_triage` controls Phase 9's assignee behavior per archetype. Valid values per archetype: `"unassign"` (return to the team pool by setting `assignee` to null) or `"self"` (leave the running user assigned, since Phase 0 already assigned them). The defaults match the 1.2.0 behavior: Bug routes back to the pool; Incident, Feature, Task, and Spike stay with the triager. Override per archetype when your team uses a different rule (for example, Sev-1 incidents auto-routing to on-call: set `"Incident": "unassign"` and have your on-call rotation pick the ticket up).
 
 **Config merge and validation rules:**
 
 - **Missing keys.** When `archetype_assignment_after_triage` is omitted entirely, the full default object (Bug → unassign, others → self) applies. When the object is present but missing some archetype keys, fill the missing keys from defaults. The user does not need to list every archetype to override one.
-- **Unknown values.** When a value is anything other than `"unassign"` or `"self"` (typo, future-version value the agent doesn't understand, wrong type), warn the user once at the start of Phase 0 with the offending archetype name and value, then fall back to the default for that archetype. Do not abort the run; bad config in one slot should not block triage.
+- **Unknown values.** When a value is anything other than `"unassign"` or `"self"` (typo, future-version value the agent doesn't understand, wrong type), record a deferred warning (surfaced in the Phase 10 DM) with the offending archetype name and value, then fall back to the default for that archetype. Do not abort the run; bad config in one slot should not block triage.
 - **Unknown archetype keys.** When the object carries a key that is not one of the five archetypes (typo like `"Bg"` or `"Outage"` from a future-version mapping), warn once and ignore that key. Do not raise an error.
 - **Future values.** The agent treats any value other than `"unassign"` or `"self"` as unknown (per the rule above). When a future plugin version adds a new value (e.g., `"oncall"` resolved via Slack), 1.3.0 installs gracefully fall back to the default and warn rather than crashing.
 
@@ -362,6 +364,7 @@ Both skills follow the same calling convention (non-interactive, evidence-tagged
 4. Summarize findings in plain prose. The structure depends on archetype: Feature gets Lead/Background/Requirements Found/Design Refs/Open Questions; Task gets Lead/Why Now/Definition of Done Found/Risks; Spike gets Lead/Question to Answer/What's Already Known/What's Unknown.
 
 **Common to both fallbacks:** Tag every finding with one of:
+
 | Tag | Meaning |
 |-----|---------|
 | `[VERIFIED]` | Directly confirmed (code read, source explicitly states this). |
