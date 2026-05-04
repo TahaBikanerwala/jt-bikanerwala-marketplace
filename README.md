@@ -24,11 +24,11 @@ Then install any plugin from the table below:
 
 UX pass on the 1.2.0 confirmation gate. Three changes you'll notice as you triage tickets:
 
-- **Faster Phase 3.** The confirmation panel now shows up to 4 decisions side by side in one `AskUserQuestion` call instead of 3-5 sequential modals. One read, one set of clicks.
+- **Faster Phase 3.** The confirmation panel now batches its decisions into a single `AskUserQuestion` call instead of 3-5 sequential modals. Today's flows show 2-3 questions side by side (post comment? refine description? plus story-point estimate when configured, or tag approval when a follow-up is proposed; story-points and tag-approval are mutually exclusive). One read, one set of clicks. The schema's 4-question cap leaves headroom for future expansion.
 - **One approval per decision, not two.** Phase 5 no longer re-asks "approve the refined description?" after Phase 3's "should I refine?". The cleaned output renders inline as an informational preview, then writes after a configurable pause (default 3 seconds; set `description_preview_pause_seconds` to taste). Users who want a second checkpoint can opt in per run via the "Other" channel on Phase 3 question 2.
 - **Per-archetype assignment is yours to set.** New `archetype_assignment_after_triage` config maps each archetype (`Bug`, `Incident`, `Feature`, `Task`, `Spike`) to either `"unassign"` (return to team pool) or `"self"` (keep with the triager). Defaults match 1.2.0. Common overrides:
-  - **On-call team for incidents:** `"Incident": "unassign"` — Sev-1 tickets auto-route to whoever's on-call instead of staying with the triager.
-  - **Triager owns bug fixes:** `"Bug": "self"` — when bug triage and bug fixing are the same person.
+  - **On-call team for incidents:** `"Incident": "unassign"`. Sev-1 tickets auto-route to whoever's on-call instead of staying with the triager.
+  - **Triager owns bug fixes:** `"Bug": "self"`. Use this when bug triage and bug fixing are the same person.
 
 Other refinements in this release: invalid `archetype_assignment_after_triage` values fall back to defaults with a warning instead of breaking the run; the Phase 3 revision loop caps at 3 rounds with an explicit "approve as-is or abort" exit; the agent body now leads with a Working State glossary and a Skill calling-context conventions section so the runtime LLM tracks state as concrete values; the setup wizard's saved JSON now includes the new advanced config keys with their defaults so the file is browsable; and the Phase 5 jira-ticket-refiner invocation uses a `Calling context: skip_preview=true.` prefix to suppress the skill's own gate, removing the third confirmation that previously snuck in.
 

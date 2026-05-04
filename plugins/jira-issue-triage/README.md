@@ -213,7 +213,7 @@ Optional fields (`Bug Description`, `Scope Summary`, `Work Type`, `Components`, 
 
 ### Advanced configuration (per-archetype tuning)
 
-Five optional fields tune the agent's behavior. They are not asked by the setup wizard; add them by editing the config file directly when you need them.
+Six optional fields tune the agent's behavior. The setup wizard writes them into the saved JSON with their default values so the file is a complete, browsable config; override them by editing the file directly when you want different behavior.
 
 | Field | Purpose | When to set |
 |-------|---------|-------------|
