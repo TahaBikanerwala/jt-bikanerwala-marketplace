@@ -9,6 +9,10 @@ metadata:
   category: writing
 ---
 
+# Prose Style
+
+Rewrite or audit text so it reads like a person wrote it. Strip the patterns that signal a model is talking: em dashes used as separators, opener phrases, LLM vocabulary, bullet sprawl where prose would do. The skill never invents content; it changes phrasing, structure, and word choice while every fact and claim from the input survives.
+
 ## Setup
 
 **Read both reference files before doing anything else.** They contain the complete catalog and calibration examples needed to do this correctly.
