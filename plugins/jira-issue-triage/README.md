@@ -226,12 +226,12 @@ The workflow runs a generic core for every archetype. Five phases gate on the de
 | Phase 0 | Fetch ticket, run skip-label check, detect archetype, assign to you, transition to investigating. | All |
 | Phase 1 | Investigation: `issue-investigator` (Bug/Incident) or `requirements-investigator` (Feature/Task/Spike). | All (skill choice gates on archetype) |
 | Phase 2 | Datadog log search using signals from Phase 1. Silently suppressed on errors. | Bug, Incident |
-| Phase 2.5 | Decide whether reporter follow-up is warranted (missing data / clarification / fix verification or relevance check). Form severity recommendation (Bug/Incident) or scope summary (Feature/Task/Spike). | All |
+| Phase 2.5 | Decide whether reporter follow-up is warranted (missing data / clarification / fix verification or relevance check). Form severity recommendation (Bug/Incident) or scope summary (Feature/Task/Spike). Draft the matching Phase 4 comment (assessment, scope summary, or follow-up question) in markdown, then run `prose-style` on it so Phase 3 previews a styled draft. | All |
 | Phase 3 | **Hard pause.** Show findings, archetype detection, and proposed updates. Wait for your approval. | All |
-| Phase 4a | Severity assessment comment (ADF). | Bug, Incident |
-| Phase 4b | Scope or AC summary comment (ADF). Optionally writes to `scope_summary_field_name` if configured. | Feature, Task, Spike |
-| Phase 4c | Follow-up question tagging reporter or EM. Replaces Phase 4a or 4b. | All (only when follow_up_needed) |
-| Phase 5 | Refine ticket via `jira-ticket-refiner`. Update title and description. | All |
+| Phase 4a | Convert the Phase 2.5 cleaned draft to ADF and post the severity assessment comment. | Bug, Incident |
+| Phase 4b | Convert the Phase 2.5 cleaned draft to ADF and post the scope or AC summary comment. Optionally writes to `scope_summary_field_name` if configured. | Feature, Task, Spike |
+| Phase 4c | Convert the Phase 2.5 cleaned draft to ADF and post the follow-up question tagging reporter or EM. Replaces Phase 4a or 4b. | All (only when follow_up_needed) |
+| Phase 5 | Refine ticket via `jira-ticket-refiner`, then run `prose-style` on the refined title + description, then preview and update. | All |
 | Phase 6 | Severity + due date (Bug/Incident) OR optional sprint placement + story points (Feature/Task/Spike). Skipped on follow-up path. | All (behavior gates on archetype) |
 | Phase 7 | Link related/duplicate tickets. | All |
 | Phase 8 | Append triaged label. Fill optional fields if discoverable. | All |

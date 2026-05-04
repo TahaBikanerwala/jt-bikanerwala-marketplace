@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. This plan is partially retroactive: tasks are checked off because the work shipped on branch `feat/jira-issue-triage-v1` alongside the plan being written. The plan documents what was done so the same pattern repeats next time.
 
-**Goal:** Bundle the `prose-style` skill into the `jira-issue-triage` plugin (nested at `plugins/jira-issue-triage/skills/prose-style/`), wire it into Phase 5 as a real skill call (replacing the inline writing-rules fallback as the primary path; the inline fallback stays as a defensive backstop), drop the skill from the marketplace Roadmap, bump the plugin version to 1.1.0, and tag the marketplace `v1.1.0`. Mirrors the bundling pattern used for `issue-investigator` (v0.2.0), `jira-ticket-refiner` (v0.3.0), and `requirements-investigator` (v1.0.0).
+**Goal:** Bundle the `prose-style` skill into the `jira-issue-triage` plugin (nested at `plugins/jira-issue-triage/skills/prose-style/`), wire it into the agent at two points (Phase 2.5 to clean comment and follow-up drafts before the Phase 3 preview, and Phase 5 to clean the refined title and description after `jira-ticket-refiner` runs), drop the skill from the marketplace Roadmap, bump the plugin version to 1.1.0, and tag the marketplace `v1.1.0`. Mirrors the bundling pattern used for `issue-investigator` (v0.2.0), `jira-ticket-refiner` (v0.3.0), and `requirements-investigator` (v1.0.0). The original Phase 5–only scope was extended to Phase 2.5 in PR #3 round 1 after Copilot flagged that the docs claimed "comments" but the workflow only touched description and title.
 
-**Architecture:** Three-file skill (one `SKILL.md`, two `references/*.md`) ported from `~/Desktop/MyProjects/simple-windows-setup/.claude/skills/prose-style` with a small Calling Convention section added so the bundled context (Phase 5 of the agent) is documented. The skill is loaded on demand by the `jira-issue-triage` agent in Phase 5 via the `Skill` tool. Existing files get small targeted edits to reflect the new bundled status (skill is no longer a Future plugin).
+**Architecture:** Three-file skill (one `SKILL.md`, two `references/*.md`) ported from `~/Desktop/MyProjects/simple-windows-setup/.claude/skills/prose-style` with a Calling Convention section added so both bundled invocation points (Phase 2.5 draft cleaning and Phase 5 refinement cleaning) are documented. The skill is loaded on demand by the `jira-issue-triage` agent via the `Skill` tool at each phase. Existing files get small targeted edits to reflect the new bundled status (skill is no longer a Future plugin) and the dual invocation.
 
 **Tech Stack:** Markdown (skill body, references, READMEs), JSON (plugin manifest, marketplace manifest), `python3 + yaml` for frontmatter validation, `python3 -m json.tool` for JSON validation, `git` + `gh` for tagging and pushing.
 
-**Working directory:** `/home/taha/Desktop/MyProjects/taha-bikanerwala-marketplace/` (existing repo, branch `feat/jira-issue-triage-v1` cut from `main` after v1.0.0 ship).
+**Working directory:** `/home/taha/Desktop/MyProjects/taha-bikanerwala-marketplace/` (existing repo, branch `feat/prose-style-bundling` cut from `origin/main` after v1.0.0 ship; opened as PR #3).
 
 **Source skill:** `/home/taha/Desktop/MyProjects/simple-windows-setup/.claude/skills/prose-style/` (Everett Morgan, v1.1, category: writing). Ported with a Calling Convention section and one new Jira-specific before/after example added.
 
@@ -80,7 +80,7 @@ Expected: matches only inside the catalog itself (the LLM Lexicon table, the AI-
 
 ---
 
-## Task 2: Update agent body — Sibling Skills section
+## Task 2: Update agent body (Sibling Skills section)
 
 **Files:**
 - Modify: `plugins/jira-issue-triage/agents/jira-issue-triage.md`
@@ -118,7 +118,7 @@ echo "jira-ticket-refiner: $(grep -c 'jira-ticket-refiner' plugins/jira-issue-tr
 echo "prose-style: $(grep -c 'prose-style' plugins/jira-issue-triage/agents/jira-issue-triage.md)"
 ```
 
-Expected: each count `>= 1`. `prose-style` should have exactly 3 references (Sibling Skills row, Phase 5 wiring sentence, Phase 5 defensive fallback).
+Expected: each count `>= 1`. `prose-style` count grew across rounds: round 1 left it at 3 (Sibling Skills row, Phase 5 wiring sentence, Phase 5 defensive fallback). Round 2 added the Phase 2.5 invocation, the Phase 2.5 fallback, three "prose-style-cleaned draft" references in Phase 4a/4b/4c, and the Reporter Follow-up Policy mention, taking the count to roughly 9. Round 3 (this PR's review pass) holds it near that number; do not depend on an exact integer.
 
 - [x] **Step 5: Re-validate frontmatter**
 
@@ -137,17 +137,17 @@ Expected: `frontmatter OK`.
 
 ---
 
-## Task 3: Update plugin README — Bundled skills section
+## Task 3: Update plugin README (Bundled skills section)
 
 **Files:**
 - Modify: `plugins/jira-issue-triage/README.md`
 
 - [x] **Step 1: Add `prose-style` to the Bundled skills table**
 
-Table goes from three rows to four. The new fourth row reads:
+Table goes from three rows to four. After PR #3 round 1, the row reads:
 
 ```
-| `prose-style` | Phase 5 (any archetype) | Writing-rule application: strips em dashes, opener phrases, LLM vocabulary, bullet sprawl. Runs after `jira-ticket-refiner` and before the user-facing preview, plus on every comment the agent drafts. | Bundled, ready to use |
+| `prose-style` | Phase 2.5 + Phase 5 (any archetype) | Writing-rule application: strips em dashes, opener phrases, LLM vocabulary, bullet sprawl. Phase 2.5 invocation cleans the assessment, scope, or follow-up comment draft before the user-facing preview. Phase 5 invocation cleans the refined title and description after `jira-ticket-refiner` runs. | Bundled, ready to use |
 ```
 
 Sentence above the table changes from "The agent calls three skills" to "The agent calls four skills".
@@ -406,3 +406,71 @@ git push
 - [x] **Step 10: Reply to each Copilot comment**
 
 Five replies on PR #3, each pointing at the commit SHA and the file changes that resolve the comment. Mark resolved through the GitHub UI after replying.
+
+---
+
+## Task 10: Post-Copilot review (PR #3 round 2)
+
+Copilot opened one comment after round 1 noting that the new `prose-style/SKILL.md` was missing a top-level H1 title and a one-paragraph overview, which made it inconsistent with the other three bundled skills.
+
+- [x] **Step 1: Add an H1 title and overview to SKILL.md**
+
+The H1 reads `# Prose Style`. The overview paragraph immediately under it states what the skill does (rewrite or audit) and what it never does (invent content), so an agent skimming the file can decide whether to load the references.
+
+- [x] **Step 2: Commit and push, reply, resolve**
+
+One commit: `fix(prose-style): add H1 title and one-paragraph overview` (SHA `b86cea3`). Reply on the Copilot comment, resolve the thread.
+
+---
+
+## Task 11: Post-Copilot review (PR #3 round 3 + self-audit)
+
+Copilot opened one more comment flagging a contradiction: Phase 3 said it would display "the full ADF body, rendered for review" but Phase 2.5 step 6 said the cached draft stays in markdown until Phase 4a/4b/4c builds ADF. The user asked for a thorough self-review pass on top of the Copilot fix to avoid further round-trips. The pass found nine issues; this task documents what shipped.
+
+- [x] **Step 1: Fix the Phase 3 ADF/markdown contradiction (Copilot's open comment)**
+
+Phase 3's Bug/Incident bullet, Feature/Task/Spike bullet, and follow-up bullet all said "the full ADF body, rendered for review". Rewritten to "the prose-style-cleaned markdown draft of the {comment kind} from Phase 2.5, shown inline as plain markdown. Phase 4{a,b,c} will convert this same text to ADF on post." Now consistent with Phase 2.5 step 5.
+
+- [x] **Step 2: Fix the Phase 9 wrong-phase reference**
+
+Phase 9 step 1 follow-up bullet said "Phase 4b already assigned the ticket". The actual assignee write happens in Phase 4c step 3. Replaced with "Phase 4c already assigned the ticket to the tagged person".
+
+- [x] **Step 3: Fix the "Rules for all three templates" miscount**
+
+Reporter Follow-up Policy has four templates (Missing data, Clarification, Fix verification, Relevance check). The header read "Rules for all three templates"; corrected to "Rules for all four templates".
+
+- [x] **Step 4: Restructure Phase 2.5 so only the comment that will actually be posted is drafted**
+
+Round 1 of Phase 2.5 wiring drafted the Phase 4a or 4b assessment/scope comment in step 3, then drafted the follow-up question in step 5 if a follow-up scenario applied. On the follow-up path, the assessment or scope draft was drafted, prose-style-cleaned, and then never used (Phase 4a and 4b are skipped on that path). The new step list moves the follow-up decision into step 3 (before any drafting), so step 4 drafts only the comment that the matching Phase 4a, 4b, or 4c will post. Step 5 runs `prose-style` on that one draft. The total step count drops from 6 to 5 and the wasted-work edge case is gone.
+
+- [x] **Step 5: Make the Phase 5 prose-style invocation explicit**
+
+Phase 5 said "Then apply the `prose-style` skill's writing rules to the output before posting", which read like inlined rules, not a skill call. Rewrote to "invoke `prose-style` via the `Skill` tool, passing the refiner output (title + description), to clean writing-style anti-patterns" and added step 2 in the steps list ("Invoke the `prose-style` skill via the `Skill` tool, passing the refined title and description from step 1 as input"). The remaining steps renumber from 4 to 5.
+
+- [x] **Step 6: Make the Phase 2.5 defensive fallback list explicit**
+
+Phase 5's defensive fallback enumerates eight rules (no em dashes, no spaced hyphens, no LLM vocabulary with the full word list, lead with the answer, no opener phrases, no trailing summaries, prose over bullets). Phase 2.5's fallback only had a parenthetical with five rules. Phase 2.5 now lists the same eight rules so behavior is symmetric whether the skill fails to load at Phase 2.5 or Phase 5.
+
+- [x] **Step 7: Update plugin README workflow phases table**
+
+Phase 2.5 row added the drafting + prose-style step. Phase 4a/4b/4c rows now state they convert the Phase 2.5 cleaned draft to ADF (rather than implying they re-draft). Phase 5 row added the prose-style step between refiner and preview.
+
+- [x] **Step 8: Clean the reporter follow-up Missing data + Clarification templates**
+
+Both templates opened with "Thanks for filing this." plus a soft setup ("To triage it properly we need one more detail" / "Before we investigate further, can you confirm"). The agent's own Reporter Follow-up rules say "Lead with the request or the evidence. No opener phrases." prose-style would catch and rewrite these at runtime. Templates now lead with the question; the rationale follows.
+
+- [x] **Step 9: Add spaced hyphens to prose-style Core Principle**
+
+Core Principle listed em dashes as the only punctuation tell. Critical Rules also forbids spaced hyphens as separators. Core Principle updated to mention both, so the principle and the rule list line up.
+
+- [x] **Step 10: Update plan Architecture, Goal, branch name, and stale row text**
+
+Plan Goal now describes both invocation points instead of "wire it into Phase 5 as a real skill call". Architecture mirrors that. Working directory line updated from branch `feat/jira-issue-triage-v1` to `feat/prose-style-bundling` (PR #3). Task 2 step 4 count assertion replaced with the per-round count history. Task 3 step 1 row text updated to the round-1 wording (`Phase 2.5 + Phase 5`).
+
+- [x] **Step 11: Re-run validations**
+
+Same three checks as Task 9 step 8 (frontmatter parse, both JSONs valid). Expected: all three print success.
+
+- [x] **Step 12: Commit and push, reply to Copilot, resolve threads**
+
+One commit on top of `b86cea3`. Reply to the open Copilot comment pointing at the new commit SHA and naming the contradiction now resolved. Resolve the thread through the GitHub UI.

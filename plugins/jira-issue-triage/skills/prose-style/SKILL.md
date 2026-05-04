@@ -39,7 +39,7 @@ In both contexts, the skill never posts to Jira on its own. The agent owns the `
 
 ## Core Principle
 
-The reader should never suspect a model wrote this. No tells: no em dashes, no opener phrases, no LLM vocabulary, no bullet lists where prose would do. Say the thing directly. Lead with the answer. Cut everything that does not add meaning.
+The reader should never suspect a model wrote this. No tells: no em dashes, no spaced hyphens used as separators, no opener phrases, no LLM vocabulary, no bullet lists where prose would do. Say the thing directly. Lead with the answer. Cut everything that does not add meaning.
 
 ## Workflow
 
