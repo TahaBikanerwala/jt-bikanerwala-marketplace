@@ -254,7 +254,7 @@ The agent will never:
 - Close or resolve a ticket without your approval.
 - Modify the `priority` field unless `priority` is the configured severity field.
 - Post a comment without showing you the text first AND getting an explicit yes at the Phase 3 gate.
-- Refine the title or description without an explicit yes at the Phase 3 gate AND a final preview approval at Phase 5.
+- Refine the title or description without an explicit yes at the Phase 3 gate. Phase 5 then renders the cleaned output inline as an informational preview and pauses for `description_preview_pause_seconds` (default 3) before writing, so you have a chance to interrupt if something looks wrong; users who want a second confirmation prompt can opt in per run via the "Other" channel on Phase 3 question 2.
 - Tag the reporter or their EM until investigation is exhausted and a specific gap blocks meaningful triage. Reporter contact is a last resort.
 - Tag anyone other than the reporter or their EM in a follow-up question.
 - Remove or overwrite reporter-provided information during refinement (only append).

@@ -16,7 +16,13 @@ This skill modifies Jira. It updates the ticket's description and title (the `fi
 
 The skill works two ways. When a user pastes a ticket key and asks to refine it, run end to end. When the `jira-issue-triage` agent calls this skill in Phase 5, treat the agent's already-fetched payload and investigation findings as the source data and skip the fetch step.
 
-- **One confirmation gate.** Always preview the rewrite before calling `editJiraIssue`. The user must approve. **Exception:** when the prompt passed to the skill begins with `Calling context: skip_preview=true.` (the `jira-issue-triage` agent inserts this leading line in Phase 5 because the agent already captured user approval at Phase 3 and renders its own informational preview before writing), produce the refined title and description, hand them back to the caller as plain text, and skip Step 7's preview-and-`editJiraIssue` entirely. Do not call `AskUserQuestion` and do not call `editJiraIssue`. The caller owns the write in that mode.
+- **One confirmation gate.** Always preview the rewrite before calling `editJiraIssue`. The user must approve. **Exception:** when the prompt passed to the skill begins with `Calling context: skip_preview=true.` (the `jira-issue-triage` agent inserts this leading line in Phase 5 because the agent already captured user approval at Phase 3 and renders its own informational preview before writing), the skill operates in **read-only-return mode**:
+  - Do not call `AskUserQuestion` (no preview gate).
+  - Do not call `editJiraIssue` (no description or title write).
+  - Do not call `addCommentToJiraIssue` (no Step 8 next-steps comment, even if the input would normally trigger it).
+  - Do not call any other Jira-mutating MCP tool.
+  - The skill's only side effects are reading the cached payload and producing the refined title and description as plain-text output for the caller to consume.
+  - The agent (Phase 5 step 4) owns the `editJiraIssue` write; if the user wants a Step 8 next-steps comment, they request it through a separate flow after the agent run completes.
 - **Read-then-write.** Refuse to write before reading the description, comments, and (when relevant) changelog.
 - **Strict superset.** The refined ticket contains every fact from the original. Restructure, rewrite, and re-tag, never truncate.
 - **No solution prescription.** The skill structures information. It does not invent fixes, recommend roadmap, or editorialize on causes that are not in the ticket.
