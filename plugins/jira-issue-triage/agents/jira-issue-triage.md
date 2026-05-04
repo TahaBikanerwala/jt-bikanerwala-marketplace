@@ -114,8 +114,9 @@ All four bundled skills install with the plugin. The defensive fallbacks below f
 
 When the agent invokes a skill via the `Skill` tool, it can pass instructions to the skill by including a leading `Calling context:` line in the prompt. The convention:
 
-- The first line of the agent's prompt to the skill is `Calling context: <key>=<value>[, <key>=<value>...].`
-- The skill body recognizes this prefix and interprets the keys it knows about.
+- The first line of the agent's prompt to the skill is **only** the directive: `Calling context: <key>=<value>[, <key>=<value>...].` (terminated by a period).
+- The directive line carries no free-text guidance. Any human-readable instructions, payload data, or skill input go on subsequent lines after a blank line.
+- The skill body parses the first line, recognizes known keys, and interprets them. Free-text guidance and payload data on later lines are read normally.
 - Unknown keys are ignored by the skill — forwards-compat for new flags.
 
 Currently defined keys:
@@ -402,7 +403,7 @@ Present findings to the user. Show:
   - The prose-style-cleaned markdown draft of the question comment from Phase 2.5, shown inline as plain markdown. Phase 4c will convert this same text to ADF on post.
   - What transition will happen (`waiting_reply`), who the ticket will be assigned to (the tagged person), and what will still run (refine, link, label) vs. skipped (the archetype-specific Phase 4 content, severity + due date for Bug/Incident, sprint placement for Feature/Task/Spike).
 
-**Working state used by this gate (excerpt of the Working State table at the top of this file).** The full canonical list lives in the Working State section above; this is a focused view for the gate's six in-scope flags:
+**Working state used by this gate (excerpt of the Working State table at the top of this file).** The full canonical list lives in the Working State section above; this is a focused view of the seven in-scope cache keys (five booleans / numerics that gate writes plus two free-text channels for revision feedback):
 
 | Cache key | Set in | Read in | Type |
 |-----------|--------|---------|------|
@@ -561,7 +562,18 @@ This phase runs two skills in sequence. First, invoke `jira-ticket-refiner` via 
 **Fallback (when `prose-style` is not installed):** apply at minimum these rules to the refined title + description before previewing: no em dashes, no spaced hyphens as separators, no LLM vocabulary (delve, leverage, robust, seamlessly, comprehensive, nuanced, elevate, foster, paradigm, ecosystem, holistic, innovative, synergy, empower, facilitate), lead with the answer, no opener phrases, no trailing summaries on short sections, prose over bullet lists when content flows naturally as sentences.
 
 Steps:
-1. Build the refined title and description (`jira-ticket-refiner` invocation, or its fallback above). The agent communicates the `skip_preview` instruction by including a leading line in the prompt it passes to the `Skill` tool: `Calling context: skip_preview=true. The orchestrator owns the user gate; do not run Step 7 preview or write via editJiraIssue. Return the refined title and description as your final output.` The skill's body recognizes this prefix and short-circuits Step 7 (no AskUserQuestion, no editJiraIssue). The skill returns the refined title + description as plain text for the agent to consume.
+1. Build the refined title and description (`jira-ticket-refiner` invocation, or its fallback above). The agent communicates the `skip_preview` instruction to the skill via the leading-line convention from the "Skill calling-context conventions" section above. The exact prompt the agent passes to the `Skill` tool is:
+
+   ```
+   Calling context: skip_preview=true.
+
+   The orchestrator owns the user gate; do not run Step 7 preview or write via editJiraIssue.
+   Return the refined title and description as your final output.
+
+   <ticket payload and refinement source data follow>
+   ```
+
+   The first line is the machine-parseable `Calling context:` directive (a single key=value, terminated by a period). Free-text guidance to the skill goes on subsequent lines, never on the first line. The skill's body parses the first line, recognizes `skip_preview=true`, and short-circuits Step 7 (no `AskUserQuestion`, no `editJiraIssue`, no comment posting). The skill returns the refined title + description as plain text for the agent to consume.
 2. Invoke the `prose-style` skill via the `Skill` tool, passing the refined title and description from step 1 as input. Replace the title and description with the cleaned versions returned by the skill (or run the inline fallback rule list above when the skill does not load).
 3. Render the cleaned refined title + description to the user as inline markdown (not wrapped in an outer code fence). This is **informational, not a question** — Phase 3 already captured the user's approval to refine. The render gives the user a chance to interrupt (Ctrl+C) if something looks egregiously wrong before the write happens. Do not call `AskUserQuestion` here. Frame the output with one line above the render: ``Writing the following to `{TICKET-KEY}` in {N} seconds (interrupt to abort):``. The pause length `{N}` reads from `description_preview_pause_seconds` in config (default 3). When the user explicitly opted in to a second checkpoint (via the "Other" channel on Phase 3 question 2 — `refine_change_request` mentions "show me before writing" or similar), DO call `AskUserQuestion` here with options `Approve and write`, `Request changes` instead of pausing. After rendering and pausing (or after the optional confirmation), proceed to step 4.
 4. Update via `editJiraIssue` with `contentFormat: "markdown"`.

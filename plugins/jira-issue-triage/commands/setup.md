@@ -158,7 +158,7 @@ Use the `Write` tool with `path: ".claude/jira-issue-triage.config.json"`. Prett
 }
 ```
 
-The wizard does NOT ask about these advanced fields: `scope_summary_field_name`, `sprint_field_name`, `story_points_field_name`, `non_bug_transitions.ready`, `archetype_assignment_after_triage`, `description_preview_pause_seconds`. They are written with their default values shown above so that the saved JSON is a complete, browseable config. Users edit the file directly to override. See the plugin README's "Advanced configuration" section for what each field does.
+The wizard does NOT ask about these advanced fields: `scope_summary_field_name`, `sprint_field_name`, `story_points_field_name`, `non_bug_transitions.ready`, `archetype_assignment_after_triage`, `description_preview_pause_seconds`. They are written with their default values shown above so that the saved JSON is a complete, browsable config. Users edit the file directly to override. See the plugin README's "Advanced configuration" section for what each field does.
 
 ### 5. Confirmation message
 
