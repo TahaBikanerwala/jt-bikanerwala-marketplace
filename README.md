@@ -18,7 +18,13 @@ Then install any plugin from the table below:
 
 | Plugin | Version | What it does |
 |--------|---------|--------------|
-| [`jira-issue-triage`](./plugins/jira-issue-triage/) | 1.2.0 | Subagent that triages Jira issues across all archetypes (Bug, Incident, Feature, Task, Spike): assigns, runs the matching investigation skill, refines the title and description, posts an archetype-appropriate assessment comment, and DMs you a summary. Bundles `issue-investigator` (Bug/Incident), `requirements-investigator` (Feature/Task/Spike), `jira-ticket-refiner` (any archetype), and `prose-style` (writing-rule application on refined output and comments). Ships a `/jira-issue-triage:setup` wizard for first-time configuration. |
+| [`jira-issue-triage`](./plugins/jira-issue-triage/) | 1.3.0 | Subagent that triages Jira issues across all archetypes (Bug, Incident, Feature, Task, Spike): assigns, runs the matching investigation skill, refines the title and description, posts an archetype-appropriate assessment comment, and DMs you a summary. Bundles `issue-investigator` (Bug/Incident), `requirements-investigator` (Feature/Task/Spike), `jira-ticket-refiner` (any archetype), and `prose-style` (writing-rule application on refined output and comments). Ships a `/jira-issue-triage:setup` wizard for first-time configuration. |
+
+## What changed in 1.3.0
+
+UX pass on the 1.2.0 confirmation gate. The Phase 3 main panel now batches its decisions into a single `AskUserQuestion` call instead of asking 3-5 sequential questions; the user sees up to 4 yes/no choices side by side and approves all writes from one panel. Phase 5 stops asking for approval a second time after the description is refined: the Phase 3 yes is the gate, and the cleaned output renders inline as an informational preview before the write so the user can interrupt if something looks wrong. Phase 9's assignment behavior is now configurable per archetype via `archetype_assignment_after_triage`. Defaults match 1.2.0 (Bug unassigns, others stay with you), but teams can override per archetype: Sev-1 incidents that should auto-route to on-call set `"Incident": "unassign"`; teams whose triager keeps bug-fix ownership set `"Bug": "self"`.
+
+No migration steps. Re-install the plugin to pick up the new behavior. Existing configs without `archetype_assignment_after_triage` get the 1.2.0 defaults.
 
 ## What changed in 1.2.0
 
