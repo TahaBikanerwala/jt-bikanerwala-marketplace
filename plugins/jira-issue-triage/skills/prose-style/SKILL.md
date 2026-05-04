@@ -1,12 +1,11 @@
 ---
 name: prose-style
-description: Rewrites or audits prose to eliminate AI writing patterns and produce natural human writing. Use when the user says "AI slop", "sounds generated", "too formal", "write like a human", "fix the writing", "rewrite this", "clean up the prose", or asks for writing style guidance. Also apply proactively when generating documentation, Slack messages, Confluence pages, Jira ticket text, or any long-form prose output.
-tools: Read
+description: 'Rewrites or audits prose to eliminate AI writing patterns and produce natural human writing. Use when the user says "AI slop", "sounds generated", "too formal", "write like a human", "fix the writing", "rewrite this", "clean up the prose", or asks for writing style guidance. Also apply proactively when generating documentation, Slack messages, Confluence pages, Jira ticket text, or any long-form prose output.'
 metadata:
-  author: Everett Morgan
-  ported_by: Taha Bikanerwala
+  author: Taha Bikanerwala
   version: "1.1"
   category: writing
+tools: Read
 ---
 
 # Prose Style

@@ -1,6 +1,6 @@
 # prose-style Skill Bundling Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. This plan is partially retroactive: tasks are checked off because the work shipped on branch `feat/jira-issue-triage-v1` alongside the plan being written. The plan documents what was done so the same pattern repeats next time.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. This plan is partially retroactive: tasks are checked off because the work shipped on branch `feat/prose-style-bundling` (PR #3) alongside the plan being written. The plan documents what was done so the same pattern repeats next time.
 
 **Goal:** Bundle the `prose-style` skill into the `jira-issue-triage` plugin (nested at `plugins/jira-issue-triage/skills/prose-style/`), wire it into the agent at two points (Phase 2.5 to clean comment and follow-up drafts before the Phase 3 preview, and Phase 5 to clean the refined title and description after `jira-ticket-refiner` runs), drop the skill from the marketplace Roadmap, bump the plugin version to 1.1.0, and tag the marketplace `v1.1.0`. Mirrors the bundling pattern used for `issue-investigator` (v0.2.0), `jira-ticket-refiner` (v0.3.0), and `requirements-investigator` (v1.0.0). The original Phase 5–only scope was extended to Phase 2.5 in PR #3 round 1 after Copilot flagged that the docs claimed "comments" but the workflow only touched description and title.
 
@@ -10,7 +10,7 @@
 
 **Working directory:** `/home/taha/Desktop/MyProjects/taha-bikanerwala-marketplace/` (existing repo, branch `feat/prose-style-bundling` cut from `origin/main` after v1.0.0 ship; opened as PR #3).
 
-**Source skill:** `/home/taha/Desktop/MyProjects/simple-windows-setup/.claude/skills/prose-style/` (Everett Morgan, v1.1, category: writing). Ported with a Calling Convention section and one new Jira-specific before/after example added.
+**Source skill:** `/home/taha/Desktop/MyProjects/simple-windows-setup/.claude/skills/prose-style/` (v1.1, category: writing). Ported with a Calling Convention section and one new Jira-specific before/after example added; authorship metadata reset to Taha Bikanerwala in PR #3 round 4 (see Task 12).
 
 ---
 
@@ -29,9 +29,9 @@ mkdir -p /home/taha/Desktop/MyProjects/taha-bikanerwala-marketplace/plugins/jira
 
 - [x] **Step 2: Write the SKILL.md**
 
-Body has six sections: Setup (read both references first), Calling Convention (standalone vs Phase 5 of `jira-issue-triage`), Core Principle, Workflow (4-row table), Critical Rules (always active), Anti-Patterns (7 hard rules).
+Body has six sections: Setup (read both references first), Calling Convention (standalone use plus the two `jira-issue-triage` invocation points: Phase 2.5 draft cleaning and Phase 5 refinement cleaning), Core Principle, Workflow (4-row table), Critical Rules (always active), Anti-Patterns (7 hard rules).
 
-Frontmatter: `name: prose-style`, description starts with "Rewrites or audits prose..." and includes Jira-specific triggers ("Jira ticket text") so Phase 5 discovery is reliable. `metadata.author: Everett Morgan`, `metadata.ported_by: Taha Bikanerwala`, `metadata.version: "1.1"`, `metadata.category: writing`. Total frontmatter under 1024 chars.
+Frontmatter field order matches the other three bundled skills: `name`, `description`, `metadata`, `tools`. The description is single-quoted (the description body has seven inner double-quoted trigger phrases like `"AI slop"`; single quotes avoid the `\"` escape clutter that double quotes would force, while still satisfying the YAML-safety quoting convention used by the other three bundled skills). `metadata.author: Taha Bikanerwala`, `metadata.version: "1.1"`, `metadata.category: writing`; the extra `version` and `category` fields are intentional (they document the skill's origin and domain) even though the other three bundled skills only carry `metadata.author`. Description body length stays under 1024 chars (the Claude Code skill discoverability budget). Round 4 dropped the `ported_by` field and replaced the original `Everett Morgan` author with the current owner; see Task 12 for the rationale.
 
 - [x] **Step 3: Write `references/anti-patterns.md`**
 
@@ -53,9 +53,9 @@ m = re.match(r'^---\n(.*?)\n---', content, re.DOTALL)
 assert m, 'no frontmatter'
 data = yaml.safe_load(m.group(1))
 assert data['name'] == 'prose-style'
-assert 'description' in data and len(data['description']) > 50 and len(data['description']) < 1024
-assert data.get('metadata', {}).get('author') == 'Everett Morgan'
-assert data.get('metadata', {}).get('ported_by') == 'Taha Bikanerwala'
+assert 'description' in data and len(data['description']) > 50 and len(data['description']) < 1024  # description body, not total frontmatter
+assert data.get('metadata', {}).get('author') == 'Taha Bikanerwala'
+assert list(data.keys()) == ['name', 'description', 'metadata', 'tools'], f'unexpected key order: {list(data.keys())}'
 print('frontmatter OK')
 "
 ```
@@ -319,7 +319,7 @@ No drift detected.
 
 **3. Out-of-band considerations.**
 
-- The skill source has `metadata.author: Everett Morgan`. Preserved that attribution and added `metadata.ported_by: Taha Bikanerwala` so credit lands in both directions.
+- Authorship: round 1 preserved the upstream `metadata.author: Everett Morgan` and added `metadata.ported_by: Taha Bikanerwala`. Round 4 (Task 12) reset to a single `metadata.author: Taha Bikanerwala`, matching the convention used by the other three bundled skills and reflecting the current ownership of the bundled copy.
 - Added one Jira-specific before/after example in `references/examples.md` (Example 6) so the Phase 5 use case has a calibration anchor. This is the only substantive content addition over the source skill.
 - Replaced em-dash separators that appeared in the source's catalog body prose (the catalog itself names em dashes as the first anti-pattern; keeping them inside the catalog made the file inconsistent with its own rule). The em dashes inside the rule-statement examples and the catalog-of-words tables remain because removing them would defeat the catalog's purpose.
 
@@ -353,6 +353,8 @@ Added a 2-row table mapping each invocation point (Phase 2.5 draft cleaning, Pha
 Phase column changes from `Phase 5 (any archetype)` to `Phase 2.5 + Phase 5 (any archetype)`. The purpose cell calls out both invocation points explicitly.
 
 - [x] **Step 4: Wire `prose-style` into Phase 2.5**
+
+> Round 2 layout, **superseded by Task 11 Step 4** (the round-3 self-review pass refactored this into 5 steps so the follow-up decision lands before drafting; the layout below is kept as audit history, not the current behavior).
 
 Phase 2.5 step list grew from 4 steps to 6:
 
@@ -471,6 +473,49 @@ Plan Goal now describes both invocation points instead of "wire it into Phase 5 
 
 Same three checks as Task 9 step 8 (frontmatter parse, both JSONs valid). Expected: all three print success.
 
-- [x] **Step 12: Commit and push, reply to Copilot, resolve threads**
+- [x] **Step 12: Commit, push, reply, resolve (round 3 close-out)**
 
-One commit on top of `b86cea3`. Reply to the open Copilot comment pointing at the new commit SHA and naming the contradiction now resolved. Resolve the thread through the GitHub UI.
+One commit on top of `b86cea3`. Reply to the open Copilot comment pointing at the new commit SHA and naming the contradiction now resolved. Resolve the thread through the GitHub UI. (Sub-step is named "round 3 close-out" so it does not collide with the top-level Task 12 below.)
+
+---
+
+## Task 12: Post-Copilot review (PR #3 round 4 + authorship reset)
+
+Two changes land together in this round. Copilot opened one comment noting that the new `prose-style/SKILL.md` was the only one of the four bundled skills with an unquoted `description:` field; the other three (`issue-investigator`, `jira-ticket-refiner`, `requirements-investigator`) all double-quote their descriptions. Independently, the user reset the prose-style authorship from `Everett Morgan` plus `ported_by: Taha Bikanerwala` to a single `author: Taha Bikanerwala`, matching the convention of the other three bundled skills. Both changes ship in the same commit so the SKILL.md frontmatter pass is one diff hunk.
+
+- [x] **Step 1: Quote the description field**
+
+Single quotes, not double. The description body has seven inner double-quoted trigger phrases (`"AI slop"`, `"sounds generated"`, `"too formal"`, `"write like a human"`, `"fix the writing"`, `"rewrite this"`, `"clean up the prose"`). Double-quoting the outer string would force `\"` escapes on every one, which hurts readability. Single-quoted YAML scalars are still "quoted" for the parser's purposes; the YAML safety concern Copilot raised (accidental `:` or `#` interpretation, parser edge cases) applies equally to either quote style. The other three skills happen to use double quotes only because their description bodies do not contain inner double quotes.
+
+- [x] **Step 2: Reset authorship metadata**
+
+The user dropped `ported_by` and changed `author` from `Everett Morgan` to `Taha Bikanerwala`. The new metadata block now has three fields (`author`, `version`, `category`); the other three bundled skills only have `author`. The extra `version` and `category` fields stay because they convey real information about the skill's origin and domain, even if they are not standardized across the marketplace yet.
+
+- [x] **Step 3: Update the plan to match**
+
+Source skill line: dropped `Everett Morgan` from the parenthetical and added a note pointing at this task. Task 1 Step 2 frontmatter description: updated to single-quoted, single-author, with one sentence on why single quotes are right here. Task 1 Step 5 frontmatter validator: assertion now checks `author == 'Taha Bikanerwala'` and the `ported_by` assertion is gone. Self-review section 3 first bullet: rewrote to explain the round-1-vs-round-4 history of authorship instead of the round-1-only "preserved attribution" framing.
+
+- [x] **Step 4: Re-run validations**
+
+```bash
+python3 -c "
+import re, yaml
+content = open('plugins/jira-issue-triage/skills/prose-style/SKILL.md').read()
+m = re.match(r'^---\n(.*?)\n---', content, re.DOTALL)
+data = yaml.safe_load(m.group(1))
+assert data['name'] == 'prose-style'
+assert data['tools'] == 'Read'
+assert data.get('metadata', {}).get('author') == 'Taha Bikanerwala'
+assert 'ported_by' not in data.get('metadata', {})
+assert 'AI slop' in data['description']
+print('frontmatter OK')
+"
+python3 -m json.tool .claude-plugin/marketplace.json > /dev/null && echo OK
+python3 -m json.tool plugins/jira-issue-triage/.claude-plugin/plugin.json > /dev/null && echo OK
+```
+
+Expected: all three print success.
+
+- [x] **Step 5: Commit, push, reply, resolve**
+
+One commit covering the SKILL.md frontmatter and the four plan-file edits. Reply on the Copilot comment with the new SHA and the single-quote rationale. Resolve the thread.
