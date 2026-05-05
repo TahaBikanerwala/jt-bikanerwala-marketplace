@@ -159,7 +159,7 @@ The agent tracks a small set of named caches across phases. Treat these as concr
 | `approved_followup_tag` | Phase 3 main panel question 4 | Phase 3 post-panel downgrade rule | boolean | `false` |
 | `comment_change_request` | "Other" channel of Phase 3 question 1 | Phase 3 revision loop | string or empty | empty |
 | `refine_change_request` | "Other" channel of Phase 3 question 2 | Phase 5 invocation guidance | string or empty | empty |
-| `assignment_outcome` | Phase 9 step 1 | Phase 10 DM placeholder `{assignment outcome}` | enum (`unassigned` / `kept assigned to you` / `tagged-followup`) | `null` |
+| `assignment_outcome` | Phase 9 step 1 (standard path only) | Phase 10 DM placeholder `{assignment outcome}` | enum (`unassigned` / `kept assigned to you`) | `null` |
 
 Phase 3 reproduces the gate-relevant subset of this table inline for context, but this is the canonical glossary.
 
@@ -718,7 +718,7 @@ Pick the outcome that matches what you did:
 | Description skipped at Phase 3 | (append) `Title and description left as-is (skipped at confirmation gate)` |
 | Aborted at Phase 3 (3-revision cap reached) | `Aborted triage at confirmation gate after 3 revision rounds. Last user comment: "{quoted comment}". Ticket stays assigned to you in {investigating transition}.` |
 | Config field-resolution misses (Phase 0 auto-discovery couldn't find a configured field) | (append) `Skipped {field name} write: configured field not found on this project.` |
-| Invalid archetype_assignment_after_triage entry (warned at Phase 0) | (append) `Ignored invalid archetype_assignment_after_triage entry: {key} = {value}. Used default for that archetype.` |
+| Invalid archetype_assignment_after_triage entry (validated at Phase 0; warning deferred to this DM) | (append) `Ignored invalid archetype_assignment_after_triage entry: {key} = {value}. Used default for that archetype.` |
 | Duplicate (only if user explicitly approved closure) | `Closed as duplicate of ORIGINAL-KEY` |
 | Severity changed | `Changed severity from {SevX} to {SevY}` |
 | Closed (only if user explicitly approved closure) | `Closed as {resolution}` |

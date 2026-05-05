@@ -10,7 +10,7 @@ tools: Read, mcp__plugin_atlassian_atlassian__getAccessibleAtlassianResources, m
 
 Take a Jira ticket that is hard to read and turn it into a document a stranger can open cold, in a year, and act on. Reorganize the content. Never delete it. Every fact in the original survives the rewrite, just placed somewhere it can be found.
 
-This skill modifies Jira in its default mode: it updates the ticket's description and title (the `fields.summary` API field) via the Atlassian MCP, and posts an optional next-steps comment when the user asks for one. **One exception:** when invoked with `Calling context: skip_preview=true.` (the `jira-issue-triage` agent does this in Phase 5), the skill operates in **read-only-return mode** and performs no Jira writes at all; it returns the refined title and description as plain text for the caller to write. See the "Calling Convention" bullets below for the full read-only-return contract.
+This skill modifies Jira in its default mode: it updates the ticket's description and title (writing to the `fields.description` and `fields.summary` Jira API fields, respectively) via the Atlassian MCP, and posts an optional next-steps comment when the user asks for one. **One exception:** when invoked with `Calling context: skip_preview=true.` (the `jira-issue-triage` agent does this in Phase 5), the skill operates in **read-only-return mode** and performs no Jira writes at all; it returns the refined title and description as plain text for the caller to write. See the "Calling Convention" bullets below for the full read-only-return contract.
 
 ## Calling Convention
 

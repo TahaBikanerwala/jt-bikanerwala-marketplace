@@ -32,7 +32,7 @@ UX pass on the 1.2.0 confirmation gate. Three changes you'll notice as you triag
 
 Other refinements in this release: invalid `archetype_assignment_after_triage` values fall back to defaults with a warning instead of breaking the run; the Phase 3 revision loop caps at 3 rounds with an explicit "approve as-is or abort" exit; the agent body now leads with a Working State glossary and a Skill calling-context conventions section so the runtime LLM tracks state as concrete values; the setup wizard's saved JSON now includes the new advanced config keys with their defaults so the file is browsable; and the Phase 5 jira-ticket-refiner invocation uses a `Calling context: skip_preview=true.` prefix to suppress the skill's own gate, removing the third confirmation that previously snuck in.
 
-No migration steps. Existing configs without `archetype_assignment_after_triage` or `description_preview_pause_seconds` get the 1.2.0 defaults applied at runtime.
+No migration steps. Existing configs without `archetype_assignment_after_triage` or `description_preview_pause_seconds` get the 1.3.0 defaults applied at runtime: the assignment defaults preserve 1.2.0 behavior (Bug unassigns, others stay), and `description_preview_pause_seconds` defaults to `3` (the pause is new in 1.3.0; 1.2.0 had no equivalent setting).
 
 ## What changed in 1.2.0
 
