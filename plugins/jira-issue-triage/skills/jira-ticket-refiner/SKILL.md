@@ -3,7 +3,7 @@ name: jira-ticket-refiner
 description: "Restructures a poorly written Jira ticket into a clear, self-contained document that a stranger can read cold and act on. Works on any ticket type (bug, feature, task, spike, incident). Updates the description and title via the Atlassian MCP and never deletes original content. Use when the user asks to refine, rewrite, restructure, clean up, or improve a Jira ticket."
 metadata:
   author: Taha Bikanerwala
-tools: Read, mcp__plugin_atlassian_atlassian__getAccessibleAtlassianResources, mcp__plugin_atlassian_atlassian__getJiraIssue, mcp__plugin_atlassian_atlassian__editJiraIssue, mcp__plugin_atlassian_atlassian__addCommentToJiraIssue
+tools: AskUserQuestion, Read, mcp__plugin_atlassian_atlassian__getAccessibleAtlassianResources, mcp__plugin_atlassian_atlassian__getJiraIssue, mcp__plugin_atlassian_atlassian__editJiraIssue, mcp__plugin_atlassian_atlassian__addCommentToJiraIssue
 ---
 
 # Jira Ticket Refiner
