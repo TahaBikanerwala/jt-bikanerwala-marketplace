@@ -4,11 +4,19 @@ A Claude Code plugin that ships one subagent (`azure-issue-triage`) and a setup 
 
 This plugin is a sibling of [`jira-issue-triage`](../jira-issue-triage/). The two plugins install side by side; the workflows are conceptually identical but call platform-specific tools.
 
+## What's new in v0.3.0
+
+Three Bug/Incident-flow upgrades that bring the agent closer to feature parity with `jira-issue-triage`:
+
+- **Severity SLA due dates.** `severity_scheme` config (`due_offset_days`, `escalate_immediately`) maps each severity level to a target turnaround. Phase 6 writes `Microsoft.VSTS.Scheduling.DueDate` as `System.CreatedDate + due_offset_days`. The pre-triage value is preserved in revision history.
+- **Microsoft Teams escalation routing.** A new `escalation` config block (`teams_channel`, `primary_contact`, `fallback_contact`) drives Phase 10 escalation when the recommended severity has `escalate_immediately: true`. The agent posts a separate channel message mentioning the resolved primary contact (looked up by email at session start), DMs the contact directly when no channel is configured, or no-ops when both are null.
+- **EM-fallback for deactivated reporters.** When a follow-up is needed and the reporter appears unreachable, the agent now runs a three-step ladder: Teams profile manager lookup, AzDO team-admin scan, then ask-the-user with a proposed candidate. EM tagging requires explicit user approval; the question comment carries an "original reporter is unreachable" preamble.
+
+Earlier deferred items still pending for **v0.4.0**: sprint placement via `work_list_team_iterations` + `@CurrentIteration`, story-point estimation prompt at Phase 3, and Azure Repos PR linking via `wit_link_work_item_to_pull_request`.
+
 ## What's new in v0.2.0
 
 The archetype scope expanded from Bug + Task (v0.1.0) to all five archetypes. **Bug, Incident, User Story, Feature, Task, and Spike** all triage end-to-end now. Process-template-aware mapping in `work_item_type_map` lets Scrum (Product Backlog Item, Impediment) and CMMI (Requirement, Issue) projects override the work-item-type names.
-
-Still deferred to **v0.3.0**: severity SLA due-date computation, Phase 9 escalation routing (Teams channel ping, primary/fallback contacts), sprint placement via `work_list_team_iterations`, story-point estimation prompt, Azure Repos PR linking via `wit_link_work_item_to_pull_request`, and EM-fallback when the reporter is deactivated.
 
 ## Prerequisites
 
@@ -113,6 +121,17 @@ Configuration is **optional**. The agent uses sensible defaults if no config fil
     "Task": "self",
     "Spike": "self"
   },
+  "severity_scheme": {
+    "1 - Critical": { "due_offset_days": 7,  "escalate_immediately": true  },
+    "2 - High":     { "due_offset_days": 14, "escalate_immediately": false },
+    "3 - Medium":   { "due_offset_days": 30, "escalate_immediately": false },
+    "4 - Low":      { "due_offset_days": 90, "escalate_immediately": false }
+  },
+  "escalation": {
+    "teams_channel": null,
+    "primary_contact": null,
+    "fallback_contact": null
+  },
   "teams_channel": null,
   "description_preview_pause_seconds": 3
 }
@@ -127,8 +146,58 @@ Configuration is **optional**. The agent uses sensible defaults if no config fil
 - `states`: shown above. Azure DevOps requires a `State` + `Reason` pair on most transitions, so each entry is an object. Mapping depends on your process template (Agile, Scrum, CMMI). The defaults match Agile.
 - `work_item_type_map`: assumes the **Agile** process template. `Bug -> Bug`, `Incident -> Issue`, `User Story -> User Story`, `Feature -> Feature`, `Task -> Task`, `Spike -> Task` (Spike has no canonical work-item type; the agent treats a Task tagged `spike` as a Spike). Override for Scrum (`User Story` becomes `Product Backlog Item`; `Incident` becomes `Impediment` or stays as a Bug with an `incident` tag) or CMMI (`User Story` becomes `Requirement`; `Incident` becomes `Issue`). Unknown work-item types pause the run and ask you which archetype to apply.
 - `archetype_assignment_after_triage`: `Bug = "unassign"`; `Incident, User Story, Feature, Task, Spike = "self"`. Override per archetype. Common overrides: `"Incident": "unassign"` to route Sev-1 incidents back to the on-call pool; `"Bug": "self"` when bug triage and bug fixing are the same person.
-- `teams_channel`: null. The agent prints the summary inline.
+- `severity_scheme`: 4-tier (`1 - Critical` / `2 - High` / `3 - Medium` / `4 - Low`) with 7/14/30/90-day SLA offsets. Critical is flagged for immediate escalation. The keys must exactly match the option names in your Severity field.
+- `escalation`: all null. The Phase 10 summary still lands in the per-run `teams_channel` (when configured), but no separate Sev-1 channel post or contact DM happens. Set `escalation.teams_channel` and `escalation.primary_contact` to enable.
+- `teams_channel`: null. The agent prints the per-run summary inline (separate from `escalation.teams_channel`, which is for the high-severity routing).
 - `description_preview_pause_seconds`: `3`. The pause between the Phase 5 informational preview and the actual write.
+
+### Severity SLA and the 4-tier default
+
+The default scheme aligns with the built-in `Microsoft.VSTS.Common.Severity` enum:
+
+| Level | Due offset | Escalate immediately |
+|-------|-----------|----------------------|
+| `1 - Critical` | 7 days | yes |
+| `2 - High` | 14 days | no |
+| `3 - Medium` | 30 days | no |
+| `4 - Low` | 90 days | no |
+
+Phase 6 reads `severity_scheme[severity_recommendation].due_offset_days`, computes `System.CreatedDate + due_offset_days`, and writes the result to `Microsoft.VSTS.Scheduling.DueDate` (as a `YYYY-MM-DDT00:00:00Z` ISO timestamp; midnight UTC keeps the rendered date stable across viewers' time zones). When the recommended level is missing from `severity_scheme`, the agent skips the due-date write and notes the miss in the Phase 10 summary.
+
+Override the keys to match a renamed Severity field's options. Add or remove tiers freely; the agent uses whatever keys you define at runtime.
+
+### Escalation contacts
+
+Set `escalation.primary_contact` (and optionally `fallback_contact`) to an object with `name` and `email`:
+
+```json
+{
+  "escalation": {
+    "teams_channel": "Incident Response > Escalations",
+    "primary_contact": { "name": "Alice Kumar", "email": "alice@example.com" },
+    "fallback_contact": { "name": "Bob Singh",  "email": "bob@example.com"  }
+  }
+}
+```
+
+The agent's Prerequisites step 4 looks up Alice's Teams user descriptor via her email once per session and caches it. On any severity level marked `escalate_immediately: true`:
+
+- If `escalation.teams_channel` is set, the agent posts a separate Teams message to that channel mentioning Alice.
+- If only `primary_contact` is set, the agent DMs Alice directly.
+- If both are null, the running-user summary is the only escalation; the operator decides what to do.
+- `fallback_contact` is not auto-paged on a timer; you can ask the agent ad hoc to ping the fallback later.
+
+Escalation only applies to Bug and Incident archetypes (severity is not used for User Story / Feature / Task / Spike). When a contact's email cannot be resolved at session start, the channel post mentions them by name only and the Phase 10 summary appends an unresolvable-contact warning.
+
+### EM-fallback when the reporter is deactivated
+
+When a follow-up question is warranted and the reporter appears unreachable (no recent assignments and Teams MCP user lookup fails), the agent runs a three-step ladder before asking you:
+
+1. **Teams profile manager.** If the Teams MCP exposes a profile call returning a `manager` field, the agent uses the manager's email as a candidate.
+2. **AzDO team admin.** If the reporter belongs to one or more project teams, the agent proposes the team administrator (when distinct from the reporter and unique) as a candidate.
+3. **Ask the user.** If the ladder produces a candidate, the agent surfaces it for confirmation. Otherwise it asks you to enter someone, or to skip the follow-up entirely.
+
+EM-tagged comments carry a one-sentence preamble: "The original reporter on this work item is unreachable. Tagging you as their EM (or alternate contact) to route this forward." Tagging requires explicit user approval; the agent never auto-tags an EM.
 
 ### Process-template note
 
@@ -188,11 +257,11 @@ The workflow runs a generic core for every archetype. Four phases gate on archet
 | Phase 4b | Convert the cleaned draft to safe HTML and post the scope summary comment. The "What's in scope" body adapts to archetype (User Story / Feature: requirements found and design refs; Task: definition of done and why-now; Spike: question to answer and what's already known). | User Story, Feature, Task, Spike |
 | Phase 4c | Convert the cleaned draft to safe HTML and post the follow-up question tagging the reporter. Replaces 4a or 4b. | All (only when follow_up_needed) |
 | Phase 5 | Refine via `azure-work-item-refiner` (with `Calling context: skip_preview=true.` to suppress the skill's own preview gate), then run `prose-style` on the refined title and description, render the cleaned output inline as an informational preview, and write `System.Title` + `System.Description` after `description_preview_pause_seconds`. | All |
-| Phase 6 | Severity write for Bug or Incident (`Microsoft.VSTS.Common.Severity`). Skipped for User Story / Feature / Task / Spike. No SLA due-date computation yet (deferred to v0.3.0). | Bug, Incident |
+| Phase 6 | Severity write for Bug or Incident (`Microsoft.VSTS.Common.Severity`) plus due-date write to `Microsoft.VSTS.Scheduling.DueDate` computed from `severity_scheme[recommendation].due_offset_days`. Skipped for User Story / Feature / Task / Spike. | Bug, Incident |
 | Phase 7 | Link related/duplicate work items via `wit_update_work_item` adding a relations entry (`System.LinkTypes.Related`, `System.LinkTypes.Hierarchy-Forward`, `System.LinkTypes.Duplicate-Forward`). | All |
 | Phase 8 | Append the triaged tag to `System.Tags`. | All |
 | Phase 9 | Final assignee per `archetype_assignment_after_triage[<archetype>]`. The follow-up path moves to `waiting_reply` here; the standard path leaves the work item in `investigating` from Phase 0. | All |
-| Phase 10 | Teams summary if a Teams MCP is installed and `teams_channel` is set; otherwise print inline. | All |
+| Phase 10 | Per-run summary (Teams when `teams_channel` is set; otherwise inline). Then escalation routing: when the recommended severity has `escalate_immediately: true`, post a separate channel message to `escalation.teams_channel` (or DM the resolved primary contact) mentioning `escalation.primary_contact`. | All (escalation routing on Bug/Incident only) |
 
 ## Limitations
 
@@ -201,7 +270,7 @@ The agent will never:
 - Modify `Microsoft.VSTS.Common.Priority` unless `severity_field` is configured to it.
 - Post a comment without showing you the text first AND getting an explicit yes at the Phase 3 gate.
 - Refine the title or description without an explicit yes at the Phase 3 gate. Phase 5 then renders the cleaned output inline as an informational preview and pauses for `description_preview_pause_seconds` (default 3) before writing.
-- Tag the reporter until investigation is exhausted and a specific gap blocks meaningful triage. Reporter contact is a last resort.
+- Tag the reporter until investigation is exhausted and a specific gap blocks meaningful triage. Reporter contact is a last resort. EM-fallback (when the reporter is deactivated) is best-effort and requires explicit user approval before tagging.
 - Remove or overwrite reporter-provided information during refinement (only append).
 - Fabricate reproduction steps without verification.
 - Mention an integration (Datadog, Teams, etc.) in any output if its API errored or returned no results.

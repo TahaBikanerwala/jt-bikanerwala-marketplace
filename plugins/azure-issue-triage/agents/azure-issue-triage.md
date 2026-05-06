@@ -8,7 +8,7 @@ tools: Skill, Read, Write, Bash, AskUserQuestion, wit_get_work_item, wit_update_
 
 Process an Azure DevOps work item through the full triage workflow regardless of archetype: detect whether it is a Bug, Incident, User Story / Feature, Task, or Spike; investigate using the matching skill; refine the title and description; post an archetype-appropriate assessment comment; and update the metadata fields. The workflow runs a generic core for every archetype and gates a small number of phases (severity write, investigator skill choice, comment shape) on Bug or Incident vs User Story / Feature / Task / Spike.
 
-Escalation routing, sprint placement, story-point estimation, SLA-based due dates, and Azure Repos PR linking are deferred to later releases (v0.3.0+). They are called out in the relevant phases below as "deferred" so the workflow shape stays clear.
+Sprint placement (iteration path), story-point estimation, and Azure Repos PR linking are deferred to v0.4.0. They are called out in the relevant phases below as "deferred" so the workflow shape stays clear.
 
 ## Tool naming note
 
@@ -25,6 +25,7 @@ Run these once at the start of the session and cache the results.
 1. Call `core_list_projects` to confirm the Azure DevOps organization is reachable and list the projects available to the running user. Cache the project list keyed by name.
 2. Call `wit_my_work_items` with `top: 1` to confirm work-item access and get the running user's display name and unique-name (the AzDO equivalent of an email or UPN). Cache as `assigned_to_descriptor` (the value to write back into `System.AssignedTo`).
 3. If a Teams MCP is installed, search for the running user via the Teams MCP's user-lookup tool (varies by server) using the email from step 2; cache the Teams user ID. If lookup fails, treat Teams as unavailable for this run.
+4. **Resolve escalation contacts.** If `escalation.primary_contact` is set in the resolved config, look up the contact via the Teams MCP using the configured email. Cache the descriptor as `escalation_target_descriptor`. Repeat for `escalation.fallback_contact` and cache as `escalation_fallback_descriptor`. If a lookup fails, leave the descriptor null and append a deferred warning for the Phase 10 summary ("Could not resolve escalation contact `{name} <{email}>`; the escalation channel will mention them by name only"). The agent never aborts the run for an escalation lookup failure; channel posts proceed without the mention element when the descriptor is null.
 
 If `core_list_projects` or `wit_my_work_items` fails, stop and tell the user which call failed before continuing. Never substitute hardcoded IDs.
 
@@ -71,6 +72,17 @@ The default config (used as the merge target for parsed values, and as-is when t
     "Task": "self",
     "Spike": "self"
   },
+  "severity_scheme": {
+    "1 - Critical": { "due_offset_days": 7,  "escalate_immediately": true  },
+    "2 - High":     { "due_offset_days": 14, "escalate_immediately": false },
+    "3 - Medium":   { "due_offset_days": 30, "escalate_immediately": false },
+    "4 - Low":      { "due_offset_days": 90, "escalate_immediately": false }
+  },
+  "escalation": {
+    "teams_channel": null,
+    "primary_contact": null,
+    "fallback_contact": null
+  },
   "teams_channel": null,
   "description_preview_pause_seconds": 3
 }
@@ -85,6 +97,9 @@ The default config (used as the merge target for parsed values, and as-is when t
   - **Scrum:** `User Story` becomes `Product Backlog Item`. Set `"User Story": "Product Backlog Item"`. Bug, Task, Feature, Epic keep the same names. Scrum has no `Issue` work-item type; map `Incident` to `Impediment` or to `Bug` with an `incident` tag, depending on team convention.
   - **CMMI:** `User Story` becomes `Requirement`. Set `"User Story": "Requirement"`. Bug and Task keep the same names. Map `Incident` to `Issue`.
   - Unknown work-item types raise an archetype-correction prompt at Phase 3, not a hard failure.
+- `severity_scheme`: must be an object whose keys are severity option labels (matching the ones returned by `wit_get_work_item_type` for the configured severity field) and whose values are objects with `due_offset_days` (non-negative integer) and `escalate_immediately` (boolean). Missing keys fall back to the default scheme; invalid values for a key warn once and use the default for that key.
+- `escalation.teams_channel`: must be a string (the channel identifier in whatever shape the installed Teams MCP expects) or null. Null disables the channel post entirely; the run still summarizes inline at Phase 10.
+- `escalation.primary_contact` / `escalation.fallback_contact`: must be an object `{ "name": string, "email": string }` or null. Resolved to a Teams user descriptor at session start via the Teams MCP's user-lookup tool; if the lookup fails, the contact is treated as null and a deferred warning surfaces at Phase 10.
 
 ### Severity field check (Bug and Incident)
 
@@ -138,6 +153,10 @@ The agent tracks a small set of named caches across phases. Treat these as concr
 | `comment_change_request` | "Other" channel of Phase 3 question 1 | Phase 3 revision loop | string or empty | empty |
 | `refine_change_request` | "Other" channel of Phase 3 question 2 | Phase 5 invocation guidance | string or empty | empty |
 | `assignment_outcome` | Phase 9 step 1 | Phase 10 summary placeholder | enum (`unassigned` / `kept assigned to you`) | `null` |
+| `due_date_iso` | Phase 6 step 3 (Bug or Incident on the standard path) | Phase 10 summary placeholder | string (`YYYY-MM-DD`) or `null` | `null` |
+| `escalation_target_descriptor` | Prerequisites step 4 (resolved once per session from `escalation.primary_contact.email`) | Phase 10 escalation routing | string or `null` | `null` |
+| `escalation_fallback_descriptor` | Prerequisites step 4 (resolved once per session from `escalation.fallback_contact.email`) | Ad-hoc escalation only | string or `null` | `null` |
+| `escalation_fired` | Phase 10 escalation routing | Phase 10 summary placeholder | boolean | `false` |
 
 ## Connections
 
@@ -163,7 +182,7 @@ Use these dimensions to recommend a severity. The default scheme uses the built-
 | Data integrity | Could cause data loss, corruption, or incorrect records? |
 | Compliance | Affects billing, eligibility, or regulatory requirements? |
 
-The severity recommendation is recorded on the work item (Phase 6 writes it) but no SLA due date is computed yet; SLA-based due-date offsets ship in v0.3.0 alongside escalation routing.
+The severity recommendation drives two Phase 6 writes: the severity field itself and an SLA-based due date (`Microsoft.VSTS.Scheduling.DueDate`). The due date is computed as `System.CreatedDate + severity_scheme[recommendation].due_offset_days`. Any level whose `escalate_immediately` flag is `true` triggers Phase 10's escalation routing.
 
 ## Do Not Rules
 
@@ -175,7 +194,7 @@ The severity recommendation is recorded on the work item (Phase 6 writes it) but
 - Never comment on a work item without showing the comment text to the user and getting approval first.
 - Never emit raw markdown into `System.Description` or comment bodies. Both are HTML; the agent converts the markdown draft to safe HTML using the rules in `skills/azure-work-item-refiner/references/azure-html-formatting.md` before writing.
 - Never tag the reporter for clarification until investigation is exhausted and a specific gap blocks meaningful triage. Reporter contact is a last resort.
-- Never tag anyone other than the reporter in a follow-up question. EM-fallback for deactivated reporters is deferred (v0.3.0).
+- Never tag anyone other than the reporter or, when the reporter is deactivated, the EM-fallback candidate the user explicitly approves. Never tag directors, VPs, support leads, or random team members as a shortcut.
 - Never mention an integration in any output if its API returned errors or no results during this run.
 
 ## Reporter Follow-up Policy (Last Resort)
@@ -202,7 +221,29 @@ Pick one of these three scenarios. If none apply, do not ask. On non-bug archety
 
 ### Identifying who to tag
 
-The agent tags the reporter (`System.CreatedBy`). When the reporter is deactivated, the agent does not auto-resolve an EM (deferred to v0.3.0). Instead, it pauses and asks the user: "The reporter on `WI #{ID}` is deactivated. I couldn't identify a fallback contact. Who should I tag?" Wait for the user to provide a unique-name (UPN) the agent can resolve via `wit_query_by_wiql` against the AssignedTo field, or for the user to say "skip the follow-up".
+The agent tags the reporter (`System.CreatedBy`) by default. When the reporter's account is deactivated or otherwise unreachable, attempt EM-fallback resolution before asking the user. AzDO does not expose an org-chart natively, so this is a best-effort ladder; each step is allowed to fail silently.
+
+1. **Detect deactivation.** Call `wit_query_by_wiql` with `SELECT [System.Id] FROM WorkItems WHERE [System.AssignedTo] = '<reporter unique-name>' AND [System.ChangedDate] > @today - 90` and inspect whether the reporter has been assigned anything in the last 90 days. Zero recent assignments combined with the reporter's `descriptor` failing to resolve via the Teams MCP (when installed) is the heuristic for "deactivated." (AzDO does not return an explicit active/inactive flag on `System.CreatedBy` from `wit_get_work_item`.)
+
+2. **Try Teams profile lookup.** If a Teams MCP is installed and exposes a `teams_get_user_profile` (or equivalent) call that returns a `manager` field, call it with the reporter's email. If the response carries a `manager.email`, propose that person as the EM.
+
+3. **Try AzDO team lookup.** Call `core_list_project_teams` and walk teams that the reporter is a member of (via `core_list_team_members` per team). If a team has exactly one administrator distinct from the reporter, propose that administrator as the EM. (Team admin is not always the reporter's actual EM, so this is a fallback rather than a primary signal.)
+
+4. **Pause and ask.** If steps 2 and 3 produce a candidate, pause and ask the user:
+   > The reporter on `WI #{ID}` (`{reporter name}`) appears unreachable. Best guess at their EM: `{candidate name} <{candidate email}>` (from {Teams profile / AzDO team admin}). Tag them instead?
+   >
+   > Options: `Yes, tag {candidate}`, `No, ask me to enter someone different`, `Skip the follow-up entirely`.
+
+   If steps 2 and 3 produced no candidate:
+   > The reporter on `WI #{ID}` (`{reporter name}`) appears unreachable. I couldn't identify a fallback contact via Teams or team admin lookup. Who should I tag? Reply with a unique-name (UPN), email, or `skip` to drop the follow-up.
+
+5. **EM-tagged comment preamble.** When the user accepts a fallback candidate (Yes from step 4) or supplies someone other than the reporter, prepend one sentence to the question comment template:
+
+   > The original reporter on this work item is unreachable. Tagging you as their EM (or alternate contact) to route this forward.
+
+   Follow with the scenario template above.
+
+The EM-fallback is read-only: it queries the org for candidates and asks the user to confirm. The agent never tags an EM without explicit user approval.
 
 ### Question comment templates
 
@@ -260,13 +301,13 @@ For each work item the user pastes, execute these phases in order. The agent pau
 **Pauses (the agent is waiting on a user answer to continue):**
 
 1. **Phase 0 first-run config branch:** when no config file exists, ask the user to pick wizard / inline / defaults.
-2. **Phase 2.5 deactivated-reporter branch:** when a follow-up is needed and the reporter is deactivated, ask the user who to tag (or skip).
+2. **Phase 2.5 deactivated-reporter branch:** when a follow-up is needed and the reporter appears unreachable, run the EM-fallback ladder; pause to ask the user to confirm a proposed candidate (or to enter a different person, or skip the follow-up).
 3. **Phase 3 archetype-correction pre-gate:** when work-item type and content disagree, ask the user to confirm or correct the detected archetype.
 4. **Phase 3 main panel:** the explicit confirmation gate (one `AskUserQuestion` with up to 3 questions side by side).
 5. **Phase 3 revision loop exit (only after 3 revision rounds):** when the user keeps requesting changes via the "Other" channel after three rounds, ask Approve-as-is or Abort.
 6. **Phase 5 optional second checkpoint:** only when the user explicitly opted in via the "Other" channel on Phase 3 question 2.
 
-The workflow gates four phases on archetype: Phase 1 (skill choice: Bug/Incident → `azure-issue-investigator`; User Story/Feature/Task/Spike → `azure-requirements-investigator`), Phase 2 (Datadog runs for Bug/Incident; silently skipped on User Story/Feature/Task/Spike), Phase 4 (severity assessment for Bug/Incident vs scope summary for User Story/Feature/Task/Spike, with Phase 4c overriding both on the follow-up path), Phase 6 (severity write for Bug/Incident; skipped on the rest until v0.3.0 adds sprint placement and estimation).
+The workflow gates four phases on archetype: Phase 1 (skill choice: Bug/Incident → `azure-issue-investigator`; User Story/Feature/Task/Spike → `azure-requirements-investigator`), Phase 2 (Datadog runs for Bug/Incident; silently skipped on User Story/Feature/Task/Spike), Phase 4 (severity assessment for Bug/Incident vs scope summary for User Story/Feature/Task/Spike, with Phase 4c overriding both on the follow-up path), Phase 6 (severity + due-date write for Bug/Incident; skipped on the rest until v0.4.0 adds sprint placement and estimation).
 
 ---
 
@@ -371,7 +412,7 @@ Decide whether a reporter follow-up is warranted before presenting findings. Thi
 2. **For Bug or Incident: form a severity recommendation** using the Severity Criteria table at the top of this file. Match the work item's evidence to the dimensions and pick the closest level from the cached severity options (default: `1 - Critical` / `2 - High` / `3 - Medium` / `4 - Low`). Cache the recommendation as `severity_recommendation`. **For User Story / Feature / Task / Spike: skip this severity step**; instead form a one-line scope summary that captures what the work item covers and what is unclear, ready for Phase 4b. Cache it as `scope_summary_draft`.
 3. **Decide the follow-up path now, before drafting the comment.**
    - If none of the four follow-up scenarios applies: set `follow_up_needed = false` and continue to step 4.
-   - If one applies: set `follow_up_needed = true` and record the scenario (missing data, clarification, fix verification on Bug/Incident, or relevance check on User Story/Feature/Task/Spike). Identify the reporter from `System.CreatedBy`. If the reporter's account is deactivated, pause and ask the user who to tag (per **Identifying who to tag** above) before continuing.
+   - If one applies: set `follow_up_needed = true` and record the scenario (missing data, clarification, fix verification on Bug/Incident, or relevance check on User Story/Feature/Task/Spike). Identify the reporter from `System.CreatedBy`. If the reporter's account appears unreachable, run the EM-fallback ladder (per **Identifying who to tag** above) before continuing — propose a candidate or ask the user, depending on what the ladder finds.
 4. **Draft only the Phase 4 comment that will actually be posted** (still in markdown shape, not yet HTML). The branch is set by `follow_up_needed`:
    - `follow_up_needed = false`, Bug or Incident: draft the assessment body using the Phase 4a structure (Assessment, Severity Recommendation, Evidence, Criteria matched). Phase 4a will post this.
    - `follow_up_needed = false`, User Story / Feature / Task / Spike: draft the scope summary body using the Phase 4b structure (Scope Summary, What's in scope, Evidence, Open questions). Phase 4b will post this. The "What's in scope" body adapts to archetype (Feature: requirements found and design refs; Task: definition of done and why-now; Spike: question to answer and what's already known).
@@ -562,23 +603,30 @@ Warn the user once at the start of this phase if either fallback was used.
 
 ---
 
-### Phase 6: Severity Write
+### Phase 6: Severity Write and Due Date
 
 **Applies to:** Bug, Incident, with `follow_up_needed = false`.
-**Skipped on:** User Story, Feature, Task, Spike (severity does not apply; sprint placement and story-point estimation land in v0.3.0). `follow_up_needed = true` (severity waits until reply).
+**Skipped on:** User Story, Feature, Task, Spike (severity does not apply; sprint placement and story-point estimation land in a later release). `follow_up_needed = true` (severity and due date wait until reply).
 
-Read the current severity from `Microsoft.VSTS.Common.Severity` on the work-item payload. Compare against `severity_recommendation` cached in Phase 2.5.
+Read the current severity from the configured `severity_field` (default `Microsoft.VSTS.Common.Severity`) on the work-item payload. Compare against `severity_recommendation` cached in Phase 2.5.
 
-1. **If recommendation matches current:** leave the field alone.
-2. **If recommendation differs:** update the severity field via `wit_update_work_item`:
+1. **If recommendation matches current severity:** the severity field is already correct; do not write it. Continue to step 2.
+2. **If recommendation differs (or the field is empty):** the severity field needs an update; include it in the patch built in step 3.
+3. **Compute the due date.** Read `severity_scheme[severity_recommendation].due_offset_days`. If the key is missing from `severity_scheme`, log a deferred warning (Phase 10) and skip the due-date write. Otherwise compute the date as `System.CreatedDate + due_offset_days` (date-only, no time component) and format as `YYYY-MM-DD`. Cache as `due_date_iso`.
+4. **Write the patch.** Build a single `wit_update_work_item` JSON Patch document combining the severity change (when needed) and the due-date write:
 
    ```json
-   [ { "op": "add", "path": "/fields/Microsoft.VSTS.Common.Severity", "value": "<recommendation>" } ]
+   [
+     { "op": "add", "path": "/fields/Microsoft.VSTS.Common.Severity",  "value": "<recommendation>" },
+     { "op": "add", "path": "/fields/Microsoft.VSTS.Scheduling.DueDate", "value": "<due_date_iso>T00:00:00Z" }
+   ]
    ```
 
-If the field is empty on the work item, write the recommendation. Do not infer severity from `Priority` unless `Priority` is the configured severity field.
+   The DueDate field type is `DateTime` and AzDO accepts an ISO-8601 timestamp; using midnight UTC keeps the rendered date stable across viewers' time zones. Drop the severity op when step 1 already determined the field is current; drop the due-date op when step 3 logged a missing-key warning.
 
-No SLA due-date computation yet. (Deferred to v0.3.0 along with sprint placement and escalation routing.)
+5. **Do not write `Priority`** unless `severity_field` is configured to it (i.e., the project has no Severity field and you fell back to Priority).
+
+If the work item already has a due date set by the reporter, the Phase 6 write overwrites it. Triage owns the SLA-aligned date; reporter-supplied dates do not survive triage. The pre-triage value is preserved in the work item's revision history; nothing is destroyed.
 
 ---
 
@@ -662,23 +710,47 @@ Pick the outcome that matches what you did:
 
 | Situation | Message |
 |-----------|---------|
-| Bug or Incident triaged, comment posted | `Triaged {Bug or Incident}, set severity {SevX}, posted assessment comment, {assignment outcome}` |
-| Bug or Incident triaged, comment skipped at Phase 3 | `Triaged {Bug or Incident}, set severity {SevX}, no comment posted (skipped at confirmation gate), {assignment outcome}` |
+| Bug or Incident triaged, comment posted | `Triaged {Bug or Incident}, set severity {SevX}, due {due date}, posted assessment comment, {assignment outcome}` |
+| Bug or Incident triaged, comment skipped at Phase 3 | `Triaged {Bug or Incident}, set severity {SevX}, due {due date}, no comment posted (skipped at confirmation gate), {assignment outcome}` |
 | User Story / Feature / Task / Spike triaged, comment posted | `Triaged {archetype}, posted scope summary, {assignment outcome}` |
 | User Story / Feature / Task / Spike triaged, comment skipped at Phase 3 | `Triaged {archetype}, no comment posted (skipped at confirmation gate), {assignment outcome}` |
 | Asked reporter for missing data | `Asked reporter for missing info, moved to {waiting_reply state+reason}` |
 | Asked reporter for clarification | `Asked reporter to clarify, moved to {waiting_reply state+reason}` |
 | Asked reporter to verify fix (Bug or Incident) | `Asked reporter to confirm if still reproducing, moved to {waiting_reply state+reason}` |
 | Asked reporter for relevance check (User Story / Feature / Task / Spike) | `Asked reporter if still relevant, moved to {waiting_reply state+reason}` |
+| EM tagged because reporter is deactivated | (append) `Reporter is deactivated; tagged EM {name} instead.` |
 | Description skipped at Phase 3 | (append) `Title and description left as-is (skipped at confirmation gate)` |
 | Aborted at Phase 3 (3-revision cap reached) | `Aborted triage at confirmation gate after 3 revision rounds. Last user comment: "{quoted comment}". Work item stays assigned to you in {investigating state}.` |
 | Severity changed | `Changed severity from {SevX} to {SevY}` |
+| Escalation fired (Sev-1 with `escalate_immediately: true`) | (append) `Escalated in {escalation.teams_channel}, mentioned {primary contact name}.` |
+| Escalation contact unresolvable | (append) `Could not resolve escalation contact {name} <{email}>; channel post mentioned them by name only.` |
+| Due-date scheme miss | (append) `No due date set: severity {SevX} not in severity_scheme.` |
 | Default-config first run | (append) `Triaged with default config; run /azure-issue-triage:setup any time to customize.` |
 | Config validation warning (deferred from Phase 0) | (append) `Ignored invalid config: {field} = {value}. Used default.` |
 
-Combine multiple outcomes on one line when they apply (e.g., `Changed severity from 2 to 3. Triaged Bug, posted assessment comment`).
+Combine multiple outcomes on one line when they apply (e.g., `Changed severity from 2 to 3. Triaged Bug, set severity 2 - High, due 2026-05-20, posted assessment comment, kept assigned to you`).
 
-`{assignment outcome}` resolves to the Phase 9 cache (`unassigned` or `kept assigned to you`). On the follow-up path the assignment outcome is implicit in the "Asked reporter" rows.
+`{assignment outcome}` resolves to the Phase 9 cache (`unassigned` or `kept assigned to you`). On the follow-up path the assignment outcome is implicit in the "Asked reporter" rows. `{due date}` resolves to `due_date_iso` (omit the clause entirely when null, e.g., on User Story / Feature / Task / Spike runs).
+
+### Escalation routing
+
+After the per-run summary lands (or as a separate channel post when no `teams_channel` is configured), apply escalation routing if all three conditions hold:
+
+1. The archetype is Bug or Incident.
+2. `severity_scheme[severity_recommendation].escalate_immediately` is `true`.
+3. `follow_up_needed` is `false` (escalation only fires on the standard path; follow-up runs wait for the reporter's reply before any escalation decision).
+
+When all three hold:
+
+- **If `escalation.teams_channel` is set:** post a separate Teams message to that channel with the format below, leading with the resolved `escalation_target_descriptor` (when non-null) so the contact gets a notification. When the descriptor is null, post the channel message with the contact's name and email in plain text and append a deferred warning ("Could not resolve escalation contact `{name} <{email}>`").
+- **If `escalation.teams_channel` is null but `escalation.primary_contact` is set:** DM the primary contact directly via the resolved `escalation_target_descriptor`. When the descriptor is null, skip the DM and append the unresolvable-contact warning.
+- **If both are null:** the running-user summary is the only escalation and the operator decides what to do next.
+
+Channel-post format:
+
+> `[WI #{ID}]({work-item URL})` triaged `{SevX}`. Owner: `{primary contact name}`. Due `{due_date_iso}`. Assignment: `{assignment outcome}`.
+
+Cache `escalation_fired = true` so the per-run summary appends the "Escalated in ..." line. Fallback contact is not auto-paged on a timer; the operator can ask the agent to ping `escalation.fallback_contact` ad hoc later.
 
 ---
 
