@@ -1,6 +1,6 @@
 ---
 name: azure-work-item-refiner
-description: "Restructures a poorly written Azure DevOps work item into a clear, self-contained document that a stranger can read cold and act on. Works on Bug and Task work-item types in v0.1.0 (other types will land in later releases). Updates the description (System.Description) and title (System.Title) via the Azure DevOps MCP and never deletes original content. Use when the user asks to refine, rewrite, restructure, clean up, or improve an Azure DevOps work item."
+description: "Restructures a poorly written Azure DevOps work item into a clear, self-contained document that a stranger can read cold and act on. Works on any work-item type (Bug, Incident, User Story / Feature, Task, Spike). Updates the description (System.Description) and title (System.Title) via the Azure DevOps MCP and never deletes original content. Use when the user asks to refine, rewrite, restructure, clean up, or improve an Azure DevOps work item."
 metadata:
   author: Taha Bikanerwala
 tools: AskUserQuestion, Read, wit_get_work_item, wit_update_work_item, wit_add_work_item_comment, core_list_projects
@@ -11,10 +11,6 @@ tools: AskUserQuestion, Read, wit_get_work_item, wit_update_work_item, wit_add_w
 Take an Azure DevOps work item that is hard to read and turn it into a document a stranger can open cold, in a year, and act on. Reorganize the content. Never delete it. Every fact in the original survives the rewrite, just placed somewhere it can be found.
 
 This skill modifies Azure DevOps in its default mode: it updates the work item's title and description (writing to the `System.Title` and `System.Description` fields, both submitted as a JSON Patch document via `wit_update_work_item`), and posts an optional next-steps comment when the user asks for one. **One exception:** when invoked with `Calling context: skip_preview=true.` (the `azure-issue-triage` agent does this in Phase 5), the skill operates in **read-only-return mode** and performs no Azure DevOps writes at all; it returns the refined title and description as plain text for the caller to write. See the "Calling Convention" bullets below for the full read-only-return contract.
-
-## v0.1.0 archetype scope
-
-The agent's bundled v0.1.0 release routes **only Bug and Task** work items into this skill. The skill itself documents Feature, Incident, and Spike archetypes for forward compatibility (a user invoking the skill directly with one of those types will get a sensible result), but the agent's Phase 0 will refuse to triage them in v0.1.0.
 
 ## Calling Convention
 

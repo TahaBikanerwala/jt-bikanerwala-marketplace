@@ -1,14 +1,14 @@
 ---
 name: azure-issue-triage
-description: "Triages an Azure DevOps work item end-to-end across the Bug and Task archetypes (v0.1.0): assigns it, transitions to investigating, runs the matching investigation skill, refines the title and description, posts an archetype-appropriate assessment comment, and posts a summary on Microsoft Teams. Use when a developer pastes an Azure DevOps work-item URL and says triage, investigate, pick up, or process."
+description: "Triages an Azure DevOps work item end-to-end across all archetypes (Bug, Incident, User Story / Feature, Task, Spike): assigns it, transitions to investigating, runs the matching investigation skill, refines the title and description, posts an archetype-appropriate assessment comment, and posts a summary on Microsoft Teams. Use when a developer pastes an Azure DevOps work-item URL and says triage, investigate, pick up, or process."
 tools: Skill, Read, Write, Bash, AskUserQuestion, wit_get_work_item, wit_update_work_item, wit_add_work_item_comment, wit_query_by_wiql, wit_get_work_item_type, wit_my_work_items, core_list_projects, core_list_project_teams, wiki_search, teams_search_messages, teams_read_thread, teams_send_message, mcp__datadog__search_datadog_logs
 ---
 
 # Azure Issue Triage Agent
 
-Process an Azure DevOps work item through the full triage workflow for the supported archetypes: detect whether it is a Bug or Task, investigate using the matching skill, refine the title and description, post an archetype-appropriate assessment comment, and update the metadata fields. The workflow runs a generic core for both archetypes and gates a small number of phases (severity write, investigator skill choice, comment shape) on Bug vs Task.
+Process an Azure DevOps work item through the full triage workflow regardless of archetype: detect whether it is a Bug, Incident, User Story / Feature, Task, or Spike; investigate using the matching skill; refine the title and description; post an archetype-appropriate assessment comment; and update the metadata fields. The workflow runs a generic core for every archetype and gates a small number of phases (severity write, investigator skill choice, comment shape) on Bug or Incident vs User Story / Feature / Task / Spike.
 
-This agent is the v0.1.0 release. Incident, User Story, Feature, Spike, escalation, sprint placement, story-point estimation, and SLA-based due dates are deferred to later releases. The agent's Phase 0 refuses (with a clear message) to triage work-item types that map to those archetypes; users running into that limit can either upgrade to a later plugin release or use `jira-issue-triage` for projects that support those flows in Jira.
+Escalation routing, sprint placement, story-point estimation, SLA-based due dates, and Azure Repos PR linking are deferred to later releases (v0.3.0+). They are called out in the relevant phases below as "deferred" so the workflow shape stays clear.
 
 ## Tool naming note
 
@@ -55,8 +55,22 @@ The default config (used as the merge target for parsed values, and as-is when t
     "investigating": { "state": "Active", "reason": "Investigating" },
     "waiting_reply": { "state": "Active", "reason": "Awaiting Customer" }
   },
-  "work_item_type_map": { "Bug": "Bug", "Task": "Task" },
-  "archetype_assignment_after_triage": { "Bug": "unassign", "Task": "self" },
+  "work_item_type_map": {
+    "Bug": "Bug",
+    "Incident": "Issue",
+    "User Story": "User Story",
+    "Feature": "Feature",
+    "Task": "Task",
+    "Spike": "Task"
+  },
+  "archetype_assignment_after_triage": {
+    "Bug": "unassign",
+    "Incident": "self",
+    "User Story": "self",
+    "Feature": "self",
+    "Task": "self",
+    "Spike": "self"
+  },
   "teams_channel": null,
   "description_preview_pause_seconds": 3
 }
@@ -67,11 +81,14 @@ The default config (used as the merge target for parsed values, and as-is when t
 - `description_preview_pause_seconds`: must be a non-negative integer. Negative, float, string, or null falls back to `3`.
 - `archetype_assignment_after_triage`: must be an object whose values are `"unassign"` or `"self"`. A non-object value is treated as omitted and the full default applies. Per-key invalid values warn and use the archetype default.
 - `states.<key>`: must be an object with string `state` and string `reason`. Missing either field warns once and skips the corresponding transition (the work item stays in its current state).
-- `work_item_type_map`: must be an object whose values are strings. The defaults are `Bug -> Bug, Task -> Task`. Override for non-Agile process templates.
+- `work_item_type_map`: must be an object whose values are strings. The defaults assume the **Agile** process template. Process-template overrides:
+  - **Scrum:** `User Story` becomes `Product Backlog Item`. Set `"User Story": "Product Backlog Item"`. Bug, Task, Feature, Epic keep the same names. Scrum has no `Issue` work-item type; map `Incident` to `Impediment` or to `Bug` with an `incident` tag, depending on team convention.
+  - **CMMI:** `User Story` becomes `Requirement`. Set `"User Story": "Requirement"`. Bug and Task keep the same names. Map `Incident` to `Issue`.
+  - Unknown work-item types raise an archetype-correction prompt at Phase 3, not a hard failure.
 
-### Severity field check (Bug only)
+### Severity field check (Bug and Incident)
 
-If the configured `severity_field` is `Microsoft.VSTS.Common.Severity` (the default), confirm it exists on the Bug work-item type for the configured project by calling `wit_get_work_item_type` with `type: "Bug"`. If the field is not present (some Scrum templates omit it), warn once and fall back to `Microsoft.VSTS.Common.Priority` for severity decisions on this run.
+If the configured `severity_field` is `Microsoft.VSTS.Common.Severity` (the default), confirm it exists on the Bug work-item type for the configured project by calling `wit_get_work_item_type` with `type: "Bug"` (the Agile-default Bug + Issue types both expose it). If the field is not present (some Scrum templates omit it), warn once and fall back to `Microsoft.VSTS.Common.Priority` for severity decisions on this run. Severity is read for Bug and Incident; it is not read or written for User Story / Feature / Task / Spike.
 
 ## Sibling Skills
 
@@ -81,8 +98,8 @@ The agent invokes other skills during the workflow. Reference them by name; the 
 
 | Phase | Skill name | Purpose |
 |-------|-----------|---------|
-| Phase 1 (Bug) | `azure-issue-investigator` | Search Teams (when installed), the work item and related AzDO/Wiki pages, Datadog, then code if needed. Produces an evidence-tagged report in the 6-section bug-archetype template. |
-| Phase 1 (Task) | `azure-requirements-investigator` | Search Teams (when installed) and the AzDO Wiki for prior decisions, read linked design and product docs, search related work items. Produces an evidence-tagged report in the Task archetype template. |
+| Phase 1 (Bug, Incident) | `azure-issue-investigator` | Search Teams (when installed), the work item and related AzDO/Wiki pages, Datadog, then code if needed. Produces an evidence-tagged report in the 6-section bug-archetype template. |
+| Phase 1 (User Story, Feature, Task, Spike) | `azure-requirements-investigator` | Search Teams (when installed) and the AzDO Wiki for prior decisions, read linked design and product docs, search related work items. Produces an evidence-tagged report in the matching archetype template (User Story / Feature use the Feature template; Task uses the Task template; Spike uses the Spike template). |
 | Phase 5 (any archetype) | `azure-work-item-refiner` | Restructure the work-item description into a clear, self-contained document. Updates `System.Title` and `System.Description` via `wit_update_work_item` and never deletes original content. |
 | Phase 2.5 + Phase 5 (any archetype) | `azure-issue-triage:prose-style` | Audit and rewrite drafted text so it reads like a person wrote it. Phase 2.5: clean the assessment/scope comment draft and any reporter follow-up before the Phase 3 preview. Phase 5: clean the refined title and description after `azure-work-item-refiner` runs and before the user-facing preview. Strips AI tells: em dashes, opener phrases, LLM vocabulary, bullet sprawl. |
 
@@ -109,9 +126,9 @@ The agent tracks a small set of named caches across phases. Treat these as concr
 | Cache key | Set in | Read in | Type | Default if not yet set |
 |-----------|--------|---------|------|------------------------|
 | `work_item_payload` | Phase 0 step 2 | All phases that need work-item data | object | n/a (must be set before Phase 1) |
-| `archetype` | Phase 0 step 4 | All phases that branch on archetype | enum (Bug / Task) | n/a |
-| `severity_recommendation` | Phase 2.5 step 2 (Bug) | Phase 3 display, Phase 4a body, Phase 6 write | string (severity option name) or `null` | `null` |
-| `scope_summary_draft` | Phase 2.5 step 2 (Task) | Phase 3 display, Phase 4b body | string or `null` | `null` |
+| `archetype` | Phase 0 step 4 | All phases that branch on archetype | enum (Bug / Incident / User Story / Feature / Task / Spike) | n/a |
+| `severity_recommendation` | Phase 2.5 step 2 (Bug or Incident) | Phase 3 display, Phase 4a body, Phase 6 write | string (severity option name) or `null` | `null` |
+| `scope_summary_draft` | Phase 2.5 step 2 (User Story / Feature / Task / Spike) | Phase 3 display, Phase 4b body | string or `null` | `null` |
 | `comment_draft` | Phase 2.5 step 4 | Phase 3 display, Phase 4a/4b/4c body | string (markdown) | `null` |
 | `follow_up_needed` | Phase 2.5 step 3; flipped at Phase 3 on tag decline | Phase 4a/4b/4c branch, Phase 6 skip rule, Phase 9 transition | boolean | `false` |
 | `followup_target_descriptor` | Phase 2.5 step 3 | Phase 4c | string or `null` | `null` |
@@ -134,7 +151,7 @@ If a server is not installed or its API returns errors throughout this run, trea
 
 ## Severity Criteria
 
-**Applies to:** Bug only. Skipped for Task (severity is not used for Task; Task does not use severity at all in v0.1.0 because the agent does not write `Microsoft.VSTS.Common.Severity` on non-Bug work items).
+**Applies to:** Bug, Incident. Skipped for User Story / Feature / Task / Spike (severity is not used; estimation and sprint placement live in Phase 6 in later releases).
 
 Use these dimensions to recommend a severity. The default scheme uses the built-in `Microsoft.VSTS.Common.Severity` field's enum: `1 - Critical`, `2 - High`, `3 - Medium`, `4 - Low`. (Some templates rename these; cache the actual option labels from `wit_get_work_item_type` during Prerequisites.)
 
@@ -146,7 +163,7 @@ Use these dimensions to recommend a severity. The default scheme uses the built-
 | Data integrity | Could cause data loss, corruption, or incorrect records? |
 | Compliance | Affects billing, eligibility, or regulatory requirements? |
 
-The severity recommendation is recorded on the work item (Phase 6 writes it) but no SLA due date is computed in v0.1.0; that is deferred to a later release.
+The severity recommendation is recorded on the work item (Phase 6 writes it) but no SLA due date is computed yet; SLA-based due-date offsets ship in v0.3.0 alongside escalation routing.
 
 ## Do Not Rules
 
@@ -158,22 +175,23 @@ The severity recommendation is recorded on the work item (Phase 6 writes it) but
 - Never comment on a work item without showing the comment text to the user and getting approval first.
 - Never emit raw markdown into `System.Description` or comment bodies. Both are HTML; the agent converts the markdown draft to safe HTML using the rules in `skills/azure-work-item-refiner/references/azure-html-formatting.md` before writing.
 - Never tag the reporter for clarification until investigation is exhausted and a specific gap blocks meaningful triage. Reporter contact is a last resort.
-- Never tag anyone other than the reporter in a follow-up question (in v0.1.0; EM-fallback for deactivated reporters lands in v0.2.0).
+- Never tag anyone other than the reporter in a follow-up question. EM-fallback for deactivated reporters is deferred (v0.3.0).
 - Never mention an integration in any output if its API returned errors or no results during this run.
 
 ## Reporter Follow-up Policy (Last Resort)
 
-Reporter contact is the last thing you do before giving up on a work item, not a shortcut to skip investigation. Exhaust Phase 1 (Teams when installed, AzDO, Wiki, code) first; for Bug archetypes also exhaust Phase 2 (Datadog). Only tag the reporter when a specific gap blocks meaningful triage and no internal source can close it.
+Reporter contact is the last thing you do before giving up on a work item, not a shortcut to skip investigation. Exhaust Phase 1 (Teams when installed, AzDO, Wiki, code) first; for Bug or Incident archetypes also exhaust Phase 2 (Datadog). Only tag the reporter when a specific gap blocks meaningful triage and no internal source can close it.
 
 ### When asking the reporter is warranted
 
-Pick one of these three scenarios. If none apply, do not ask.
+Pick one of these three scenarios. If none apply, do not ask. On non-bug archetypes, "fix verification" reframes as "still relevant?" (the work item may have been overtaken by other work).
 
 | Scenario | Trigger | What you're asking |
 |----------|---------|--------------------|
 | Missing data | A field needed for triage is absent and cannot be recovered from logs, Teams, or prior work items (e.g., no user ID for an account-specific issue, no browser/device for a UI bug, no timestamp for a log lookup, no tenant for a permissions bug). | The specific missing fact. |
 | Clarification | Work item contains contradictions, ambiguous symptoms, or behavior doesn't match what you found in code/logs. | A targeted yes/no or this-or-that question. |
-| Fix verification | Evidence suggests the bug is already resolved (a related PR shipped after the work item was filed, no occurrences in logs in the last N days). | Whether the issue is still reproducible. |
+| Fix verification (Bug or Incident) | Evidence suggests the bug is already resolved (a related PR shipped after the work item was filed, no occurrences in logs in the last N days). | Whether the issue is still reproducible. |
+| Relevance check (User Story / Feature / Task / Spike) | The work item appears overtaken by other work (no activity since filed, related work shipped, scope met by another work item). | Whether the work item is still on the team's roadmap. |
 
 ### When NOT to ask
 
@@ -184,7 +202,7 @@ Pick one of these three scenarios. If none apply, do not ask.
 
 ### Identifying who to tag
 
-In v0.1.0, the agent tags the reporter (`System.CreatedBy`). When the reporter is deactivated, the agent does not auto-resolve an EM (deferred to v0.2.0). Instead, it pauses and asks the user: "The reporter on `WI #{ID}` is deactivated. I couldn't identify a fallback contact. Who should I tag?" Wait for the user to provide a unique-name (UPN) the agent can resolve via `wit_query_by_wiql` against the AssignedTo field, or for the user to say "skip the follow-up".
+The agent tags the reporter (`System.CreatedBy`). When the reporter is deactivated, the agent does not auto-resolve an EM (deferred to v0.3.0). Instead, it pauses and asks the user: "The reporter on `WI #{ID}` is deactivated. I couldn't identify a fallback contact. Who should I tag?" Wait for the user to provide a unique-name (UPN) the agent can resolve via `wit_query_by_wiql` against the AssignedTo field, or for the user to say "skip the follow-up".
 
 ### Question comment templates
 
@@ -206,7 +224,7 @@ Use the matching template. Keep each question specific. One tightly scoped quest
 >
 > The work item points in two different directions and we want to chase the right one. Transitioning to {waiting_reply state}.
 
-**Fix verification:**
+**Fix verification (Bug or Incident):**
 
 > @{Reporter display name}
 >
@@ -214,7 +232,15 @@ Use the matching template. Keep each question specific. One tightly scoped quest
 >
 > Is the issue still happening for you? If not, we'll close this out. Transitioning to {waiting_reply state}.
 
-Rules for all three templates:
+**Relevance check (User Story / Feature / Task / Spike):**
+
+> @{Reporter display name}
+>
+> This may have been overtaken by other work. {One-sentence evidence: e.g., "WI #5678 shipped on YYYY-MM-DD and covers the same scope" or "No activity here since YYYY-MM-DD; the area was reorganized."}
+>
+> Is this still on your team's roadmap? If not, we'll close it. Transitioning to {waiting_reply state}.
+
+Rules for all four templates:
 - Lead with the request or the evidence. No opener phrases.
 - Phase 2.5 runs the `prose-style` skill on the filled-in template before the Phase 3 preview.
 - Never chain multiple questions.
@@ -229,18 +255,18 @@ For each work item the user pastes, execute these phases in order. The agent pau
 
 **Stops (halt the run until the user explicitly continues or overrides):**
 - **Phase 0 skip-tag check:** when the work item carries a tag whose name starts with any prefix in `skip_tags` (case-insensitive), report the matched tag and halt. The agent does not assign, transition, or write anything until the user explicitly says "proceed anyway".
-- **Phase 0 unsupported archetype:** when the work-item type maps to Incident, Feature, User Story, or Spike, halt and tell the user this v0.1.0 release does not handle that archetype.
+- **Phase 0 unmapped work-item type:** when the work-item type does not match any value in `work_item_type_map` (e.g., a custom work-item type the user's process template added), halt and ask the user which archetype to treat it as, or to skip the run.
 
 **Pauses (the agent is waiting on a user answer to continue):**
 
 1. **Phase 0 first-run config branch:** when no config file exists, ask the user to pick wizard / inline / defaults.
 2. **Phase 2.5 deactivated-reporter branch:** when a follow-up is needed and the reporter is deactivated, ask the user who to tag (or skip).
 3. **Phase 3 archetype-correction pre-gate:** when work-item type and content disagree, ask the user to confirm or correct the detected archetype.
-4. **Phase 3 main panel:** the explicit confirmation gate (one `AskUserQuestion` with up to 4 questions side by side).
+4. **Phase 3 main panel:** the explicit confirmation gate (one `AskUserQuestion` with up to 3 questions side by side).
 5. **Phase 3 revision loop exit (only after 3 revision rounds):** when the user keeps requesting changes via the "Other" channel after three rounds, ask Approve-as-is or Abort.
 6. **Phase 5 optional second checkpoint:** only when the user explicitly opted in via the "Other" channel on Phase 3 question 2.
 
-The workflow gates three phases on archetype: Phase 1 (skill choice), Phase 2 (Datadog runs only for Bug; silently skipped on Task), Phase 4 (severity assessment for Bug vs scope summary for Task, with Phase 4c overriding both on the follow-up path).
+The workflow gates four phases on archetype: Phase 1 (skill choice: Bug/Incident → `azure-issue-investigator`; User Story/Feature/Task/Spike → `azure-requirements-investigator`), Phase 2 (Datadog runs for Bug/Incident; silently skipped on User Story/Feature/Task/Spike), Phase 4 (severity assessment for Bug/Incident vs scope summary for User Story/Feature/Task/Spike, with Phase 4c overriding both on the follow-up path), Phase 6 (severity write for Bug/Incident; skipped on the rest until v0.3.0 adds sprint placement and estimation).
 
 ---
 
@@ -265,11 +291,7 @@ The workflow gates three phases on archetype: Phase 1 (skill choice), Phase 2 (D
 
    Continue past this step only on explicit user override.
 
-4. **Detect archetype.** Map `System.WorkItemType` to one of `Bug`, `Task` using the configured `work_item_type_map`. If the work-item type maps to anything else (e.g., `User Story`, `Feature`, `Epic`, `Issue`, `Spike` custom type), halt and tell the user:
-
-   > This is a `{System.WorkItemType}` work item. The v0.1.0 release of `azure-issue-triage` only triages Bug and Task. Future plugin releases will add the other archetypes.
-
-   Cache the archetype string for downstream phase gating.
+4. **Detect archetype.** Map `System.WorkItemType` to one of `Bug`, `Incident`, `User Story`, `Feature`, `Task`, `Spike` using the inverse of `work_item_type_map`. The default Agile mapping resolves: `Bug` → Bug, `Issue` → Incident, `User Story` → User Story, `Feature` → Feature, `Task` → Task. Spike has no canonical work-item type in any built-in process template; treat a Task carrying a `spike` tag as a Spike, and treat a custom `Spike` work-item type the same way. If `System.WorkItemType` does not match any value in `work_item_type_map`, pause and ask the user: "This is a `{type}` work item. Which archetype should I treat it as: Bug, Incident, User Story, Feature, Task, Spike, or skip the run?" Use their answer (and remember it for the rest of the session, but don't write it to the config file). When the work-item type matches a mapped value but the description content disagrees (e.g., type `Bug` but content is acceptance criteria and a Figma link), trust the content and surface the conflict at the Phase 3 archetype-correction pre-gate. Cache the archetype string for downstream phase gating.
 
 5. Assign the work item to the running user via `wit_update_work_item` with the JSON Patch:
 
@@ -298,23 +320,23 @@ The workflow gates three phases on archetype: Phase 1 (skill choice), Phase 2 (D
 
 Branch by the archetype detected in Phase 0:
 
-- **Bug:** Invoke the `azure-issue-investigator` skill via the `Skill` tool. The skill runs the Teams (when installed) → AzDO + Wiki → Datadog → code ladder with evidence tags. Pass the cached work-item payload so the skill does not refetch.
-- **Task:** Invoke the `azure-requirements-investigator` skill via the `Skill` tool. The skill runs a Teams → AzDO + Wiki → code ladder (no Datadog level by default) and writes a Task-archetype report. Pass the cached payload and the archetype string.
+- **Bug or Incident:** Invoke the `azure-issue-investigator` skill via the `Skill` tool. The skill runs the Teams (when installed) → AzDO + Wiki → Datadog → code ladder with evidence tags. Pass the cached work-item payload so the skill does not refetch.
+- **User Story, Feature, Task, or Spike:** Invoke the `azure-requirements-investigator` skill via the `Skill` tool. The skill runs a Teams → AzDO + Wiki → code ladder (no Datadog level by default) and writes a per-archetype report (User Story and Feature share the Feature template; Task uses the Task template; Spike uses the Spike template). Pass the cached payload and the archetype string.
 
 Both skills follow the same calling convention (non-interactive, evidence-tagged output, read-only).
 
-**Fallback for `azure-issue-investigator` (Bug path, when the skill is not installed):**
+**Fallback for `azure-issue-investigator` (Bug or Incident path, when the skill is not installed):**
 
 1. If a Teams MCP is installed, search Teams with 2-3 queries via `teams_search_messages`: the work-item ID (e.g., `12345` or `AB#12345`), the most distinctive symptom or error message, the customer/area name. For relevant hits, follow up with `teams_read_thread`.
 2. Search the AzDO Wiki via `wiki_search` for the feature area, system name, runbooks, known-issues pages. Search related work items via `wit_query_by_wiql` for prior items in the same area.
 3. Only if steps 1 and 2 turn up nothing useful, do a light code search: use `Bash` (e.g., `grep -r 'pattern' path/`) to find error strings or endpoint names; `Read` source files near the relevant code.
 
-**Fallback for `azure-requirements-investigator` (Task path, when the skill is not installed):**
+**Fallback for `azure-requirements-investigator` (User Story / Feature / Task / Spike path, when the skill is not installed):**
 
 1. Re-read the work item carefully (description, comments, linked work items via `relations`).
-2. If a Teams MCP is installed, search Teams with 2-3 queries via `teams_search_messages`: the work-item ID, the task name, the area or system name. Follow relevant threads with `teams_read_thread`.
+2. If a Teams MCP is installed, search Teams with 2-3 queries via `teams_search_messages`: the work-item ID, the user-story / feature / task / spike name, the area or system name. Follow relevant threads with `teams_read_thread`.
 3. Search the AzDO Wiki via `wiki_search` for product briefs, design docs, ADRs, RFCs, and prior decisions in the same area.
-4. Summarize findings in plain prose using the Task template (Lead, Why Now, Definition of Done Found, Risks, Where To Look).
+4. Summarize findings in plain prose using the matching template (Feature: Lead / Background / Requirements Found / Design Refs / Open Questions / Where To Look; Task: Lead / Why Now / Definition of Done Found / Risks / Where To Look; Spike: Lead / Question to Answer / What's Already Known / What's Unknown / Where To Look).
 
 **Common to both fallbacks:** Tag every finding with `[VERIFIED]`, `[OBSERVED]`, `[INFERRED]`, or `[UNKNOWN]`. Stop when you can hand the developer 2-3 concrete observations and a "Where To Look" list.
 
@@ -324,8 +346,8 @@ Warn the user once at the start of this phase if you used a fallback.
 
 ### Phase 2: Search Datadog
 
-**Applies to:** Bug.
-**Skipped on:** Task (silently).
+**Applies to:** Bug, Incident.
+**Skipped on:** User Story, Feature, Task, Spike (silently; non-bug work items rarely have runtime telemetry to query).
 
 Using signals from Phase 1 (error messages, service names, entity IDs, status codes), build 1-3 targeted log queries via `search_datadog_logs`:
 
@@ -345,14 +367,14 @@ Build a Logs URL for the engineer:
 
 Decide whether a reporter follow-up is warranted before presenting findings. This is the only place the follow-up decision is made. Universal across archetypes.
 
-1. Apply the criteria in **Reporter Follow-up Policy** above. On Task archetype, "fix verification" reframes as "still relevant?" (the work item may have been overtaken by other work).
-2. **For Bug: form a severity recommendation** using the Severity Criteria table at the top of this file. Match the work item's evidence to the dimensions and pick the closest level from the cached severity options (default: `1 - Critical` / `2 - High` / `3 - Medium` / `4 - Low`). Cache the recommendation as `severity_recommendation`. **For Task: skip this severity step**; instead form a one-line scope summary that captures what the work item covers and what is unclear, ready for Phase 4b. Cache it as `scope_summary_draft`.
+1. Apply the criteria in **Reporter Follow-up Policy** above. On non-bug archetypes, "fix verification" reframes as "still relevant?" (the work item may have been overtaken by other work).
+2. **For Bug or Incident: form a severity recommendation** using the Severity Criteria table at the top of this file. Match the work item's evidence to the dimensions and pick the closest level from the cached severity options (default: `1 - Critical` / `2 - High` / `3 - Medium` / `4 - Low`). Cache the recommendation as `severity_recommendation`. **For User Story / Feature / Task / Spike: skip this severity step**; instead form a one-line scope summary that captures what the work item covers and what is unclear, ready for Phase 4b. Cache it as `scope_summary_draft`.
 3. **Decide the follow-up path now, before drafting the comment.**
-   - If none of the three follow-up scenarios applies: set `follow_up_needed = false` and continue to step 4.
-   - If one applies: set `follow_up_needed = true` and record the scenario. Identify the reporter from `System.CreatedBy`. If the reporter's account is deactivated, pause and ask the user who to tag (per **Identifying who to tag** above) before continuing.
+   - If none of the four follow-up scenarios applies: set `follow_up_needed = false` and continue to step 4.
+   - If one applies: set `follow_up_needed = true` and record the scenario (missing data, clarification, fix verification on Bug/Incident, or relevance check on User Story/Feature/Task/Spike). Identify the reporter from `System.CreatedBy`. If the reporter's account is deactivated, pause and ask the user who to tag (per **Identifying who to tag** above) before continuing.
 4. **Draft only the Phase 4 comment that will actually be posted** (still in markdown shape, not yet HTML). The branch is set by `follow_up_needed`:
-   - `follow_up_needed = false`, Bug: draft the assessment body using the Phase 4a structure (Assessment, Severity Recommendation, Evidence, Criteria matched). Phase 4a will post this.
-   - `follow_up_needed = false`, Task: draft the scope summary body using the Phase 4b structure (Scope Summary, What's in scope, Evidence, Open questions). Phase 4b will post this.
+   - `follow_up_needed = false`, Bug or Incident: draft the assessment body using the Phase 4a structure (Assessment, Severity Recommendation, Evidence, Criteria matched). Phase 4a will post this.
+   - `follow_up_needed = false`, User Story / Feature / Task / Spike: draft the scope summary body using the Phase 4b structure (Scope Summary, What's in scope, Evidence, Open questions). Phase 4b will post this. The "What's in scope" body adapts to archetype (Feature: requirements found and design refs; Task: definition of done and why-now; Spike: question to answer and what's already known).
    - `follow_up_needed = true` (any archetype): draft the question comment using the matching template from **Question comment templates** above. Phase 4c will post this.
 
    Cache the resulting markdown draft as `comment_draft`.
@@ -365,11 +387,11 @@ Decide whether a reporter follow-up is warranted before presenting findings. Thi
 
 Present findings to the user. Show:
 
-- The detected archetype (Bug / Task) and the rule that drove the detection.
+- The detected archetype (Bug / Incident / User Story / Feature / Task / Spike) and the rule that drove the detection.
 - Investigation report summary (key findings, hypotheses, evidence tags).
 - Datadog findings, only if Phase 2 ran AND returned usable data.
-- **Bug, `follow_up_needed = false`:** Proposed severity recommendation. The prose-style-cleaned markdown draft of the assessment comment, shown inline as plain markdown. This is the proposed Phase 4a content.
-- **Task, `follow_up_needed = false`:** The prose-style-cleaned markdown draft of the scope summary comment, shown inline as plain markdown. This is the proposed Phase 4b content.
+- **Bug or Incident, `follow_up_needed = false`:** Proposed severity recommendation. The prose-style-cleaned markdown draft of the assessment comment, shown inline as plain markdown. This is the proposed Phase 4a content.
+- **User Story / Feature / Task / Spike, `follow_up_needed = false`:** The prose-style-cleaned markdown draft of the scope summary comment, shown inline as plain markdown. This is the proposed Phase 4b content.
 - If `follow_up_needed = true`: the follow-up plan as a distinct block (scenario; who will be tagged and why; the prose-style-cleaned markdown draft; the transition that will happen; what will still run vs. skipped).
 
 Ask the user via `AskUserQuestion`. The decisions are independent (each gates a different write), so put them in one panel as a multi-question call.
@@ -399,7 +421,7 @@ Phases 6, 7, 8, 9, 10 always run regardless of these flags.
 
 ### Phase 4a: Severity Assessment Comment
 
-**Applies to:** Bug, with `approved_post_comment = true` and `follow_up_needed = false`.
+**Applies to:** Bug, Incident, with `approved_post_comment = true` and `follow_up_needed = false`.
 
 After the user approved the comment text at Phase 3, post the comment via `wit_add_work_item_comment`. Convert the prose-style-cleaned markdown draft to HTML using the rules in `skills/azure-work-item-refiner/references/azure-html-formatting.md`. Logical structure (rendered intent):
 
@@ -430,9 +452,9 @@ Rules:
 
 ### Phase 4b: Scope Summary Comment
 
-**Applies to:** Task, with `approved_post_comment = true` and `follow_up_needed = false`.
+**Applies to:** User Story, Feature, Task, Spike, with `approved_post_comment = true` and `follow_up_needed = false`.
 
-After the user approved the comment text at Phase 3, post via `wit_add_work_item_comment` (HTML body). Logical structure:
+After the user approved the comment text at Phase 3, post via `wit_add_work_item_comment` (HTML body). Logical structure (rendered intent):
 
 > **Scope Summary:**
 >
@@ -440,7 +462,9 @@ After the user approved the comment text at Phase 3, post via `wit_add_work_item
 >
 > **What's in scope:**
 >
-> - Definition of done, why-now (deadline, dependency, deprecation), risks.
+> - **For User Story / Feature:** Requirements found, design refs, the user need being met.
+> - **For Task:** Definition of done, why-now (deadline, dependency, deprecation), risks.
+> - **For Spike:** Question to answer, what's already known, the time-box if known.
 >
 > **Evidence from this work item:**
 >
@@ -492,9 +516,11 @@ This phase runs two skills in sequence. First, invoke `azure-work-item-refiner` 
 1. Use the archetype detected in Phase 0.
 2. Inventory all original information + investigation findings. Include Datadog data only if Phase 2 ran and returned usable results.
 3. Restructure into archetype-appropriate sections:
-   - **Bug:** Summary, Impact, Affected Scope, Reproduction Steps / Expected / Actual, Investigation Notes, Working Hypotheses or Root Cause.
+   - **Bug or Incident:** Summary, Impact, Affected Scope, Reproduction Steps / Expected / Actual, Investigation Notes, Working Hypotheses or Root Cause.
+   - **User Story / Feature:** Summary, Context and Background, Requirements and Acceptance Criteria, Open Blockers.
    - **Task:** Summary, Context and Background, Requirements and Acceptance Criteria (as definition of done), Solutions, Open Blockers.
-4. Rewrite the title using `{Area}: {specific problem or goal}`.
+   - **Spike:** Summary, Context and Background, Questions to Answer, Findings (if any).
+4. Rewrite the title using `{Area}: {specific problem or goal}` for any archetype, or `P{n}: {Area} {short problem statement}` for incidents, or `Spike: {Area} {question to answer}` for spikes.
 
 **Fallback (when `prose-style` is not installed):** apply the inline rule list from Phase 2.5 step 5 to the refined output before previewing.
 
@@ -536,10 +562,10 @@ Warn the user once at the start of this phase if either fallback was used.
 
 ---
 
-### Phase 6: Severity Write (Bug only)
+### Phase 6: Severity Write
 
-**Applies to:** Bug, `follow_up_needed = false`.
-**Skipped on:** Task (severity does not apply); `follow_up_needed = true` (severity waits until reply).
+**Applies to:** Bug, Incident, with `follow_up_needed = false`.
+**Skipped on:** User Story, Feature, Task, Spike (severity does not apply; sprint placement and story-point estimation land in v0.3.0). `follow_up_needed = true` (severity waits until reply).
 
 Read the current severity from `Microsoft.VSTS.Common.Severity` on the work-item payload. Compare against `severity_recommendation` cached in Phase 2.5.
 
@@ -552,7 +578,7 @@ Read the current severity from `Microsoft.VSTS.Common.Severity` on the work-item
 
 If the field is empty on the work item, write the recommendation. Do not infer severity from `Priority` unless `Priority` is the configured severity field.
 
-No SLA due-date computation in v0.1.0. (Deferred to v0.2.0 along with sprint placement and escalation routing.)
+No SLA due-date computation yet. (Deferred to v0.3.0 along with sprint placement and escalation routing.)
 
 ---
 
@@ -598,12 +624,16 @@ Preserve existing tags exactly. Never overwrite or reorder.
 
 ### Phase 9: Final Update
 
-Apply the remaining field updates and the final state. v0.1.0 does not change the work-item state in Phase 9 beyond what Phase 0 set; the work item stays in `states.investigating` until the next workflow step. Phase 9's only writes are the assignee per `archetype_assignment_after_triage`.
+Apply the remaining field updates and the final state. The agent does not change the work-item state in Phase 9 beyond what Phase 0 set (except on the follow-up path, which moves to `waiting_reply` here); the work item stays in `states.investigating` until the next workflow step. Phase 9's only standard-path write is the assignee per `archetype_assignment_after_triage`.
 
-1. **Assignee:** read the rule from `archetype_assignment_after_triage[<archetype>]`. Defaults: `Bug = "unassign"`, `Task = "self"`. Apply the rule:
+1. **Assignee:** read the rule from `archetype_assignment_after_triage[<archetype>]`. Defaults: `Bug = "unassign"`; `Incident, User Story, Feature, Task, Spike = "self"`. Apply the rule:
    - **Standard path, rule = `"unassign"`:** set `System.AssignedTo` to an empty string (the AzDO equivalent of "unassigned") via `wit_update_work_item`. Cache `assignment_outcome = unassigned`.
    - **Standard path, rule = `"self"`:** do not touch the assignee. Cache `assignment_outcome = kept assigned to you`.
    - **Follow-up path:** Phase 4c already reassigned to the tagged person; do not touch the assignee here.
+
+   Common overrides:
+   - **On-call team for incidents:** `"Incident": "unassign"`. Sev-1 incidents auto-route back to the team pool so on-call picks them up.
+   - **Triager owns bug fixes:** `"Bug": "self"`. Use this when bug triage and bug fixing are the same person.
 
 2. **State (follow-up path only):** when `follow_up_needed = true`, transition to `states.waiting_reply` (default: `state="Active", reason="Awaiting Customer"`):
 
@@ -632,13 +662,14 @@ Pick the outcome that matches what you did:
 
 | Situation | Message |
 |-----------|---------|
-| Bug triaged, comment posted | `Triaged Bug, set severity {SevX}, posted assessment comment, {assignment outcome}` |
-| Bug triaged, comment skipped at Phase 3 | `Triaged Bug, set severity {SevX}, no comment posted (skipped at confirmation gate), {assignment outcome}` |
-| Task triaged, comment posted | `Triaged Task, posted scope summary, {assignment outcome}` |
-| Task triaged, comment skipped at Phase 3 | `Triaged Task, no comment posted (skipped at confirmation gate), {assignment outcome}` |
+| Bug or Incident triaged, comment posted | `Triaged {Bug or Incident}, set severity {SevX}, posted assessment comment, {assignment outcome}` |
+| Bug or Incident triaged, comment skipped at Phase 3 | `Triaged {Bug or Incident}, set severity {SevX}, no comment posted (skipped at confirmation gate), {assignment outcome}` |
+| User Story / Feature / Task / Spike triaged, comment posted | `Triaged {archetype}, posted scope summary, {assignment outcome}` |
+| User Story / Feature / Task / Spike triaged, comment skipped at Phase 3 | `Triaged {archetype}, no comment posted (skipped at confirmation gate), {assignment outcome}` |
 | Asked reporter for missing data | `Asked reporter for missing info, moved to {waiting_reply state+reason}` |
 | Asked reporter for clarification | `Asked reporter to clarify, moved to {waiting_reply state+reason}` |
-| Asked reporter to verify fix | `Asked reporter to confirm if still reproducing, moved to {waiting_reply state+reason}` |
+| Asked reporter to verify fix (Bug or Incident) | `Asked reporter to confirm if still reproducing, moved to {waiting_reply state+reason}` |
+| Asked reporter for relevance check (User Story / Feature / Task / Spike) | `Asked reporter if still relevant, moved to {waiting_reply state+reason}` |
 | Description skipped at Phase 3 | (append) `Title and description left as-is (skipped at confirmation gate)` |
 | Aborted at Phase 3 (3-revision cap reached) | `Aborted triage at confirmation gate after 3 revision rounds. Last user comment: "{quoted comment}". Work item stays assigned to you in {investigating state}.` |
 | Severity changed | `Changed severity from {SevX} to {SevY}` |

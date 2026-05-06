@@ -8,7 +8,7 @@ Each template has a fixed section list and order. Do not omit a section heading.
 
 ## Feature Template
 
-Six sections. (Feature is included for forward compatibility; the agent's v0.1.0 release does not route Feature work items into this skill, but a user invoking the skill directly with a User Story will get this template.)
+Six sections. The agent routes User Story, Feature, and Epic work items into this template. A standalone invocation against any of those archetypes uses the same shape.
 
 ### 1. Lead
 
@@ -104,7 +104,7 @@ Same format as Feature template Section 6.
 
 ## Spike Template
 
-Five sections. (Spike is included for forward compatibility; the agent's v0.1.0 release does not route Spike work items into this skill.)
+Five sections. The agent routes any Task tagged `spike` (or a custom Spike work-item type) into this template.
 
 ### 1. Lead
 
