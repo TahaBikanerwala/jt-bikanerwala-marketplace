@@ -1,6 +1,6 @@
 ---
 name: azure-issue-investigator
-description: "Investigates an Azure DevOps Bug work item by searching Microsoft Teams, the work item and related AzDO/Wiki pages, Datadog, and the codebase, then writes an evidence-tagged report in the bug-archetype template. Use when a Bug work item needs an investigation report before triage decisions are made. For Task work items, see `azure-requirements-investigator`."
+description: "Investigates an Azure DevOps Bug or Incident work item by searching Microsoft Teams, the work item and related AzDO/Wiki pages, Datadog, and the codebase, then writes an evidence-tagged report in the bug-archetype template. Use when a Bug or Incident work item needs an investigation report before triage decisions are made. For User Story, Feature, Task, or Spike work items, see `azure-requirements-investigator`."
 metadata:
   author: Taha Bikanerwala
 tools: Read, Bash, Grep, wit_get_work_item, wit_query_by_wiql, wiki_search, teams_search_messages, teams_read_thread, mcp__datadog__search_datadog_logs
@@ -8,9 +8,9 @@ tools: Read, Bash, Grep, wit_get_work_item, wit_query_by_wiql, wiki_search, team
 
 # Azure Issue Investigator
 
-Produce a structured report that orients an engineer for an Azure DevOps Bug work item. The report names what is broken, ranks 2-3 hypotheses, lists concrete next-step queries, and tags every claim with its evidence level.
+Produce a structured report that orients an engineer for an Azure DevOps Bug or Incident work item. The report names what is broken, ranks 2-3 hypotheses, lists concrete next-step queries, and tags every claim with its evidence level.
 
-**Scope:** Bug archetype. For Task work items, the `azure-issue-triage` agent calls `azure-requirements-investigator` instead. Incident, User Story, and Spike archetypes are deferred to a later release of the plugin; if a user invokes this skill directly with one of those types it will still produce a report, but the agent's Phase 0 will refuse to triage them in v0.1.0.
+**Scope:** Bug and Incident archetypes. For User Story, Feature, Task, or Spike work items, the `azure-issue-triage` agent calls `azure-requirements-investigator` instead.
 
 This skill investigates. It does not solve, post, or modify anything.
 

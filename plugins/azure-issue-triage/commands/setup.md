@@ -67,7 +67,7 @@ Default: empty (the agent leaves area path untouched at triage time).
 
 Use `AskUserQuestion`:
 
-> Which field holds the severity for Bug work items?
+> Which field holds the severity for Bug and Incident work items?
 
 Options:
 - `Microsoft.VSTS.Common.Severity` (recommended for Agile and CMMI process templates)
@@ -129,7 +129,11 @@ Use the `Write` tool with `path: ".claude/azure-issue-triage.config.json"`. Pret
 {
   "archetype_assignment_after_triage": {
     "Bug": "unassign",
-    "Task": "self"
+    "Incident": "self",
+    "User Story": "self",
+    "Feature": "self",
+    "Task": "self",
+    "Spike": "self"
   },
   "area_path_prefix": null,
   "default_team": null,
@@ -146,7 +150,11 @@ Use the `Write` tool with `path: ".claude/azure-issue-triage.config.json"`. Pret
   "triaged_tag": "triaged",
   "work_item_type_map": {
     "Bug": "Bug",
-    "Task": "Task"
+    "Incident": "Issue",
+    "User Story": "User Story",
+    "Feature": "Feature",
+    "Task": "Task",
+    "Spike": "Task"
   }
 }
 ```

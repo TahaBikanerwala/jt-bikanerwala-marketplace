@@ -1,6 +1,6 @@
 ---
 name: azure-requirements-investigator
-description: "Investigates a non-bug Azure DevOps work item (Task in v0.1.0; Feature, User Story, Spike in later releases) by reading the work item and linked design or product docs, searching Microsoft Teams and AzDO Wiki for prior decisions, and producing an evidence-tagged orientation report. Use when a developer is about to pick up a Task work item and wants context before starting work."
+description: "Investigates a non-bug Azure DevOps work item (User Story, Feature, Task, Spike) by reading the work item and linked design or product docs, searching Microsoft Teams and AzDO Wiki for prior decisions, and producing an evidence-tagged orientation report. Use when a developer is about to pick up a non-bug work item and wants context before starting work."
 metadata:
   author: Taha Bikanerwala
 tools: Read, Bash, Grep, wit_get_work_item, wit_query_by_wiql, wiki_search, teams_search_messages, teams_read_thread
@@ -8,9 +8,9 @@ tools: Read, Bash, Grep, wit_get_work_item, wit_query_by_wiql, wiki_search, team
 
 # Azure Requirements Investigator
 
-Produce a structured report that orients a developer about to pick up a Task work item (or, in future plugin releases, Feature, User Story, or Spike). The report names what is being built (or asked), surfaces prior decisions found in Microsoft Teams and AzDO Wiki, lists the open questions that block start-of-work, and tags every claim with its evidence level.
+Produce a structured report that orients a developer about to pick up a User Story, Feature, Task, or Spike work item. The report names what is being built (or asked), surfaces prior decisions found in Microsoft Teams and AzDO Wiki, lists the open questions that block start-of-work, and tags every claim with its evidence level.
 
-**Scope in v0.1.0:** Task. The agent's Phase 0 routes only Task work items into this skill. Feature, User Story, and Spike templates are kept in the report-template reference for forward compatibility; users who invoke the skill directly with one of those types will get a sensible report.
+**Scope:** User Story, Feature, Task, Spike. The agent's Phase 0 routes any of these archetypes into this skill. Bug and Incident go to `azure-issue-investigator` instead.
 
 This skill investigates. It does not solve, post, or modify anything.
 
@@ -38,14 +38,14 @@ Before running the levels, fetch the work item once and cache it for the rest of
 
 1. Identify the work-item ID from the invocation context (e.g., `12345` from a pasted URL or a parameter passed by the caller). If the calling context (such as the `azure-issue-triage` agent) has already fetched the work item and exposed the payload, reuse that payload; don't fetch again.
 2. If no payload is available, call `wit_get_work_item` with the ID and `expand: "all"`. Request these fields at minimum: `System.Title`, `System.Description`, `System.State`, `System.WorkItemType`, `System.Tags`, `System.AreaPath`, `System.IterationPath`, `System.AssignedTo`, `System.CreatedBy`, `System.CreatedDate`, `System.ChangedDate`, `System.Parent`, plus the `relations` array. Add the optional fields the caller cares about (`Microsoft.VSTS.Common.AcceptanceCriteria`, `Microsoft.VSTS.Scheduling.StoryPoints`) when known.
-3. Determine the archetype: use the value passed by the caller. If running standalone, map `System.WorkItemType` using the table below. If the work-item type is `Bug`, stop and tell the caller this skill does not handle that archetype; route to `azure-issue-investigator` instead.
+3. Determine the archetype: use the value passed by the caller. If running standalone, map `System.WorkItemType` using the table below. If the work-item type is `Bug`, or `Issue` / `Impediment` (which the agent routes as Incident), stop and tell the caller this skill does not handle those archetypes; route to `azure-issue-investigator` instead.
 
-   | Work-item type (Agile / Scrum / CMMI) | Archetype |
-   |---------------------------------------|-----------|
-   | Task | Task |
-   | User Story / Product Backlog Item / Requirement | Feature |
-   | Feature / Epic | Feature (epic-level — note in Lead) |
-   | Issue / Impediment | Incident-adjacent — handle as Task |
+   | Work-item type (Agile / Scrum / CMMI) | Archetype | Report template |
+   |---------------------------------------|-----------|-----------------|
+   | User Story (Agile) / Product Backlog Item (Scrum) / Requirement (CMMI) | User Story | Feature template |
+   | Feature / Epic | Feature (epic-level — note in Lead) | Feature template |
+   | Task | Task | Task template |
+   | Task tagged `spike`, or a custom `Spike` work-item type | Spike | Spike template |
 
 4. Cache the response as "the work-item payload" throughout the skill.
 
