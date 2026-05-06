@@ -4,6 +4,16 @@ A Claude Code plugin that ships one subagent (`azure-issue-triage`) and a setup 
 
 This plugin is a sibling of [`jira-issue-triage`](../jira-issue-triage/). The two plugins install side by side; the workflows are conceptually identical but call platform-specific tools.
 
+## What's new in v0.4.0
+
+Three non-bug-flow upgrades that close the parity gap with `jira-issue-triage` and add a feature unique to the AzDO stack:
+
+- **Sprint placement (iteration path).** New `iteration_path_strategy` config (`null` / `"current"` / `"explicit:<path>"`). When `"current"`, Phase 6 calls `work_list_team_iterations` for the configured `default_team` and writes the active iteration to `System.IterationPath`. When `"explicit:<path>"`, the agent writes that path verbatim. Applies to User Story / Feature / Task / Spike on the standard path.
+- **Story-point estimation prompt.** New `story_points_field` config (defaults to null). When set, the Phase 3 main panel adds a fourth question for User Story or Feature work items: `1`, `3`, `5`, or `Skip` (with "Other" accepting any other number). Phase 6 writes the estimate to the configured field; null estimates skip the write.
+- **Azure Repos pull-request linking.** New `pr_linking_enabled` config (defaults to `true`). The agent regex-matches Azure Repos PR URLs in the description, comments, Teams threads, and investigator output, resolves each via `repos_get_pull_request_by_id`, proposes up to 4 at the Phase 3 panel, and writes the user-approved subset as `ArtifactLink` relations using the AzDO `vstfs:///Git/PullRequestId/...` URL form.
+
+All planned v0.x archetype-and-workflow surface area has now landed. Open follow-ups for v0.5.0 and later: capacity-aware sprint placement (overflow into next sprint when current is full), backfill PR links on already-merged work items, support for the `Microsoft.VSTS.CMMI.*` field family on CMMI projects.
+
 ## What's new in v0.3.0
 
 Three Bug/Incident-flow upgrades that bring the agent closer to feature parity with `jira-issue-triage`:
@@ -12,7 +22,7 @@ Three Bug/Incident-flow upgrades that bring the agent closer to feature parity w
 - **Microsoft Teams escalation routing.** A new `escalation` config block (`teams_channel`, `primary_contact`, `fallback_contact`) drives Phase 10 escalation when the recommended severity has `escalate_immediately: true`. The agent posts a separate channel message mentioning the resolved primary contact (looked up by email at session start), DMs the contact directly when no channel is configured, or no-ops when both are null.
 - **EM-fallback for deactivated reporters.** When a follow-up is needed and the reporter appears unreachable, the agent now runs a three-step ladder: Teams profile manager lookup, AzDO team-admin scan, then ask-the-user with a proposed candidate. EM tagging requires explicit user approval; the question comment carries an "original reporter is unreachable" preamble.
 
-Earlier deferred items still pending for **v0.4.0**: sprint placement via `work_list_team_iterations` + `@CurrentIteration`, story-point estimation prompt at Phase 3, and Azure Repos PR linking via `wit_link_work_item_to_pull_request`.
+All deferred items shipped in v0.4.0 (see above).
 
 ## What's new in v0.2.0
 
@@ -132,6 +142,9 @@ Configuration is **optional**. The agent uses sensible defaults if no config fil
     "primary_contact": null,
     "fallback_contact": null
   },
+  "iteration_path_strategy": null,
+  "story_points_field": null,
+  "pr_linking_enabled": true,
   "teams_channel": null,
   "description_preview_pause_seconds": 3
 }
@@ -148,8 +161,35 @@ Configuration is **optional**. The agent uses sensible defaults if no config fil
 - `archetype_assignment_after_triage`: `Bug = "unassign"`; `Incident, User Story, Feature, Task, Spike = "self"`. Override per archetype. Common overrides: `"Incident": "unassign"` to route Sev-1 incidents back to the on-call pool; `"Bug": "self"` when bug triage and bug fixing are the same person.
 - `severity_scheme`: 4-tier (`1 - Critical` / `2 - High` / `3 - Medium` / `4 - Low`) with 7/14/30/90-day SLA offsets. Critical is flagged for immediate escalation. The keys must exactly match the option names in your Severity field.
 - `escalation`: all null. The Phase 10 summary still lands in the per-run `teams_channel` (when configured), but no separate Sev-1 channel post or contact DM happens. Set `escalation.teams_channel` and `escalation.primary_contact` to enable.
+- `iteration_path_strategy`: null. Sprint placement (Phase 6 on User Story / Feature / Task / Spike) is disabled. Set to `"current"` (and configure `default_team`) or `"explicit:<full iteration path>"` to enable.
+- `story_points_field`: null. The Phase 3 story-points question and Phase 6 estimate write are disabled. Set to `"Microsoft.VSTS.Scheduling.StoryPoints"` (or your custom field's reference name) to enable.
+- `pr_linking_enabled`: `true`. The agent surfaces Azure Repos PRs found during investigation as proposed `ArtifactLink` relations at the Phase 3 gate. Set to `false` to skip both the collection and the proposal.
 - `teams_channel`: null. The agent prints the per-run summary inline (separate from `escalation.teams_channel`, which is for the high-severity routing).
 - `description_preview_pause_seconds`: `3`. The pause between the Phase 5 informational preview and the actual write.
+
+### Sprint placement
+
+When `iteration_path_strategy = "current"`, Phase 6 calls `work_list_team_iterations` with `team: <default_team>` and `timeframe: "current"` to find the team's active sprint. The response carries the iteration path; Phase 6 writes it to `System.IterationPath`. If the team has no active sprint window (between two iterations), the agent warns once and skips the iteration write — the work item stays in its current iteration (which is usually the team's default backlog area for unscheduled work).
+
+When `iteration_path_strategy = "explicit:MyProject\\Backend\\Sprint 42"`, the agent writes that exact path verbatim. Useful when the work item belongs to a future sprint, a hardening sprint, or a non-default team.
+
+`default_team` must be set when `iteration_path_strategy = "current"` and the project has more than one team. The setup wizard prompts for it as a follow-up to Q9.
+
+Sprint placement only applies to User Story / Feature / Task / Spike. Bug and Incident don't use iteration paths in v0.4.0.
+
+### Story-point estimation
+
+When `story_points_field` is set and the archetype is User Story or Feature, the Phase 3 main panel adds a fourth question: `1`, `3`, `5`, or `Skip`. The "Other" channel accepts any other integer or the Fibonacci values most teams use (`2`, `8`, `13`, `21`). Phase 6 writes the chosen value to the configured field via `wit_update_work_item`.
+
+The estimate is voluntary; picking "Skip" leaves the field at its existing value (which may be unset). The `null` cache value means "no estimate captured" — never "estimated zero." Bug, Incident, Task, and Spike work items do not see the prompt.
+
+### Azure Repos pull-request linking
+
+The agent regex-matches Azure Repos PR URLs (`https://dev.azure.com/<org>/<project>/_git/<repo>/pullrequest/<id>`) in the description, comments, Teams threads, and investigator output. It calls `repos_get_pull_request_by_id` to resolve the title, project GUID, and repo GUID for each unique URL, capping the proposed list at 8 most-recent PRs.
+
+The Phase 3 main panel surfaces up to 4 of these as a multi-select question. The user picks any subset to link (or the "Other" channel to add a PR URL the agent didn't propose). Phase 7 writes each approved PR as an `ArtifactLink` relation with the AzDO-required `vstfs:///Git/PullRequestId/<projectId>%2F<repoId>%2F<prId>` URL form. Surplus entries (more than 4 proposed) are listed in the Phase 10 summary as "skipped (panel cap)" so the user can link them manually.
+
+Set `pr_linking_enabled = false` to disable both the collection step and the Phase 3 proposal entirely.
 
 ### Severity SLA and the 4-tier default
 
@@ -257,8 +297,8 @@ The workflow runs a generic core for every archetype. Four phases gate on archet
 | Phase 4b | Convert the cleaned draft to safe HTML and post the scope summary comment. The "What's in scope" body adapts to archetype (User Story / Feature: requirements found and design refs; Task: definition of done and why-now; Spike: question to answer and what's already known). | User Story, Feature, Task, Spike |
 | Phase 4c | Convert the cleaned draft to safe HTML and post the follow-up question tagging the reporter. Replaces 4a or 4b. | All (only when follow_up_needed) |
 | Phase 5 | Refine via `azure-work-item-refiner` (with `Calling context: skip_preview=true.` to suppress the skill's own preview gate), then run `prose-style` on the refined title and description, render the cleaned output inline as an informational preview, and write `System.Title` + `System.Description` after `description_preview_pause_seconds`. | All |
-| Phase 6 | Severity write for Bug or Incident (`Microsoft.VSTS.Common.Severity`) plus due-date write to `Microsoft.VSTS.Scheduling.DueDate` computed from `severity_scheme[recommendation].due_offset_days`. Skipped for User Story / Feature / Task / Spike. | Bug, Incident |
-| Phase 7 | Link related/duplicate work items via `wit_update_work_item` adding a relations entry (`System.LinkTypes.Related`, `System.LinkTypes.Hierarchy-Forward`, `System.LinkTypes.Duplicate-Forward`). | All |
+| Phase 6 | **Bug / Incident:** severity write (`Microsoft.VSTS.Common.Severity`) + due-date write (`Microsoft.VSTS.Scheduling.DueDate` computed from `severity_scheme`). **User Story / Feature / Task / Spike:** sprint placement (when `iteration_path_strategy` is set) writing `System.IterationPath`, plus optional story-point write (when `story_points_field` and `story_point_estimate` are both set). | All |
+| Phase 7 | Link related/duplicate work items via `wit_update_work_item` adding `relations` entries (`System.LinkTypes.Related`, `System.LinkTypes.Hierarchy-Reverse`, `System.LinkTypes.Duplicate-Forward`). When `pr_linking_enabled = true`, also link the user-approved Azure Repos PRs as `ArtifactLink` relations using the `vstfs:///Git/PullRequestId/...` URL form. | All (PR links any archetype) |
 | Phase 8 | Append the triaged tag to `System.Tags`. | All |
 | Phase 9 | Final assignee per `archetype_assignment_after_triage[<archetype>]`. The follow-up path moves to `waiting_reply` here; the standard path leaves the work item in `investigating` from Phase 0. | All |
 | Phase 10 | Per-run summary (Teams when `teams_channel` is set; otherwise inline). Then escalation routing: when the recommended severity has `escalate_immediately: true`, post a separate channel message to `escalation.teams_channel` (or DM the resolved primary contact) mentioning `escalation.primary_contact`. | All (escalation routing on Bug/Incident only) |
