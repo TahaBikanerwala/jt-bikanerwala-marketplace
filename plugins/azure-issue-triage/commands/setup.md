@@ -6,7 +6,7 @@ allowed-tools: Read, Write, AskUserQuestion, core_list_projects, core_list_proje
 
 # azure-issue-triage Setup Wizard
 
-Walk the user through six configuration questions and write the result to `.claude/azure-issue-triage.config.json`. Re-runnable: pointing the wizard at an existing config offers to overwrite or keep current.
+Walk the user through eight configuration questions and write the result to `.claude/azure-issue-triage.config.json`. Re-runnable: pointing the wizard at an existing config offers to overwrite or keep current.
 
 ## Steps
 
@@ -102,13 +102,58 @@ Then two more:
 
 Free-text prompt:
 
-> Microsoft Teams channel for the Phase 10 summary? Format: team name + channel name (e.g., `Engineering > Triage`). Press Enter to skip; the agent will print the summary inline instead of sending a Teams message.
+> Microsoft Teams channel for the Phase 10 per-run summary? Format: team name + channel name (e.g., `Engineering > Triage`). Press Enter to skip; the agent will print the summary inline instead of sending a Teams message.
 
 Default: empty.
 
 **Serialization rule.** Empty answer maps to JSON `null`. A typed value writes the string verbatim. The agent does not validate the channel against the live Teams instance; the actual channel ID resolution happens at runtime.
 
-#### Q7: Save?
+#### Q7: Severity scheme
+
+Use `AskUserQuestion`:
+
+> Which severity scheme do you want to use?
+
+Options:
+- `4-tier (1 - Critical, 2 - High, 3 - Medium, 4 - Low) with 7/14/30/90 day SLAs` (recommended default; matches the built-in `Microsoft.VSTS.Common.Severity` enum)
+- `Custom (specify each level)`
+
+On "Custom", walk through each level: ask for the level name (string, must match an option of the configured `severity_field`), the `due_offset_days` integer, and via `AskUserQuestion` whether `escalate_immediately` is `Yes` or `No`. Loop until the user types `done` for the level name. The agent uses the keys you define at runtime, so make sure they exactly match the option names in your Severity custom field.
+
+**Serialization rule.** Save under `severity_scheme`:
+
+```json
+"severity_scheme": {
+  "1 - Critical": { "due_offset_days": 7,  "escalate_immediately": true  },
+  "2 - High":     { "due_offset_days": 14, "escalate_immediately": false },
+  "3 - Medium":   { "due_offset_days": 30, "escalate_immediately": false },
+  "4 - Low":      { "due_offset_days": 90, "escalate_immediately": false }
+}
+```
+
+#### Q8: Escalation contacts (optional)
+
+Three free-text sub-prompts. Each accepts an empty answer (Enter for none).
+
+1. > Microsoft Teams channel for high-severity escalation pings? (e.g., `Incident Response > Escalations`) Press Enter for none.
+2. > Primary escalation contact? Format: `Alice Kumar <alice@example.com>`. Press Enter for none.
+3. > Fallback escalation contact? Same format. Press Enter for none.
+
+Parse the contact strings into `{ "name": "Alice Kumar", "email": "alice@example.com" }`. If the format does not match, warn and re-prompt.
+
+**Serialization rule.** Empty answers map to JSON `null`, not empty strings or empty objects. Save under `escalation`:
+
+```json
+"escalation": {
+  "teams_channel": null,
+  "primary_contact": null,
+  "fallback_contact": null
+}
+```
+
+The agent's Prerequisites step 4 resolves the contacts to Teams user descriptors at session start; if a contact's email cannot be resolved, the channel post (when configured) mentions them by name only and a deferred warning surfaces in the Phase 10 summary.
+
+#### Q9: Save?
 
 Show the assembled config as pretty-printed JSON with sorted top-level keys. Use `AskUserQuestion`:
 
@@ -119,7 +164,7 @@ Options:
 - `No, discard and exit`
 - `Edit a specific question (which one?)`
 
-On `Edit`, ask which question number (1-6) to revisit, re-prompt that question, and loop back to Q7.
+On `Edit`, ask which question number (1-8) to revisit, re-prompt that question, and loop back to Q9.
 
 ### 4. Write the config file
 
@@ -138,9 +183,20 @@ Use the `Write` tool with `path: ".claude/azure-issue-triage.config.json"`. Pret
   "area_path_prefix": null,
   "default_team": null,
   "description_preview_pause_seconds": 3,
+  "escalation": {
+    "teams_channel": null,
+    "primary_contact": null,
+    "fallback_contact": null
+  },
   "organization_url": "https://dev.azure.com/<org>",
   "project": "<project-name>",
   "severity_field": "Microsoft.VSTS.Common.Severity",
+  "severity_scheme": {
+    "1 - Critical": { "due_offset_days": 7,  "escalate_immediately": true  },
+    "2 - High":     { "due_offset_days": 14, "escalate_immediately": false },
+    "3 - Medium":   { "due_offset_days": 30, "escalate_immediately": false },
+    "4 - Low":      { "due_offset_days": 90, "escalate_immediately": false }
+  },
   "skip_tags": [],
   "states": {
     "investigating": { "state": "Active", "reason": "Investigating" },
