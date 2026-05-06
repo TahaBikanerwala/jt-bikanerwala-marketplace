@@ -10,6 +10,11 @@
       "name": "jira-issue-triage",
       "source": "./plugins/jira-issue-triage",
       "description": "End-to-end Jira issue triage subagent across all archetypes. Bundles issue-investigator (Bug/Incident), requirements-investigator (Feature/Task/Spike), jira-ticket-refiner (any archetype), and prose-style (writing-rule application on refined output and comments). Ships a /jira-issue-triage:setup wizard."
+    },
+    {
+      "name": "azure-issue-triage",
+      "source": "./plugins/azure-issue-triage",
+      "description": "End-to-end Azure DevOps work-item triage subagent for Bug and Task archetypes (v0.1.0 cut-down release). Sibling of jira-issue-triage; ports the same workflow to AzDO Boards: WIQL queries, Area/Iteration paths, State+Reason transitions, Microsoft.VSTS.Common.Severity. Bundles azure-issue-investigator, azure-requirements-investigator, azure-work-item-refiner, prose-style. Ships a /azure-issue-triage:setup wizard."
     }
   ]
 }
