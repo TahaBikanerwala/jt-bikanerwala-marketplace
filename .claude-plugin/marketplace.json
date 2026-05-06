@@ -15,6 +15,11 @@
       "name": "azure-issue-triage",
       "source": "./plugins/azure-issue-triage",
       "description": "End-to-end Azure DevOps work-item triage subagent across all archetypes (Bug, Incident, User Story, Feature, Task, Spike). Sibling of jira-issue-triage; ports the same workflow to AzDO Boards: WIQL queries, Area/Iteration paths, State+Reason transitions, Microsoft.VSTS.Common.Severity, SLA-driven due dates, Teams escalation routing, EM-fallback for deactivated reporters, sprint placement via active-iteration lookup, story-point estimation prompt, and Azure Repos pull-request linking via ArtifactLink relations. Bundles azure-issue-investigator, azure-requirements-investigator, azure-work-item-refiner, prose-style. Ships a /azure-issue-triage:setup wizard."
+    },
+    {
+      "name": "azure-incident-postmortem",
+      "source": "./plugins/azure-incident-postmortem",
+      "description": "End-to-end incident postmortem generator for Azure DevOps. Paste an incident work-item URL and the agent gathers evidence from Teams, related AzDO work items, Datadog logs, and Azure Repos pull-request merges; reconstructs a chronological timeline with evidence tags; and writes a Google-SRE-style blameless postmortem (summary, impact, timeline, root cause, contributing factors, what went well/wrong, action items, lessons learned). Pauses at a confirmation gate after gathering so the user can review the timeline before generation. Optionally saves the markdown to a configured directory. Bundles incident-timeline-builder, postmortem-writer, prose-style. Ships a /azure-incident-postmortem:setup wizard."
     }
   ]
 }
