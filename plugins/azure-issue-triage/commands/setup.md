@@ -1,12 +1,12 @@
 ---
 description: First-time setup wizard for azure-issue-triage. Walks through configuration questions and writes .claude/azure-issue-triage.config.json.
 argument-hint: (no args)
-allowed-tools: Read, Write, AskUserQuestion, core_list_projects, core_list_project_teams, wit_my_work_items
+allowed-tools: Read, Write, AskUserQuestion, core_list_projects, core_list_project_teams, wit_my_work_items, work_list_team_iterations
 ---
 
 # azure-issue-triage Setup Wizard
 
-Walk the user through eight configuration questions and write the result to `.claude/azure-issue-triage.config.json`. Re-runnable: pointing the wizard at an existing config offers to overwrite or keep current.
+Walk the user through ten configuration questions and write the result to `.claude/azure-issue-triage.config.json`. Re-runnable: pointing the wizard at an existing config offers to overwrite or keep current.
 
 ## Steps
 
@@ -153,7 +153,37 @@ Parse the contact strings into `{ "name": "Alice Kumar", "email": "alice@example
 
 The agent's Prerequisites step 4 resolves the contacts to Teams user descriptors at session start; if a contact's email cannot be resolved, the channel post (when configured) mentions them by name only and a deferred warning surfaces in the Phase 10 summary.
 
-#### Q9: Save?
+#### Q9: Sprint placement (optional)
+
+Use `AskUserQuestion`:
+
+> Should the agent place User Story / Feature / Task / Spike work items into a sprint at triage time?
+
+Options:
+- `No, skip sprint placement` (recommended default)
+- `Yes, current sprint of the default team` — uses `work_list_team_iterations` with `timeframe: "current"` at runtime to find the active iteration. Requires `default_team` to be set; the wizard prompts for it as a follow-up if it's still null.
+- `Yes, a fixed iteration path I'll specify` — prompts for an explicit path like `MyProject\\Backend\\Sprint 42`.
+
+**Serialization rule.** "No" writes `"iteration_path_strategy": null`. "Current" writes `"iteration_path_strategy": "current"`. "Fixed" writes `"iteration_path_strategy": "explicit:<path>"`. When "Current" is chosen and `default_team` is null, ask:
+
+> What's your team name in Azure DevOps? (e.g., `Platform Engineering`). The agent uses this to find the active iteration.
+
+Save the answer to `default_team`.
+
+#### Q10: Story-point estimation (optional)
+
+Use `AskUserQuestion`:
+
+> Should the agent prompt for a story-point estimate at the Phase 3 confirmation gate (User Story / Feature work items)?
+
+Options:
+- `No, skip estimation` (recommended default)
+- `Yes, write to Microsoft.VSTS.Scheduling.StoryPoints` — the built-in field on Agile and Scrum process templates.
+- `Custom field reference name (type the name)` — for projects using a custom story-point field.
+
+**Serialization rule.** "No" writes `"story_points_field": null`. "Yes" writes `"story_points_field": "Microsoft.VSTS.Scheduling.StoryPoints"`. "Custom" writes the typed reference name verbatim. Validate non-empty.
+
+#### Q11: Save?
 
 Show the assembled config as pretty-printed JSON with sorted top-level keys. Use `AskUserQuestion`:
 
@@ -164,7 +194,7 @@ Options:
 - `No, discard and exit`
 - `Edit a specific question (which one?)`
 
-On `Edit`, ask which question number (1-8) to revisit, re-prompt that question, and loop back to Q9.
+On `Edit`, ask which question number (1-10) to revisit, re-prompt that question, and loop back to Q11.
 
 ### 4. Write the config file
 
@@ -188,7 +218,9 @@ Use the `Write` tool with `path: ".claude/azure-issue-triage.config.json"`. Pret
     "primary_contact": null,
     "fallback_contact": null
   },
+  "iteration_path_strategy": null,
   "organization_url": "https://dev.azure.com/<org>",
+  "pr_linking_enabled": true,
   "project": "<project-name>",
   "severity_field": "Microsoft.VSTS.Common.Severity",
   "severity_scheme": {
@@ -198,6 +230,7 @@ Use the `Write` tool with `path: ".claude/azure-issue-triage.config.json"`. Pret
     "4 - Low":      { "due_offset_days": 90, "escalate_immediately": false }
   },
   "skip_tags": [],
+  "story_points_field": null,
   "states": {
     "investigating": { "state": "Active", "reason": "Investigating" },
     "waiting_reply": { "state": "Active", "reason": "Awaiting Customer" }
@@ -215,7 +248,7 @@ Use the `Write` tool with `path: ".claude/azure-issue-triage.config.json"`. Pret
 }
 ```
 
-The wizard does NOT ask about these advanced fields: `archetype_assignment_after_triage`, `description_preview_pause_seconds`, `default_team`, `skip_tags`, `triaged_tag`, `work_item_type_map`. They are written with their default values shown above so that the saved JSON is a complete, browsable config. Users edit the file directly to override.
+The wizard does NOT ask about these advanced fields: `archetype_assignment_after_triage`, `description_preview_pause_seconds`, `pr_linking_enabled`, `skip_tags`, `triaged_tag`, `work_item_type_map`. They are written with their default values shown above so that the saved JSON is a complete, browsable config. Users edit the file directly to override. (`default_team` is asked only when Q9 picks "current sprint" — it stays null otherwise.)
 
 ### 5. Confirmation message
 

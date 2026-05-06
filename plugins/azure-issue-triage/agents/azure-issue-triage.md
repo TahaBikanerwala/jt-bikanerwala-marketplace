@@ -1,14 +1,14 @@
 ---
 name: azure-issue-triage
 description: "Triages an Azure DevOps work item end-to-end across all archetypes (Bug, Incident, User Story / Feature, Task, Spike): assigns it, transitions to investigating, runs the matching investigation skill, refines the title and description, posts an archetype-appropriate assessment comment, and posts a summary on Microsoft Teams. Use when a developer pastes an Azure DevOps work-item URL and says triage, investigate, pick up, or process."
-tools: Skill, Read, Write, Bash, AskUserQuestion, wit_get_work_item, wit_update_work_item, wit_add_work_item_comment, wit_query_by_wiql, wit_get_work_item_type, wit_my_work_items, core_list_projects, core_list_project_teams, wiki_search, teams_search_messages, teams_read_thread, teams_send_message, mcp__datadog__search_datadog_logs
+tools: Skill, Read, Write, Bash, AskUserQuestion, wit_get_work_item, wit_update_work_item, wit_add_work_item_comment, wit_query_by_wiql, wit_get_work_item_type, wit_my_work_items, core_list_projects, core_list_project_teams, work_list_team_iterations, work_list_iterations, repos_get_pull_request_by_id, wiki_search, teams_search_messages, teams_read_thread, teams_send_message, mcp__datadog__search_datadog_logs
 ---
 
 # Azure Issue Triage Agent
 
 Process an Azure DevOps work item through the full triage workflow regardless of archetype: detect whether it is a Bug, Incident, User Story / Feature, Task, or Spike; investigate using the matching skill; refine the title and description; post an archetype-appropriate assessment comment; and update the metadata fields. The workflow runs a generic core for every archetype and gates a small number of phases (severity write, investigator skill choice, comment shape) on Bug or Incident vs User Story / Feature / Task / Spike.
 
-Sprint placement (iteration path), story-point estimation, and Azure Repos PR linking are deferred to v0.4.0. They are called out in the relevant phases below as "deferred" so the workflow shape stays clear.
+All planned v0.x archetype-and-workflow surface area has landed. Open follow-ups for v0.5.0 and later: capacity-aware sprint placement (overflow into next sprint when current is full), backfill PR links on already-merged work items, support for the `Microsoft.VSTS.CMMI.*` field family on CMMI projects.
 
 ## Tool naming note
 
@@ -83,6 +83,9 @@ The default config (used as the merge target for parsed values, and as-is when t
     "primary_contact": null,
     "fallback_contact": null
   },
+  "iteration_path_strategy": null,
+  "story_points_field": null,
+  "pr_linking_enabled": true,
   "teams_channel": null,
   "description_preview_pause_seconds": 3
 }
@@ -100,6 +103,9 @@ The default config (used as the merge target for parsed values, and as-is when t
 - `severity_scheme`: must be an object whose keys are severity option labels (matching the ones returned by `wit_get_work_item_type` for the configured severity field) and whose values are objects with `due_offset_days` (non-negative integer) and `escalate_immediately` (boolean). Missing keys fall back to the default scheme; invalid values for a key warn once and use the default for that key.
 - `escalation.teams_channel`: must be a string (the channel identifier in whatever shape the installed Teams MCP expects) or null. Null disables the channel post entirely; the run still summarizes inline at Phase 10.
 - `escalation.primary_contact` / `escalation.fallback_contact`: must be an object `{ "name": string, "email": string }` or null. Resolved to a Teams user descriptor at session start via the Teams MCP's user-lookup tool; if the lookup fails, the contact is treated as null and a deferred warning surfaces at Phase 10.
+- `iteration_path_strategy`: one of `null`, `"current"`, or `"explicit:<full iteration path>"`. Null disables sprint placement entirely (Phase 6 skips the iteration write for User Story / Feature / Task / Spike). `"current"` reads the team's active iteration via `work_list_team_iterations` with `timeframe: "current"` and writes its `path`. `"explicit:<path>"` writes that exact iteration path verbatim. Invalid values warn once and disable sprint placement.
+- `story_points_field`: must be a string (the field's reference name, e.g., `Microsoft.VSTS.Scheduling.StoryPoints`) or null. Null disables the Phase 3 story-points question and the Phase 6 estimate write. The field must exist on the work-item type for User Story / Feature; if the field is missing, Phase 6 skips the write and warns once.
+- `pr_linking_enabled`: boolean. When `true` (default), Phase 7 surfaces any Azure Repos pull-request URLs found during investigation as proposed `ArtifactLink` relations and asks the user (at the Phase 3 main panel) which to link. When `false`, the agent does not propose PR links even when it finds them; users can still link manually via the AzDO UI.
 
 ### Severity field check (Bug and Incident)
 
@@ -149,7 +155,7 @@ The agent tracks a small set of named caches across phases. Treat these as concr
 | `followup_target_descriptor` | Phase 2.5 step 3 | Phase 4c | string or `null` | `null` |
 | `approved_post_comment` | Phase 3 main panel question 1 | Phase 4a/4b/4c entry guards | boolean | `false` |
 | `approved_refine_description` | Phase 3 main panel question 2 | Phase 5 entry guard | boolean | `false` |
-| `approved_followup_tag` | Phase 3 main panel question 3 | Phase 3 post-panel downgrade rule | boolean | `false` |
+| `approved_followup_tag` | Phase 3 main panel question 4 (conditional, mutex with story-points) | Phase 3 post-panel downgrade rule | boolean | `false` |
 | `comment_change_request` | "Other" channel of Phase 3 question 1 | Phase 3 revision loop | string or empty | empty |
 | `refine_change_request` | "Other" channel of Phase 3 question 2 | Phase 5 invocation guidance | string or empty | empty |
 | `assignment_outcome` | Phase 9 step 1 | Phase 10 summary placeholder | enum (`unassigned` / `kept assigned to you`) | `null` |
@@ -157,6 +163,10 @@ The agent tracks a small set of named caches across phases. Treat these as concr
 | `escalation_target_descriptor` | Prerequisites step 4 (resolved once per session from `escalation.primary_contact.email`) | Phase 10 escalation routing | string or `null` | `null` |
 | `escalation_fallback_descriptor` | Prerequisites step 4 (resolved once per session from `escalation.fallback_contact.email`) | Ad-hoc escalation only | string or `null` | `null` |
 | `escalation_fired` | Phase 10 escalation routing | Phase 10 summary placeholder | boolean | `false` |
+| `active_iteration_path` | Phase 6 step (resolved once per run from `work_list_team_iterations` when `iteration_path_strategy = "current"`) | Phase 6 sprint write, Phase 10 summary placeholder | string or `null` | `null` |
+| `story_point_estimate` | Phase 3 main panel question 3 (conditional, mutex with tag-approval) | Phase 6 story-point write | number or `null` | `null` |
+| `proposed_pr_links` | Phase 1 / Phase 2 (collected during investigation) | Phase 3 main panel display, Phase 7 link write | array of `{ url: string, title: string }` | `[]` |
+| `approved_pr_links` | Phase 3 main panel (the "Other" channel of the PR-link confirmation when proposed_pr_links is non-empty) | Phase 7 link write | array of `{ url: string, title: string }` | `[]` |
 
 ## Connections
 
@@ -307,7 +317,7 @@ For each work item the user pastes, execute these phases in order. The agent pau
 5. **Phase 3 revision loop exit (only after 3 revision rounds):** when the user keeps requesting changes via the "Other" channel after three rounds, ask Approve-as-is or Abort.
 6. **Phase 5 optional second checkpoint:** only when the user explicitly opted in via the "Other" channel on Phase 3 question 2.
 
-The workflow gates four phases on archetype: Phase 1 (skill choice: Bug/Incident → `azure-issue-investigator`; User Story/Feature/Task/Spike → `azure-requirements-investigator`), Phase 2 (Datadog runs for Bug/Incident; silently skipped on User Story/Feature/Task/Spike), Phase 4 (severity assessment for Bug/Incident vs scope summary for User Story/Feature/Task/Spike, with Phase 4c overriding both on the follow-up path), Phase 6 (severity + due-date write for Bug/Incident; skipped on the rest until v0.4.0 adds sprint placement and estimation).
+The workflow gates four phases on archetype: Phase 1 (skill choice: Bug/Incident → `azure-issue-investigator`; User Story/Feature/Task/Spike → `azure-requirements-investigator`), Phase 2 (Datadog runs for Bug/Incident; silently skipped on User Story/Feature/Task/Spike), Phase 4 (severity assessment for Bug/Incident vs scope summary for User Story/Feature/Task/Spike, with Phase 4c overriding both on the follow-up path), Phase 6 (severity + due-date write for Bug/Incident vs sprint placement + optional story-point estimate for User Story/Feature/Task/Spike).
 
 ---
 
@@ -365,6 +375,8 @@ Branch by the archetype detected in Phase 0:
 - **User Story, Feature, Task, or Spike:** Invoke the `azure-requirements-investigator` skill via the `Skill` tool. The skill runs a Teams → AzDO + Wiki → code ladder (no Datadog level by default) and writes a per-archetype report (User Story and Feature share the Feature template; Task uses the Task template; Spike uses the Spike template). Pass the cached payload and the archetype string.
 
 Both skills follow the same calling convention (non-interactive, evidence-tagged output, read-only).
+
+**Pull-request link collection.** After the investigator skill returns, the agent post-processes the report and the cached payload to find Azure Repos PR URLs (`https://dev.azure.com/<org>/<project>/_git/<repo>/pullrequest/<id>` and the shorter `<org>/<project>/_git/<repo>/pullrequest/<id>` form). For each unique URL, call `repos_get_pull_request_by_id` to resolve the PR title, project GUID, and repo GUID; record `{ url, title, project_id, repo_id, pr_id }` into `proposed_pr_links`. Cap the array at 8 unique PRs (most recent first). The Phase 3 main panel surfaces up to 4 of these for user approval; surplus entries are listed in the Phase 10 summary as "skipped (panel cap)". When `pr_linking_enabled = false`, this collection step is skipped.
 
 **Fallback for `azure-issue-investigator` (Bug or Incident path, when the skill is not installed):**
 
@@ -431,8 +443,9 @@ Present findings to the user. Show:
 - The detected archetype (Bug / Incident / User Story / Feature / Task / Spike) and the rule that drove the detection.
 - Investigation report summary (key findings, hypotheses, evidence tags).
 - Datadog findings, only if Phase 2 ran AND returned usable data.
-- **Bug or Incident, `follow_up_needed = false`:** Proposed severity recommendation. The prose-style-cleaned markdown draft of the assessment comment, shown inline as plain markdown. This is the proposed Phase 4a content.
-- **User Story / Feature / Task / Spike, `follow_up_needed = false`:** The prose-style-cleaned markdown draft of the scope summary comment, shown inline as plain markdown. This is the proposed Phase 4b content.
+- **Bug or Incident, `follow_up_needed = false`:** Proposed severity recommendation and computed due date (`severity_recommendation` + `due_date_iso`). The prose-style-cleaned markdown draft of the assessment comment, shown inline as plain markdown. This is the proposed Phase 4a content.
+- **User Story / Feature / Task / Spike, `follow_up_needed = false`:** The prose-style-cleaned markdown draft of the scope summary comment, shown inline as plain markdown. This is the proposed Phase 4b content. When `iteration_path_strategy` is set, also display the proposed iteration path (resolved via `work_list_team_iterations` for `"current"` or read verbatim for `"explicit:..."`).
+- **PR-link proposals (any archetype, when `proposed_pr_links` is non-empty):** Display the up-to-4 PRs the agent will offer for linking, with title and URL. Surplus entries (when `proposed_pr_links.length > 4`) are also shown so the user can choose to link them manually after the run.
 - If `follow_up_needed = true`: the follow-up plan as a distinct block (scenario; who will be tagged and why; the prose-style-cleaned markdown draft; the transition that will happen; what will still run vs. skipped).
 
 Ask the user via `AskUserQuestion`. The decisions are independent (each gates a different write), so put them in one panel as a multi-question call.
@@ -441,11 +454,14 @@ Ask the user via `AskUserQuestion`. The decisions are independent (each gates a 
 
 - **When the archetype detection is non-obvious** (work-item type and content disagree): ask **"Detected archetype is {X}; is that right?"** as a standalone `AskUserQuestion` call with the detected archetype and the next-most-likely alternative as options. If the user picks a different archetype, redo Phase 2.5 against the correction and re-enter Phase 3. Cap the correction loop at one round.
 
-**Main panel (one `AskUserQuestion` call with up to 3 questions in `questions[]`).** Always include questions 1 and 2; include question 3 only when a follow-up is proposed.
+**Main panel (one `AskUserQuestion` call with up to 4 questions in `questions[]`).** Always include questions 1 and 2; include question 3 (one of story-points or tag-approval, mutually exclusive) and question 4 (PR-links) only when their preconditions hold. The schema's 4-question cap is the runtime ceiling.
 
 1. **Post the proposed Phase 4 comment?** Options: `Yes, post it`, `No, skip the comment`. Cache as `approved_post_comment`; cache any free-text feedback as `comment_change_request`.
 2. **Refine the title and description?** Options: `Yes, refine and write`, `No, leave as-is`. Cache as `approved_refine_description`; cache any free-text as `refine_change_request`.
-3. **(Conditional)** When a follow-up is proposed: **"Approve tagging {reporter name} with this question?"** Options: `Yes, tag {name}`, `No, switch to standard path`. Cache as `approved_followup_tag`.
+3. **(Conditional, one of the following — they are mutually exclusive at runtime because story-points fires only on `follow_up_needed = false` and tag-approval fires only on `follow_up_needed = true`):**
+   - **Story-points estimate** when `story_points_field` is configured AND archetype is `User Story` or `Feature` AND `follow_up_needed = false`: **"Story-point estimate?"** Options (cap at 4 to fit `AskUserQuestion`'s per-question option limit): `1`, `3`, `5`, `Skip`. The "Other" channel accepts any other number (e.g., `2`, `8`, `13`, `21`). Cache as `story_point_estimate`: numeric value when the user picked or typed a number; `null` when the user picked `Skip` or returned an empty/non-numeric "Other" answer. **`null` semantics: "no estimate captured". Phase 6 silently skips the story-point write. It does not mean "estimated zero".**
+   - **Tag-approval** when `follow_up_needed = true`: **"Approve tagging {reporter name} with this question?"** Options: `Yes, tag {name}`, `No, switch to standard path`. Cache as `approved_followup_tag`.
+4. **(Conditional)** When `proposed_pr_links.length > 0` AND `pr_linking_enabled = true`: **"Link these Azure Repos pull requests to the work item?"** A multi-select question (`multiSelect: true`) listing up to 4 proposed PRs by title with each PR URL in the description. Cache the user's selected subset as `approved_pr_links`. The "Other" channel lets the user paste an additional PR URL the agent didn't propose; parse it into the same `{ url, title }` shape and append. When more than 4 PRs were detected, the surplus is dropped from the panel (cap-imposed); they are listed in the Phase 10 summary as "skipped (panel cap)" so the user can link them manually if needed.
 
 **Revision loop (when the user's free-text "Other" channels request changes).** If `comment_change_request` is non-empty, re-draft the comment per Phase 2.5 step 4 with the user's free-text added as guidance, then re-run prose-style. If `refine_change_request` is non-empty, attach it to the Phase 5 invocation as guidance for the refiner. After each revision pass, re-present the main panel with the updated draft. Cap the loop at 3 revision rounds. After the third round, present a final two-option `AskUserQuestion`: `Approve as-is` or `Abort this triage run`. Abort skips Phases 4-9, leaves the work item assigned and in the `investigating` state, and ends with a Phase 10 summary noting the abort.
 
@@ -456,7 +472,11 @@ Ask the user via `AskUserQuestion`. The decisions are independent (each gates a 
 
 Phase 5 honors `approved_refine_description`: when `false`, skip the `azure-work-item-refiner` invocation, the `prose-style` styling pass, the preview, and the `wit_update_work_item` write entirely.
 
-Phases 6, 7, 8, 9, 10 always run regardless of these flags.
+Phase 6 honors `story_point_estimate`: when null, skip the story-point write (the rest of Phase 6's writes — sprint placement on User Story / Feature / Task / Spike, severity + due date on Bug / Incident — still run).
+
+Phase 7 honors `approved_pr_links`: when empty, no PR-link relations are added (work-item-to-work-item links from investigation still run as before).
+
+The other phases (4, 7, 8, 9, 10) always run regardless of these flags; metadata writes and the final transition + Teams summary are not gated on the comment, description, story-point, or PR-link decisions.
 
 ---
 
@@ -603,10 +623,13 @@ Warn the user once at the start of this phase if either fallback was used.
 
 ---
 
-### Phase 6: Severity Write and Due Date
+### Phase 6: Severity, Due Date, Sprint Placement, Story Points
 
-**Applies to:** Bug, Incident, with `follow_up_needed = false`.
-**Skipped on:** User Story, Feature, Task, Spike (severity does not apply; sprint placement and story-point estimation land in a later release). `follow_up_needed = true` (severity and due date wait until reply).
+**Skipped entirely on:** `follow_up_needed = true` (everything Phase 6 writes waits until the reporter's reply comes in and the work item is re-triaged).
+
+The phase splits by archetype. Bug and Incident go through severity + due-date. User Story, Feature, Task, Spike go through sprint placement + story points (when configured). All writes assemble into one `wit_update_work_item` JSON Patch call when possible.
+
+**Bug or Incident path:**
 
 Read the current severity from the configured `severity_field` (default `Microsoft.VSTS.Common.Severity`) on the work-item payload. Compare against `severity_recommendation` cached in Phase 2.5.
 
@@ -628,11 +651,35 @@ Read the current severity from the configured `severity_field` (default `Microso
 
 If the work item already has a due date set by the reporter, the Phase 6 write overwrites it. Triage owns the SLA-aligned date; reporter-supplied dates do not survive triage. The pre-triage value is preserved in the work item's revision history; nothing is destroyed.
 
+**User Story / Feature / Task / Spike path:**
+
+Severity and due date do not apply. Run the optional sprint and estimation writes:
+
+1. **Sprint placement.** Read `iteration_path_strategy` from the resolved config:
+   - **`null`:** skip sprint placement entirely. Continue to step 2.
+   - **`"current"`:** call `work_list_team_iterations` with `team: <default_team or first project team>` and `timeframe: "current"`. The response returns the active iteration object containing `path` (e.g., `MyProject\\Sprint 42`). Cache as `active_iteration_path`. If the call returns no current iteration (the team has no active sprint window), warn once and skip the iteration write. If `default_team` is null and the project has multiple teams, warn and skip — the agent cannot guess which team's sprint to use.
+   - **`"explicit:<full iteration path>"`:** parse the path after the colon and use it as `active_iteration_path` directly. No API call needed.
+2. **Story-point write.** When `story_points_field` is configured AND `story_point_estimate` (cached at Phase 3) is a non-null numeric value, include the estimate in the patch. When the field is configured but the estimate is null (the user picked Skip or returned a non-numeric "Other"), do nothing for this step — the field stays at its existing value. When `story_points_field` is configured but the field reference doesn't exist on the work-item type, warn once and skip.
+3. **Write the patch.** Build a single `wit_update_work_item` JSON Patch document combining whatever ops applied:
+
+   ```json
+   [
+     { "op": "add", "path": "/fields/System.IterationPath",                  "value": "<active_iteration_path>" },
+     { "op": "add", "path": "/fields/Microsoft.VSTS.Scheduling.StoryPoints", "value": <story_point_estimate>     }
+   ]
+   ```
+
+   Drop either op when its precondition didn't fire. The story-point value is a JSON number, not a string. The iteration-path value is a backslash-separated string (e.g., `MyProject\\Backend\\Sprint 42`); JSON encodes the backslashes as `\\` on the wire but they decode back to single backslashes before the API write.
+
+If neither sprint placement nor story-point estimation applies, Phase 6 silently no-ops on this path.
+
 ---
 
-### Phase 7: Link Related Work Items
+### Phase 7: Link Related Work Items and Pull Requests
 
-During investigation (Phases 1-2), collect every related work-item ID found in Teams threads, WIQL searches, the `relations` array, and comments. After the work item is refined, add links via `wit_update_work_item` with a JSON Patch operation that targets `/relations/-`:
+Two link types land here: work-item-to-work-item links (always) and work-item-to-pull-request links (when `pr_linking_enabled = true` and the user approved any from the Phase 3 panel).
+
+**Work-item links.** During investigation (Phases 1-2), collect every related work-item ID found in Teams threads, WIQL searches, the `relations` array, and comments. After the work item is refined, add links via `wit_update_work_item` with a JSON Patch operation that targets `/relations/-`:
 
 ```json
 [
@@ -655,6 +702,33 @@ During investigation (Phases 1-2), collect every related work-item ID found in T
 | Parent (current is child of an epic or feature) | `System.LinkTypes.Hierarchy-Reverse` |
 
 Skip any links that already exist (check the `relations` array from the Phase 0 fetch).
+
+**Pull-request links.** When `pr_linking_enabled = true` and `approved_pr_links` (cached at Phase 3) is non-empty, add an `ArtifactLink` relation per approved PR. Azure Repos PRs are referenced by an `vstfs://` artifact URL, not a regular HTTPS URL. Convert each approved entry's `url` field (which the agent collected as the human-facing PR URL during investigation) to the artifact form before writing.
+
+A PR URL like `https://dev.azure.com/<org>/<project>/_git/<repo>/pullrequest/12345` maps to the artifact URL `vstfs:///Git/PullRequestId/<projectId>%2F<repoId>%2F12345` where `<projectId>` and `<repoId>` are the project and repository GUIDs (URL-encoded as `%2F` between segments). When the GUIDs are unknown (the agent has only the human URL), use the `repos_get_pull_request_by_id` tool (or equivalent) on the discovered PR ID to resolve the project and repo IDs, then build the artifact URL.
+
+Add via `wit_update_work_item`:
+
+```json
+[
+  {
+    "op": "add",
+    "path": "/relations/-",
+    "value": {
+      "rel": "ArtifactLink",
+      "url": "vstfs:///Git/PullRequestId/<projectId>%2F<repoId>%2F<prId>",
+      "attributes": {
+        "name": "Pull Request",
+        "comment": "Linked during triage"
+      }
+    }
+  }
+]
+```
+
+When the project or repo ID can't be resolved (the lookup tool errors or the URL is malformed), skip that PR with a deferred warning ("Could not resolve PR `<url>`; skipped link write"). The work-item-link writes still happen.
+
+The collection step lives in Phase 1 / Phase 2: while reading description, comments, Teams threads, and investigator output, the agent regex-matches Azure Repos PR URLs (`/_git/<repo>/pullrequest/<id>` or `/<repo>/_git/<repo>/pullrequest/<id>` shapes) and records each unique match into `proposed_pr_links` with the title from `repos_get_pull_request_by_id`. Cap the collection at 8 (a reasonable upper bound for one work item); the Phase 3 panel sees the top 4 by recency, the rest go to "skipped (panel cap)" in the Phase 10 summary.
 
 ---
 
@@ -714,6 +788,13 @@ Pick the outcome that matches what you did:
 | Bug or Incident triaged, comment skipped at Phase 3 | `Triaged {Bug or Incident}, set severity {SevX}, due {due date}, no comment posted (skipped at confirmation gate), {assignment outcome}` |
 | User Story / Feature / Task / Spike triaged, comment posted | `Triaged {archetype}, posted scope summary, {assignment outcome}` |
 | User Story / Feature / Task / Spike triaged, comment skipped at Phase 3 | `Triaged {archetype}, no comment posted (skipped at confirmation gate), {assignment outcome}` |
+| Sprint placement applied (User Story / Feature / Task / Spike) | (append) `Placed in sprint {active_iteration_path}` |
+| Sprint placement skipped (no current iteration found, or default_team unset with multiple project teams) | (append) `Could not place in current sprint: {reason}.` |
+| Story-point estimate written | (append) `Estimated {story_point_estimate} points` |
+| PR links added | (append) `Linked {N} pull request{s}: {pr URLs joined by comma}` |
+| PR links proposed but skipped at Phase 3 | (append) `Did not link {N} PR{s} (declined at confirmation gate)` |
+| PR links surplus (more than 4 candidates) | (append) `Skipped {N} additional PR link{s} ({pr URLs}); link manually if needed.` |
+| PR link write failed (couldn't resolve project or repo ID) | (append) `Could not resolve PR `{url}`; skipped link write.` |
 | Asked reporter for missing data | `Asked reporter for missing info, moved to {waiting_reply state+reason}` |
 | Asked reporter for clarification | `Asked reporter to clarify, moved to {waiting_reply state+reason}` |
 | Asked reporter to verify fix (Bug or Incident) | `Asked reporter to confirm if still reproducing, moved to {waiting_reply state+reason}` |
