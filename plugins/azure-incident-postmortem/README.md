@@ -17,7 +17,18 @@ This is the initial release. Compared to a hypothetical fully-featured postmorte
 
 - **Azure DevOps MCP server.** The agent needs Boards access (read incident work items, query related work items via WIQL, list deploys via Repos). Microsoft ships an official server at [github.com/microsoft/azure-devops-mcp](https://github.com/microsoft/azure-devops-mcp) (`@azure-devops/mcp`).
 
-  **Tool-prefix note.** MCP tool names are scoped by however your Claude Code client mounts the server. The agent body lists tool names in their commonly-used short form (`wit_get_work_item`, `wit_query_by_wiql`, `repos_list_pull_requests`, `wiki_search`). If your install prefixes them, edit the agent's frontmatter once.
+  **Auto-registered by this plugin (Rolai-shaped).** The plugin ships a `.mcp.json` that launches `@azure-devops/mcp` via `npx -y` with a `bash -c` wrapper that pulls the PAT from an encrypted env file with [dotenvx](https://dotenvx.com/):
+  ```
+  export AZURE_DEVOPS_PAT=$(dotenvx get AZURE_DEVOPS_PAT -f server/.env) \
+    && npx -y @azure-devops/mcp rolaillc
+  ```
+  Working assumptions today, hardcoded in the shipped config:
+  - Organization slug: `rolaillc`.
+  - PAT location: `server/.env`, relative to the directory Claude Code is launched from, encrypted with dotenvx, with the matching `.env.keys` available for decryption.
+
+  This matches the Rolai dev workflow and is the working state of the config. A universal version (`userConfig` schema, keychain-stored PAT, no dotenvx dependency) is on the follow-up list.
+
+  **Server name + tool-prefix note.** The MCP server is registered as `azure-devops-postmortem` (renamed from the upstream default `azure-devops`) so it doesn't collide with `azure-devops-triage` shipped by [`azure-issue-triage`](../azure-issue-triage/) when both plugins are enabled. Tools therefore namespace as `mcp__azure_devops_postmortem__wit_get_work_item`, etc. The agent body lists them in their commonly-used short form (`wit_get_work_item`, `wit_query_by_wiql`, `repos_list_pull_requests`, `wiki_search`). If your install requires the full prefix, edit the agent's frontmatter once.
 
 ### Recommended (the agent gracefully degrades without these)
 
