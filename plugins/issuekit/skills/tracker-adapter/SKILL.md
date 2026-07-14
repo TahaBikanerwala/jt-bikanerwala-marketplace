@@ -52,7 +52,7 @@ The caller invokes verbs by name; this skill routes the call to the resolved ada
 
 ## Lazy-prompt rule
 
-When a verb needs a policy value (state name, severity scheme, escalation contact, skip-labels, triaged-label, output_directory, archetype_assignment_after_triage) and the value is unset:
+When a verb needs a policy value (state name, severity scheme, escalation contact, skip-labels, triaged-label, output_directory, archetype_assignment_after_triage, state_categories, blocked_indicators, stale_after_days, points_field_name) and the value is unset:
 
 1. Read the question text from `references/policy-schema.md` for that key.
 2. Call `AskUserQuestion` with the question and the documented option set.
@@ -78,7 +78,7 @@ The gate is a hard boundary. Writes cannot bypass it, even for "small" updates l
 
 See `references/verbs.md` for the full schemas. Quick reference:
 
-**Reads:** `getIssue`, `getIssueHistory`, `getIssueComments`, `searchIssues`, `getIssueTypeSchema`, `linkedPullRequests`, `getCurrentSprint`, `whoAmI`, `resolveUser`, `mention`.
+**Reads:** `getIssue`, `getIssueHistory`, `getIssueComments`, `searchIssues`, `getIssueTypeSchema`, `linkedPullRequests`, `getCurrentSprint`, `getSprintItems`, `getTeamCapacity`, `whoAmI`, `resolveUser`, `mention`.
 
 **Writes:** `assign`, `transition`, `updateFields`, `addComment`, `addLabel`, `removeLabel`, `linkIssue`, `linkPullRequest`.
 
@@ -88,6 +88,7 @@ See `references/verbs.md` for the full schemas. Quick reference:
 |---|---|
 | `adapters/<tracker>/tools.md` | MCP tool-name allowlist and known prefix variants for that tracker. |
 | `adapters/<tracker>/search.md` | Query-language builder (WIQL for AzDO, JQL for Jira). |
+| `adapters/<tracker>/sprint.md` | Iteration-item fetch (`getSprintItems`), team capacity (`getTeamCapacity`), points-field resolution, and `stateCategory` mapping. |
 | `adapters/<tracker>/writes.md` | Payload shapes for write verbs (JSON Patch for AzDO, edit/transition for Jira). |
 | `adapters/<tracker>/body-format.md` | Markdown subset rules and conversion notes for that tracker. |
 | `adapters/<tracker>/states.md` | State-graph quirks and the abstract-state → vendor-state mapping rules. |
