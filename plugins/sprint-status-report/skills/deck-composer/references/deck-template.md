@@ -38,39 +38,31 @@ pie showData
 
 ## Completed this sprint
 
-| ID | Title | Pts | Owner |
-|---|---|---|---|
-{{ for item in completed }}| {{ item.id }} | {{ item.title }} | {{ item.points or "—" }} | {{ item.assignee or "—" }} |
+{{ for item in completed }}- **#{{ item.id }} {{ item.title }}** ({{ item.assignee }}{{ ", {{ item.points }} pts" when points }}). {{ item.blurb }}
 {{ endfor }}
 
 ---
 
 ## In progress
 
-| ID | Title | Pts | Owner | Idle |
-|---|---|---|---|---|
-{{ for item in in_progress }}| {{ item.id }} | {{ item.title }} | {{ item.points or "—" }} | {{ item.assignee or "—" }} | {{ item.days_since_update }}d |
+{{ for item in in_progress }}- **#{{ item.id }} {{ item.title }}** ({{ item.assignee }}{{ ", {{ item.points }} pts" when points }}). {{ item.blurb }} _(idle {{ item.days_since_update }}d)_
 {{ endfor }}
 
 ---
 
 ## Blocked / at risk
 
-| ID | Title | Owner | Why |
-|---|---|---|---|
-{{ for item in at_risk }}| {{ item.id }} | {{ item.title }} | {{ item.assignee or "—" }} | {{ item.reason }} |
+{{ for item in at_risk }}- **#{{ item.id }} {{ item.title }}** ({{ item.assignee }}). {{ item.blurb }} _({{ item.reason }})_
 {{ endfor }}
 
-<!-- when at_risk is empty, replace the table with: -->
+<!-- when at_risk is empty, replace the list with: -->
 Nothing blocked or stale. 🎉
 
 ---
 
 ## Up next
 
-| ID | Title | Pts | Owner |
-|---|---|---|---|
-{{ for item in up_next }}| {{ item.id }} | {{ item.title }} | {{ item.points or "—" }} | {{ item.assignee or "—" }} |
+{{ for item in up_next }}- **#{{ item.id }} {{ item.title }}** ({{ item.assignee }}{{ ", {{ item.points }} pts" when points }}). {{ item.blurb }}
 {{ endfor }}
 
 ---
@@ -88,10 +80,14 @@ Nothing blocked or stale. 🎉
 
 ## Rules recap
 
-- Long lists (> ~10 rows): keep the first rows, then a final row `| … | +N more | | |`.
+- Item lines: `- **#<id> <title>** (<owner>[, <pts> pts]). <blurb>`. Drop empty parenthetical
+  parts; drop the `. <blurb>` when blurb is `""`. In progress appends `_(idle <n>d)_`;
+  at-risk appends `_(<reason>)_`.
+- Unassigned owner: write `unassigned` inside the parenthetical rather than leaving it blank.
+- Long lists (> ~8 items): paginate onto `<Section> (cont.)` slides until all items show.
+  Do not truncate Completed / In progress / Up next. Only Blocked/at-risk truncates
+  (`- _+N more at risk_`) since it's a call to action, not an archive.
 - Pie chart: omit any bucket with count 0 from the `pie` block, but keep it in the headline.
-- `—` is the em-dash-free placeholder for a missing value; it is data, not a separator, so
-  it's allowed here. (The "no em dash separator" rule is about prose punctuation.)
 - Empty sprint: emit only the title slide and one Summary slide reading
   `No work items in this sprint.`; skip every list slide and the capacity slide.
 

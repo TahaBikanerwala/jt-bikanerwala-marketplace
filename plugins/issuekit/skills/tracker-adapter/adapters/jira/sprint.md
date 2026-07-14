@@ -27,6 +27,7 @@ Implements the two sprint-read verbs from `references/verbs.md`.
 | `remainingWork` | `fields.timetracking.remainingEstimateSeconds / 3600` (hours) when present, else null |
 | `updated` | `fields.updated` |
 | `labels` | `fields.labels` (array; empty when unset) |
+| `description` | `fields.description` → render to plain text (strip ADF/markdown markup), collapse whitespace, truncate to 500 chars. `""` when null. |
 
 ### Story-points field resolution
 

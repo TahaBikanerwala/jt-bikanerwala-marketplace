@@ -20,7 +20,8 @@ PRRef         = { url, title, state, mergedAt }
 Sprint        = { id, name, start, end }    // or null
 SprintItem    = {
   id, url, title, type, state, stateCategory,   // stateCategory ∈ {done, in_progress, todo, unknown}
-  assignee, points, remainingWork, updated, labels
+  assignee, points, remainingWork, updated, labels,
+  description                                    // plain-text snippet (HTML/markdown stripped, whitespace-collapsed, ≤500 chars); "" when the item has none
 }
 Capacity      = {
   totalCapacity: number,                        // team capacity across the iteration, in the tracker's unit
@@ -82,7 +83,7 @@ SearchQuery = {
 - AzDO: `work_get_work_items_for_iteration` (item ids for the iteration) → `wit_get_work_items_batch_by_ids` with `expand: "all"` (details). `stateCategory` comes from the work-item-type category (`wit_get_work_item_type` → `states[].category`), overridden by `policy.state_categories` when the state is listed there.
 - Jira: `searchJiraIssuesUsingJql` with `sprint = <sprint.id>` when a sprint is given, else `sprint in openSprints() AND project = <key>`. `stateCategory` comes from the status's `statusCategory` (`new`/`indeterminate`/`done` → `todo`/`in_progress`/`done`), overridden by `policy.state_categories`.
 
-When `sprint` is omitted the adapter resolves the current sprint first (same logic as `getCurrentSprint(team)`). `points`/`remainingWork` are numbers or `null` when the tracker or item has no value (points-field resolution is documented per-adapter). Unmapped states resolve to `stateCategory: "unknown"`; the caller decides how to bucket them.
+When `sprint` is omitted the adapter resolves the current sprint first (same logic as `getCurrentSprint(team)`). `points`/`remainingWork` are numbers or `null` when the tracker or item has no value (points-field resolution is documented per-adapter). Unmapped states resolve to `stateCategory: "unknown"`; the caller decides how to bucket them. `description` is a short plain-text snippet of the item's description/body (HTML or markdown stripped, whitespace collapsed, truncated to 500 chars) so the caller can render a brief per-ticket detail without a second fetch; it is `""` when the item has no description.
 
 ### `getTeamCapacity(team?: string, sprint?: Sprint)`
 **Out:** `Capacity | null`

@@ -48,9 +48,17 @@ Follow `references/deck-template.md` exactly for structure. Key rules:
   This keeps the deck self-contained: Marp renders Mermaid natively, so no external
   charting is needed. Omit any bucket whose count is 0 from the pie (a 0-slice renders ugly)
   but keep it in the headline numbers.
-- Item lists render as markdown tables (`| ID | Title | Pts | Owner |`) capped to what fits
-  one slide (~10 rows); if a list is longer, show the first rows and add a final row
-  `| … | +<n> more | | |`.
+- Item lists (Completed, In progress, Up next, Blocked/at-risk) render as **bulleted detail
+  lines**, one per item, so each ticket carries a brief description:
+  `- **#<id> <title>** (<owner>[, <pts> pts]). <blurb>`
+  Omit the `(...)` parenthetical parts that are empty (no owner, no points), and omit the
+  trailing `. <blurb>` entirely when `blurb` is `""`. For In progress, append the idle time:
+  `... <blurb> _(idle <n>d)_`. For Blocked/at-risk, end with the reason: `... _(<reason>)_`.
+  Fit ~8 items per slide. When a section has more, **paginate** rather than truncate: emit
+  continuation slides titled `<Section> (cont.)` until every item is shown. The one
+  exception is Blocked/at-risk, which should stay short by nature; if it somehow exceeds ~8,
+  show the first 8 and add `- _+<n> more at risk_` (at-risk is a call to action, not an
+  archive). Never silently drop completed/in-progress/up-next items.
 - Percentages come straight from `metrics.progress`; show `pct_by_count` always, and
   `pct_by_points` in parentheses when `metrics.progress.basis == "points"`.
 - The Blocked / at-risk slide: if `metrics.at_risk` is empty, render the slide with a single

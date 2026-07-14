@@ -26,8 +26,9 @@ The caller passes a JSON payload:
 }
 ```
 
-`SprintItem = { id, url, title, type, state, stateCategory, assignee, points, remainingWork, updated, labels }`
-(`stateCategory ∈ {done, in_progress, todo, unknown}`, already resolved by the adapter).
+`SprintItem = { id, url, title, type, state, stateCategory, assignee, points, remainingWork, updated, labels, description }`
+(`stateCategory ∈ {done, in_progress, todo, unknown}`, already resolved by the adapter;
+`description` is a short plain-text snippet or `""`).
 
 **Reference date for staleness.** This skill cannot read the clock, so the caller passes
 `today`. Use `today` as the reference date: an item is stale when `today − item.updated ≥
@@ -57,10 +58,10 @@ Return a single JSON object (the metrics model). Do not write files. Do not add 
     "remaining_points": <number|null>,
     "basis": "points" | "count"
   },
-  "completed":   [ { "id", "title", "points", "assignee" }, ... ],
-  "in_progress": [ { "id", "title", "points", "assignee", "days_since_update" }, ... ],
-  "at_risk":     [ { "id", "title", "assignee", "reason": "blocked: <indicator>" | "stale: <n>d" }, ... ],
-  "up_next":     [ { "id", "title", "points", "assignee" }, ... ],
+  "completed":   [ { "id", "title", "blurb", "points", "assignee" }, ... ],
+  "in_progress": [ { "id", "title", "blurb", "points", "assignee", "days_since_update" }, ... ],
+  "at_risk":     [ { "id", "title", "blurb", "assignee", "reason": "blocked: <indicator>" | "stale: <n>d" }, ... ],
+  "up_next":     [ { "id", "title", "blurb", "points", "assignee" }, ... ],
   "capacity_summary": { "total", "committed", "per_member": [ { "user", "capacity" } ], "note" } | null,
   "warnings": [ "<string>", ... ]
 }
@@ -106,6 +107,22 @@ An `in_progress` item is stale if `reference_date − item.updated ≥ policy.st
 Record `days_since_update` and add to `at_risk` with `reason: "stale: <n>d"` unless it is
 already listed as blocked (blocked takes precedence; don't double-list). Compute
 `days_since_update` for every in-progress item (shown in the deck), not just stale ones.
+
+### Blurb (brief per-ticket detail)
+Every item in `completed`, `in_progress`, `at_risk`, and `up_next` gets a `blurb`: one
+plain-text line, at most ~140 characters, that says what the ticket is about in plain
+language.
+
+- Derive it from `item.description` when present: condense to a single clause, drop
+  boilerplate headings ("Problem Statement", "Acceptance Criteria", "As a … I want …"), and
+  keep the substance. Rewrite, don't just truncate mid-sentence.
+- When `description` is `""`, derive the blurb from the title: restate it as a short action
+  phrase (a bug title becomes what's being fixed; a story title becomes what's being built).
+- Keep it factual and terse. No trailing period is required. Never invent scope the ticket
+  doesn't state. Never use em dashes or spaced hyphens as separators.
+- The blurb complements the title; it should not merely repeat it. If the title already
+  says everything and there's no description, set `blurb` to `""` and let the deck show the
+  title alone rather than padding.
 
 ### Up next
 `up_next` = `todo`-bucket items in the order they arrived (the adapter sorts by backlog

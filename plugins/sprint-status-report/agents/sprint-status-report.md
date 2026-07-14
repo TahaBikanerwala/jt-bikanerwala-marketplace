@@ -166,7 +166,10 @@ Print a short recap:
   it to update an item, point them at `issue-triage`.
 - **Never fabricate numbers.** Every count comes from `items`; every point total comes from
   the items' `points`/`remainingWork`. If points are missing, report count-based progress
-  and say so — do not invent estimates.
+  and say so; do not invent estimates.
+- **Never invent ticket detail.** The one-line blurb per ticket is condensed from its
+  `description` (or title when absent). Do not add scope, status, or claims the ticket
+  doesn't state.
 - **Never present a stale-item or blocked flag the analyst didn't produce.** The analyst
   owns those rules (`blocked_indicators`, `stale_after_days`).
 - **Never fail the run because export tooling is missing.** The markdown deck is the
