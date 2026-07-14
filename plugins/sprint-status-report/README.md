@@ -1,12 +1,17 @@
 # sprint-status-report
 
-Turn the current sprint into a status-report deck with one command, on any supported
-tracker. Reads the iteration, tallies work by state, flags what's blocked or stalling, and
-writes a [Marp](https://marp.app/) markdown deck you can export to PPTX or PDF. Powered by
-[`issuekit`](../issuekit/), so the same command works against Azure DevOps and Jira.
+Turn the current sprint into a report with one command, on any supported tracker. Two views:
 
-Read-only by design: reports never touch the tracker, so there's no confirmation gate and
-it's safe to run as often as you like.
+- **`/run`** — a point-in-time status deck: tally work by state, flag what's blocked or
+  stalling, write a [Marp](https://marp.app/) deck you can export to PPTX or PDF.
+- **`/progress-delta`** — a what-changed deck: compare the sprint now against an earlier
+  snapshot (or reconstructed history) and report what shipped, what newly started, scope
+  added or dropped, new risk, and how progress moved.
+
+Powered by [`issuekit`](../issuekit/), so the same commands work against Azure DevOps and
+Jira. Read-only by design: reports never touch the tracker, so there's no confirmation gate
+and it's safe to run as often as you like. Every run also writes a small snapshot, so deltas
+accumulate over time.
 
 ## Plug-and-play contract
 
@@ -35,10 +40,11 @@ core API, so that slide is omitted on Jira without error.
 @sprint-status-report
 ```
 
-or the slash command:
+or the slash commands:
 
 ```
 /sprint-status-report:run [sprint name or ID] [--team <name>] [--export pptx|pdf]
+/sprint-status-report:progress-delta [sprint name or ID] [--team <name>] [--since <YYYY-MM-DD>] [--baseline <path>] [--export pptx|pdf]
 ```
 
 Examples:
@@ -48,23 +54,50 @@ Examples:
 /sprint-status-report:run "Sprint 42"
 /sprint-status-report:run --team "Payments"
 /sprint-status-report:run "Sprint 42" --export pptx
+
+/sprint-status-report:progress-delta
+/sprint-status-report:progress-delta --since 2026-07-07
+/sprint-status-report:progress-delta "Sprint 42" --since 2026-07-01 --export pptx
 ```
 
-All arguments are optional. With none, it reports the current sprint for your default team
-and writes a markdown deck.
+All arguments are optional. With none, `/run` reports the current sprint for your default
+team and writes a status deck; `/progress-delta` compares it against the most recent stored
+snapshot.
+
+## progress-delta
+
+`/progress-delta` needs a "before" state to compare the current sprint against. It resolves
+one in this order:
+
+1. `--baseline <path>` — a specific saved snapshot JSON.
+2. The newest stored snapshot before today (or at/before `--since <date>`). Snapshots are
+   written on every `/run` and `/progress-delta`, under `<output_directory>/.snapshots/`.
+3. `--since <date>` with no stored snapshot: reconstruct the as-of state from item history.
+   **Azure DevOps only** (Jira does not expose issue history through the adapter).
+4. Nothing to compare (first run, or Jira with no snapshot): it establishes a baseline
+   snapshot and tells you to run again later. No delta deck yet.
+
+When the baseline comes from history reconstruction, it covers only items still in the
+sprint today; items removed earlier can't be recovered, and the deck says so.
+
+The delta deck lists what shipped (moved to Done), what newly started, scope added and
+removed, and new risk (newly blocked, newly stale, regressed), with the sprint's
+before → after headline movement on the summary slide.
 
 ## Workflow
 
-Five read-only phases:
+Read-only phases, shared until the mode branch:
 
 | Phase | What happens |
 |---|---|
-| **0. Prepare** | Parse args. Bootstrap and detect the tracker via `issuekit:tracker-adapter`. |
+| **0. Prepare** | Parse args (including mode). Bootstrap and detect the tracker via `issuekit:tracker-adapter`. |
 | **1. Resolve sprint** | Current sprint, or the one named in the argument. |
 | **2. Fetch** | `getSprintItems` for the iteration; `getTeamCapacity` (Azure DevOps only). |
 | **3. Analyze** | Bucket items (Done / In Progress / To Do), compute % complete and remaining, flag blocked and stale items (`sprint-analyst`). |
-| **4. Render** | Write a Marp deck to `output_directory`; optionally export with `marp-cli` (`deck-composer`). |
-| **5. Summary** | Recap the numbers, the deck path, and any warnings. |
+| **S. Snapshot** | Write a snapshot JSON under `.snapshots/` so later deltas have a baseline. |
+| **4. Render** (status) | Write a Marp status deck; optionally export with `marp-cli` (`deck-composer`). |
+| **D1–D3** (delta) | Resolve a baseline, diff it against the current state (`delta-analyst`), and render a Marp delta deck (`delta-narrator`). |
+| **5. Summary** | Recap the numbers, the deck path, the snapshot path, and any warnings. |
 
 ## The deck
 
@@ -104,8 +137,8 @@ plugin uses:
 - `blocked_indicators` — `{ labels, states, board_column }`; an item matching any is blocked.
 - `stale_after_days` — an in-progress item older than this is flagged at-risk. Default `3`.
 - `points_field_name` — Jira-only override for the story-points field. Default: auto-detect.
-- `output_directory` — where the deck is written. Defaults to `./sprint-reports/` for this
-  plugin.
+- `output_directory` — where decks are written. Defaults to `./sprint-reports/` for this
+  plugin. Snapshots go under `<output_directory>/.snapshots/`; there is no separate key.
 
 When the file is absent, defaults are used and the agent lazy-prompts (and offers to
 persist) any key it actually needs. Defaults are documented in
@@ -116,7 +149,9 @@ persist) any key it actually needs. Defaults are documented in
 | Skill | Purpose |
 |---|---|
 | `sprint-analyst` | Pure computation: raw `SprintItem[]` + capacity → a metrics model (buckets, %, remaining, blocked/stale, up-next, warnings). |
-| `deck-composer` | Pure rendering: metrics model → Marp markdown deck written to `output_directory`. |
+| `deck-composer` | Pure rendering: metrics model → Marp status deck written to `output_directory`. |
+| `delta-analyst` | Pure computation: a baseline snapshot + the current state → a delta model (shipped, started, added/removed, new risk, headline movement). |
+| `delta-narrator` | Pure rendering: delta model → Marp "what changed" deck written to `output_directory`. |
 
 The agent also invokes `issuekit:tracker-adapter` for every tracker read.
 
@@ -124,5 +159,4 @@ The agent also invokes `issuekit:tracker-adapter` for every tracker read.
 
 Not a roadmap, prioritization, or estimation tool. It reports what's already in the sprint.
 For changing work items (title, severity, assignment), use
-[`issue-triage`](../issue-triage/). For a what-shipped narrative, a future `progress-delta`
-plugin will cover the delta between two points in time.
+[`issue-triage`](../issue-triage/).
