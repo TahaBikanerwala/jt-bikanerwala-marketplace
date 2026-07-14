@@ -20,6 +20,11 @@
       "name": "issue-triage",
       "source": "./plugins/issue-triage",
       "description": "End-to-end issue triage across all archetypes (Bug, Incident, Story, Feature, Task, Spike) on any supported tracker (Azure DevOps, Jira). All writes pass through a single diff-and-confirm gate. Auto-installs issuekit; bring your own MCPs."
+    },
+    {
+      "name": "sprint-status-report",
+      "source": "./plugins/sprint-status-report",
+      "description": "Reads the current sprint on any supported tracker (Azure DevOps, Jira), tallies work by state, computes progress, flags blocked and stale items, and emits a Marp status deck ready to export to PPTX/PDF. Read-only and safe to run anytime. Auto-installs issuekit; bring your own MCPs."
     }
   ]
 }

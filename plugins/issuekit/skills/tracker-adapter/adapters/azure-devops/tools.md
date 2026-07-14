@@ -14,6 +14,8 @@ The adapter calls the tools below. Suffix-match against the available tool surfa
 | `getIssueTypeSchema` | `__wit_get_work_item_type` | for severity option enums and required fields |
 | `linkedPullRequests` | `__repo_list_pull_requests_by_repo_or_project`, plus walk `relations[]` from `__wit_get_work_item` | combine both sources |
 | `getCurrentSprint` | `__work_list_team_iterations` | `timeframe: "current"` |
+| `getSprintItems` | `__wit_get_work_items_for_iteration`, `__wit_get_work_items_batch_by_ids`, `__wit_get_work_item_type` | iteration ids → batch details; type lookup for `stateCategory`. See `sprint.md` |
+| `getTeamCapacity` | `__work_get_team_capacity`, `__work_get_iteration_capacities` | returns zeros when unset; `null` only if the tools are absent |
 | `resolveUser` | `__core_get_identity_ids` | best-effort; returns the AzDO descriptor |
 
 ## Write tools

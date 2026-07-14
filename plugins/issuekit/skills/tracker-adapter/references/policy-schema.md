@@ -38,7 +38,19 @@ Path: `.claude/tracker-policy.json` (project-root). Optional. When absent, the a
     "Feature":   "self",
     "Task":      "self",
     "Spike":     "self"
-  }
+  },
+  "state_categories": {
+    "done":        ["Done", "Closed", "Resolved"],
+    "in_progress": ["Active", "Committed", "In Progress", "Doing", "In Review"],
+    "todo":        ["New", "Approved", "To Do", "Open", "Backlog"]
+  },
+  "blocked_indicators": {
+    "labels":       ["blocked", "impediment"],
+    "states":       ["Blocked"],
+    "board_column": null
+  },
+  "stale_after_days": 3,
+  "points_field_name": null
 }
 ```
 
@@ -104,6 +116,32 @@ After triage finishes, who should be assigned to the issue. Per-archetype:
 
 Default: shape above. Bugs get unassigned (because triage hands off to whoever picks them up). Everything else stays with the triager.
 
+### `state_categories` (object)
+
+Buckets vendor state names into the three report categories used by `getSprintItems` and the `sprint-status-report` plugin: `done`, `in_progress`, `todo`. Each value is a case-insensitive list of vendor state names.
+
+Used only by sprint reads. When a state is not listed here, the adapter falls back to the vendor's own category signal (AzDO work-item-type `category`; Jira `statusCategory.key`). A state that matches neither becomes `stateCategory: "unknown"` and the consumer emits a one-line warning naming the unmapped state.
+
+**Default if unset:** the shape above (covers the common Agile/Scrum/Basic AzDO states and the default Jira workflow). Because the vendor-category fallback already handles most states, this key is rarely lazy-prompted; prompt only if a sprint contains an `unknown` state the user must classify.
+
+### `blocked_indicators` (object)
+
+Signals that a sprint item is blocked. Match is OR across the three signals:
+
+- **`labels`** — an item carrying any of these labels/tags is blocked.
+- **`states`** — an item in any of these states is blocked.
+- **`board_column`** — a board-column name that means blocked. Honored only where the tracker exposes board columns to the MCP; ignored otherwise.
+
+**Default if unset:** `{ labels: ["blocked", "impediment"], states: ["Blocked"], board_column: null }`.
+
+### `stale_after_days` (number)
+
+An `in_progress` item whose last-updated date is older than this many days is flagged stale (at-risk) in the report. **Default:** `3`.
+
+### `points_field_name` (string)
+
+Jira-only override for the story-points custom-field name. When unset, the Jira adapter auto-discovers the field (`Story Points` → `Story point estimate`). Ignored on AzDO, which uses the standard `Microsoft.VSTS.Scheduling.StoryPoints` field. **Default:** `null` (auto-discover).
+
 ## Lazy-prompt question text
 
 When a missing key is encountered, ask via `AskUserQuestion` using these question templates:
@@ -117,6 +155,9 @@ When a missing key is encountered, ask via `AskUserQuestion` using these questio
 | `escalation.channel` | "Which chat channel should receive escalations? (Leave blank to skip.)" | free text or skip |
 | `escalation.primary_contact` | "Email of the primary on-call contact? (Leave blank to skip.)" | email or skip |
 | `triaged_label` | "What label should mark an issue as triaged?" | free text, default "triaged" |
+| `state_categories.<bucket>` | "The sprint has a state '<state>' I couldn't classify. Is it Done, In Progress, or To Do?" | Done / In Progress / To Do |
+| `stale_after_days` | "After how many days with no update should an in-progress item be flagged at-risk?" | numeric, default 3 |
+| `points_field_name` | "Which Jira field holds story points? (Leave blank to auto-detect.)" | free text or skip |
 
 After every answer, offer:
 
