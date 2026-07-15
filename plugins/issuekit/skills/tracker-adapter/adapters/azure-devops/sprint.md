@@ -25,6 +25,12 @@ Implements the two sprint-read verbs from `references/verbs.md`.
 | `remainingWork` | `Microsoft.VSTS.Scheduling.RemainingWork` (Task) — null when absent |
 | `updated` | `System.ChangedDate` |
 | `labels` | `System.Tags` split on `; ` into an array (empty when unset) |
+| `description` | `System.Description` → strip HTML tags, decode entities, collapse whitespace, truncate to 500 chars. `""` when the field is absent. |
+
+Request `System.Description` in the `wit_get_work_items_batch_by_ids` field list (it is not
+in the default set). Some work-item types (Task, Bug) carry the body in
+`Microsoft.VSTS.TCM.ReproSteps` or `System.Description`; prefer `System.Description` and
+fall back to repro steps for Bugs when `System.Description` is empty.
 
 ### `stateCategory` resolution
 

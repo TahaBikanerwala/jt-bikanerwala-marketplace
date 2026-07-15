@@ -1,7 +1,7 @@
 {
   "name": "sprint-status-report",
   "version": "1.0.0",
-  "description": "Reads the current sprint from any supported tracker (Azure DevOps, Jira), tallies work items by state (Done / In Progress / To Do), computes percent complete and remaining count, flags blocked and stale items, and emits a Marp markdown deck ready to export to PPTX/PDF. Read-only and safe to run anytime; no writes, no confirmation gate. Tracker-agnostic via issuekit. Bundles sprint-analyst and deck-composer skills.",
+  "description": "Reads the current sprint from any supported tracker (Azure DevOps, Jira), tallies work items by state (Done / In Progress / To Do), computes percent complete and remaining count, flags blocked and stale items, and emits a Marp markdown deck ready to export to PPTX/PDF. Each completed, in-progress, and up-next ticket carries a brief one-line detail of what it is. Read-only and safe to run anytime; no writes, no confirmation gate. Tracker-agnostic via issuekit. Bundles sprint-analyst and deck-composer skills.",
   "author": {
     "name": "Taha Bikanerwala",
     "url": "https://github.com/TahaBikanerwala"
@@ -11,6 +11,6 @@
   "license": "MIT",
   "keywords": ["sprint", "status-report", "sprint-report", "marp", "slides", "delivery", "azure-devops", "jira", "tracker-agnostic"],
   "dependencies": [
-    { "name": "issuekit", "version": "^0.2.0" }
+    { "name": "issuekit", "version": "^0.2.1" }
   ]
 }

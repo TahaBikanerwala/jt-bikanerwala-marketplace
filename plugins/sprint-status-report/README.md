@@ -74,11 +74,16 @@ self-contained; no plotting dependency). Slides:
 1. **Title** — sprint name, date range, team, generated-on date.
 2. **Summary** — done/in-progress/to-do pie + headline numbers (% complete, remaining,
    at-risk count).
-3. **Completed this sprint**.
-4. **In progress** (with assignees).
-5. **Blocked / at risk** (blocked items + stale in-progress items).
-6. **Up next** (top of the remaining backlog order).
+3. **Completed this sprint** — each ticket with a one-line detail of what shipped.
+4. **In progress** — each ticket with a one-line detail, owner, and idle time.
+5. **Blocked / at risk** (blocked items + stale in-progress items, each with its reason).
+6. **Up next** — top of the remaining backlog order, each with a one-line detail.
 7. **Capacity** — only when capacity data is available (Azure DevOps).
+
+Completed, in-progress, and up-next tickets render as detail bullets
+(`**#123 Title** (owner). Brief description of the ticket.`) so a reader gets the gist of
+each item without opening the tracker. The one-line detail comes from the ticket's
+description (or its title when there's no description); it never invents scope.
 
 Export to PPTX/PDF:
 
