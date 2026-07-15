@@ -40,6 +40,10 @@ arguments as input. The agent runs a five-phase, **read-only** workflow:
 Nothing is ever written to the tracker. There is no confirmation gate because there are no
 writes. Run it as often as you like.
 
+Each run also writes a small snapshot under `<output_directory>/.snapshots/`. That snapshot
+is what `/sprint-status-report:progress-delta` compares against, so running this weekly builds
+the history a delta needs.
+
 ## Configuration
 
 Reads `.claude/tracker-policy.json` if present (shared with the rest of the suite).
