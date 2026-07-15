@@ -11,6 +11,6 @@
   "license": "MIT",
   "keywords": ["triage", "bug-triage", "issue-triage", "azure-devops", "jira", "tracker-agnostic", "subagent"],
   "dependencies": [
-    { "name": "issuekit", "version": "^0.1.0" }
+    { "name": "issuekit", "version": "^0.2.0" }
   ]
 }

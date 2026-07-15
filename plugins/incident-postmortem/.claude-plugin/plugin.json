@@ -11,6 +11,6 @@
   "license": "MIT",
   "keywords": ["incident", "postmortem", "rca", "root-cause-analysis", "sre", "azure-devops", "jira", "tracker-agnostic"],
   "dependencies": [
-    { "name": "issuekit", "version": "^0.1.0" }
+    { "name": "issuekit", "version": "^0.2.0" }
   ]
 }

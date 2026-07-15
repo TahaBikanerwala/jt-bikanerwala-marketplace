@@ -18,6 +18,17 @@ Comment       = { at, by, body, url }       // body is markdown
 IssueSummary  = { id, url, title, state, type }
 PRRef         = { url, title, state, mergedAt }
 Sprint        = { id, name, start, end }    // or null
+SprintItem    = {
+  id, url, title, type, state, stateCategory,   // stateCategory ∈ {done, in_progress, todo, unknown}
+  assignee, points, remainingWork, updated, labels,
+  description                                    // plain-text snippet (HTML/markdown stripped, whitespace-collapsed, ≤500 chars); "" when the item has none
+}
+Capacity      = {
+  totalCapacity: number,                        // team capacity across the iteration, in the tracker's unit
+  committed: number|null,                       // sum of committed effort/points, when derivable
+  perMember: [{ user, capacity }],
+  daysOff: number
+} // or null when the tracker has no capacity concept
 ```
 
 ## Reads
@@ -65,6 +76,22 @@ SearchQuery = {
 ### `getCurrentSprint(team?: string)`
 **Out:** `Sprint | null`
 **Implements:** AzDO `work_list_team_iterations` with `timeframe: "current"`; Jira `searchJiraIssuesUsingJql` with `sprint in openSprints() AND project = <key>` then extract the sprint name from the first result.
+
+### `getSprintItems(sprint?: Sprint, team?: string)`
+**Out:** `SprintItem[]` — every work item assigned to the iteration, enriched with the fields needed for a status report.
+**Implements:** see `adapters/<tracker>/sprint.md`.
+- AzDO: `work_get_work_items_for_iteration` (item ids for the iteration) → `wit_get_work_items_batch_by_ids` with `expand: "all"` (details). `stateCategory` comes from the work-item-type category (`wit_get_work_item_type` → `states[].category`), overridden by `policy.state_categories` when the state is listed there.
+- Jira: `searchJiraIssuesUsingJql` with `sprint = <sprint.id>` when a sprint is given, else `sprint in openSprints() AND project = <key>`. `stateCategory` comes from the status's `statusCategory` (`new`/`indeterminate`/`done` → `todo`/`in_progress`/`done`), overridden by `policy.state_categories`.
+
+When `sprint` is omitted the adapter resolves the current sprint first (same logic as `getCurrentSprint(team)`). `points`/`remainingWork` are numbers or `null` when the tracker or item has no value (points-field resolution is documented per-adapter). Unmapped states resolve to `stateCategory: "unknown"`; the caller decides how to bucket them. `description` is a short plain-text snippet of the item's description/body (HTML or markdown stripped, whitespace collapsed, truncated to 500 chars) so the caller can render a brief per-ticket detail without a second fetch; it is `""` when the item has no description.
+
+### `getTeamCapacity(team?: string, sprint?: Sprint)`
+**Out:** `Capacity | null`
+**Implements:** see `adapters/<tracker>/sprint.md`.
+- AzDO: `work_get_team_capacity` (per-member capacity + days off) plus `work_get_iteration_capacities` for the iteration total. `sprint` defaults to the current iteration when omitted.
+- Jira: no capacity concept in the core API — return `null`.
+
+Callers must treat `null` as "capacity unavailable" and omit any capacity output, never error.
 
 ### `resolveUser(query: { email?: string, name?: string })`
 **Out:** `UserRef` (opaque)
@@ -122,3 +149,5 @@ When a verb's underlying tool returns an error:
 ## Detection-time pre-checks
 
 If `tracker == jira` and the policy requests AzDO-specific fields (`area_path_prefix`, `iteration_path_strategy`), warn once and ignore those keys. Same in reverse for `sprint_field_name`, `severity_field_name` when `tracker == azure-devops`.
+
+`points_field_name` is Jira-only (AzDO uses the standard `Microsoft.VSTS.Scheduling.StoryPoints` field). If `tracker == azure-devops` and `points_field_name` is set, warn once and ignore it.

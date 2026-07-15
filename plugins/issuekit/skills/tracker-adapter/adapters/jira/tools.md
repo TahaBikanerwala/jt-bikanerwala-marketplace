@@ -14,6 +14,8 @@ The adapter calls the tools below. Suffix-match against the available tool surfa
 | `getIssueTypeSchema` | `__getJiraIssueTypeMetaWithFields` | used for severity auto-discovery |
 | `linkedPullRequests` | walk `issuelinks` + smart-link metadata from `__getJiraIssue` | no separate call; the Atlassian MCP does not always expose dev-status |
 | `getCurrentSprint` | `__searchJiraIssuesUsingJql` with `sprint in openSprints() AND project = <key>` | extract sprint name from first hit |
+| `getSprintItems` | `__searchJiraIssuesUsingJql` with `sprint = <id>` / `sprint in openSprints()`, plus `__getJiraIssueTypeMetaWithFields` for points-field discovery | see `sprint.md` |
+| `getTeamCapacity` | none | no capacity concept in core Jira; returns `null` |
 | `resolveUser` | `__lookupJiraAccountId` | returns `accountId`; cache per session |
 | `transition` (lookup step) | `__getTransitionsForJiraIssue` | resolves transition name → transitionId |
 
