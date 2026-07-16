@@ -1,7 +1,8 @@
 # Jira — write payloads
 
-Jira writes flow through three tools:
+Jira writes flow through these tools:
 
+- `createJiraIssue` — new issue creation.
 - `editJiraIssue` — field updates, assignment, labels, link-by-field.
 - `transitionJiraIssue` — state transitions (preceded by `getTransitionsForJiraIssue` to resolve the transition ID).
 - `addCommentToJiraIssue` — comments (ADF format).
@@ -47,6 +48,31 @@ One `editJiraIssue` call with all supplied fields:
 ### Custom rich-text fields (e.g. "Bug Description")
 
 These reject markdown and require raw ADF. Surface them as a **separate** `editJiraIssue` call with `contentFormat: "adf"` (or omit the parameter when the body is already an object). Construct the ADF from the markdown using the same converter the comment path uses.
+
+## `createIssue({ type, title, body, acceptanceCriteria?, labels?, priority?, project?, customFields? })`
+
+One `createJiraIssue` call:
+
+```
+createJiraIssue(
+  projectKey: <project>,
+  issueTypeName: <type>,          // e.g. "Story", "Bug"
+  summary: <title>,
+  description: <markdown>,          // contentFormat: "markdown"
+  ...
+)
+```
+
+| Input field | Jira field | Value transform |
+|---|---|---|
+| `title` | `summary` | as-is, plain text |
+| `body` | `description` | markdown; `contentFormat: "markdown"` |
+| `acceptanceCriteria` | folded into `description` under an `## Acceptance Criteria` heading, unless `policy.acceptance_criteria_field` names a custom field | markdown |
+| `labels` | `fields.labels` | array of strings |
+| `priority` | `fields.priority.name` | map `P0/P1/P2` through `policy.priority_label_map` (default `P0 → Highest`, `P1 → High`, `P2 → Medium`) |
+| `customFields[<id-or-name>]` | as documented in the schema | as-is |
+
+Jira has no standard acceptance-criteria field, so `acceptanceCriteria` folds into the description body by default. The new issue is **standalone** — set no `parent` and create no issue link. Read the created issue's `key` and browse URL from the response and return `{ id, url }`.
 
 ## `addComment(id, body)`
 

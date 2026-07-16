@@ -30,6 +30,11 @@
       "name": "sprint-status-report",
       "source": "./plugins/sprint-status-report",
       "description": "Reports on the current sprint on any supported tracker (Azure DevOps, Jira) two ways: /run emits a Marp status deck (work by state, progress, blocked/stale items), and /progress-delta emits a what-changed deck (what shipped, newly started, scope added/dropped, new risk, progress movement) by comparing against an earlier snapshot or reconstructed history. Read-only and safe to run anytime. Auto-installs issuekit; bring your own MCPs."
+    },
+    {
+      "name": "draft-stories",
+      "source": "./plugins/draft-stories",
+      "description": "Turns ambiguous, unclear requirements (pasted notes, a meeting transcript, or a rough brief) into INVEST user stories and creates them standalone in the tracker (Azure DevOps, Jira) tagged Draft. Brainstorms the requirements, clarifies blocking gaps, asks which candidate stories to create, probes the local codebase to self-answer open questions, then writes full stories (Problem Statement, Background, Given/When/Then acceptance criteria, In/Out of Scope, Definition of Done, Open Questions) behind a single diff-and-confirm gate. Auto-installs issuekit; bring your own MCPs."
     }
   ]
 }

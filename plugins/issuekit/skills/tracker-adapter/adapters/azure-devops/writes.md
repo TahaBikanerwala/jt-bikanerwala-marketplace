@@ -50,6 +50,35 @@ Build one patch document with one operation per supplied field. Field-name mappi
 | `storyPoints` | `/fields/Microsoft.VSTS.Scheduling.StoryPoints` | numeric |
 | `customFields[<refName>]` | `/fields/<refName>` | as-is |
 
+## `createIssue({ type, title, body, acceptanceCriteria?, labels?, priority?, project?, customFields? })`
+
+Call `wit_create_work_item` with the work-item `type` and a JSON-Patch document — one `op: add` per supplied field. The type goes in the tool's own `workItemType` argument, not in the patch; the patch carries only `/fields/*`:
+
+| Input field | AzDO path | Value transform |
+|---|---|---|
+| `title` | `/fields/System.Title` | as-is (plain text) |
+| `body` | `/fields/System.Description` | convert markdown → HTML via `body-format.md` |
+| `acceptanceCriteria` | `/fields/Microsoft.VSTS.Common.AcceptanceCriteria` | convert markdown → HTML via `body-format.md` |
+| `labels` | `/fields/System.Tags` | join with `; ` (semicolon-delimited string) |
+| `priority` | `/fields/Microsoft.VSTS.Common.Priority` | `P0 → 1`, `P1 → 2`, `P2 → 3` |
+| `customFields[<refName>]` | `/fields/<refName>` | as-is |
+
+Target the caller's `project` (default `whoAmI().defaultProject`). Add **no** `/relations/-` entry — created items are standalone (no parent, no related link). On success, read `id` and the browser URL (`_links.html.href`) from the response and return `{ id, url }`.
+
+```
+wit_create_work_item(
+  project: "<project>",
+  workItemType: "<type>",
+  fields: [
+    { "op": "add", "path": "/fields/System.Title", "value": "<title>" },
+    { "op": "add", "path": "/fields/System.Description", "value": "<html>" },
+    { "op": "add", "path": "/fields/Microsoft.VSTS.Common.AcceptanceCriteria", "value": "<html>" },
+    { "op": "add", "path": "/fields/System.Tags", "value": "Draft" },
+    { "op": "add", "path": "/fields/Microsoft.VSTS.Common.Priority", "value": 2 }
+  ]
+)
+```
+
 ## `addComment(id, body)`
 
 ```

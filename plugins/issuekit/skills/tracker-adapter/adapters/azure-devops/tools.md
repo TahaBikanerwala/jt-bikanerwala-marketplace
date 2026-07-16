@@ -22,6 +22,7 @@ The adapter calls the tools below. Suffix-match against the available tool surfa
 
 | Verb | Tool (suffix) | Notes |
 |---|---|---|
+| `createIssue` | `__wit_create_work_item` | new work item; JSON Patch of `/fields/*`, `workItemType` argument; no `/relations/-` |
 | `assign` | `__wit_update_work_item` | JSON Patch on `/fields/System.AssignedTo` |
 | `transition` | `__wit_update_work_item` | patch `/fields/System.State` (and optionally `/fields/System.Reason`) |
 | `updateFields` | `__wit_update_work_item` | one patch document; one `op: add` per field |
@@ -51,7 +52,6 @@ These tools are not part of the verb surface but are called opportunistically by
 
 The adapter does **not** call the following, even though they exist in the AzDO MCP surface:
 
-- `__wit_create_work_item` — issue creation is out of scope for the triage/postmortem verbs.
 - `__pipelines_*` — out of scope.
 - `__advsec_*` — out of scope.
 

@@ -80,7 +80,7 @@ See `references/verbs.md` for the full schemas. Quick reference:
 
 **Reads:** `getIssue`, `getIssueHistory`, `getIssueComments`, `searchIssues`, `getIssueTypeSchema`, `linkedPullRequests`, `getCurrentSprint`, `getSprintItems`, `getTeamCapacity`, `whoAmI`, `resolveUser`, `mention`.
 
-**Writes:** `assign`, `transition`, `updateFields`, `addComment`, `addLabel`, `removeLabel`, `linkIssue`, `linkPullRequest`.
+**Writes:** `createIssue`, `assign`, `transition`, `updateFields`, `addComment`, `addLabel`, `removeLabel`, `linkIssue`, `linkPullRequest`.
 
 ## Adapter file map
 
