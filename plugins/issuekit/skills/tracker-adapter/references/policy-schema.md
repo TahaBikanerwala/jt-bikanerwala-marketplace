@@ -50,7 +50,11 @@ Path: `.claude/tracker-policy.json` (project-root). Optional. When absent, the a
     "board_column": null
   },
   "stale_after_days": 3,
-  "points_field_name": null
+  "points_field_name": null,
+  "story_work_item_type": { "azure-devops": "User Story", "jira": "Story" },
+  "draft_label": "Draft",
+  "priority_label_map": { "P0": "Highest", "P1": "High", "P2": "Medium" },
+  "acceptance_criteria_field": null
 }
 ```
 
@@ -141,6 +145,27 @@ An `in_progress` item whose last-updated date is older than this many days is fl
 ### `points_field_name` (string)
 
 Jira-only override for the story-points custom-field name. When unset, the Jira adapter auto-discovers the field (`Story Points` → `Story point estimate`). Ignored on AzDO, which uses the standard `Microsoft.VSTS.Scheduling.StoryPoints` field. **Default:** `null` (auto-discover).
+
+### `story_work_item_type` (object)
+
+Used by `createIssue` (the `draft-stories` plugin) to choose which work-item type new stories are created as, per tracker. Keys are tracker names; values are the vendor type name.
+
+- **`azure-devops`** — depends on the process template: `"User Story"` (Agile), `"Product Backlog Item"` (Scrum), `"Issue"` (Basic).
+- **`jira`** — usually `"Story"`.
+
+**Default if unset:** `{ "azure-devops": "User Story", "jira": "Story" }`. If the value is not a valid type on the project (checked against `getIssueTypeSchema`), the adapter lazy-prompts with the live type list.
+
+### `draft_label` (string)
+
+The tag/label applied to work items created by `draft-stories`, so they land in the team's draft queue for refinement. **Default:** `"Draft"`.
+
+### `priority_label_map` (object)
+
+Jira-only. Maps the abstract priority tiers (`P0`/`P1`/`P2`) to the vendor priority names for `createIssue`. AzDO ignores this — it writes the numeric `Microsoft.VSTS.Common.Priority` field (`P0 → 1`, `P1 → 2`, `P2 → 3`). **Default:** `{ "P0": "Highest", "P1": "High", "P2": "Medium" }`.
+
+### `acceptance_criteria_field` (string)
+
+Jira-only override naming a custom field that holds acceptance criteria. When unset, `createIssue` folds acceptance criteria into the description body under an `## Acceptance Criteria` heading (Jira has no standard AC field). AzDO always uses the standard `Microsoft.VSTS.Common.AcceptanceCriteria` field and ignores this key. **Default:** `null` (fold into description).
 
 ## Lazy-prompt question text
 

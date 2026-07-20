@@ -23,6 +23,7 @@ The adapter calls the tools below. Suffix-match against the available tool surfa
 
 | Verb | Tool (suffix) | Notes |
 |---|---|---|
+| `createIssue` | `__createJiraIssue` | new issue; standalone (no parent, no link) |
 | `assign` | `__editJiraIssue` | `fields.assignee.accountId` or `null` |
 | `transition` (action step) | `__transitionJiraIssue` | takes the transitionId from the lookup |
 | `updateFields` | `__editJiraIssue` | one call; `contentFormat: "markdown"` for body |
@@ -47,6 +48,5 @@ Suffix matching tolerates all of them.
 
 ## Tools NOT used
 
-- `__createJiraIssue` — issue creation is out of scope.
 - `__deleteJiraIssue` — never.
 - `__getPagesInConfluenceSpace`, page-write tools — out of scope.

@@ -8,9 +8,9 @@ The verb-plugin builds a list of intended writes. Each entry has the shape:
 
 ```
 {
-  verb:   "addComment" | "transition" | "updateFields" | "assign" | "addLabel" | "removeLabel" | "linkIssue" | "linkPullRequest",
-  target: <IssueId>,
-  before: <current value | null>,
+  verb:   "createIssue" | "addComment" | "transition" | "updateFields" | "assign" | "addLabel" | "removeLabel" | "linkIssue" | "linkPullRequest",
+  target: <IssueId | "(new)">,
+  before: <current value | null | "(new)">,
   after:  <intended value>,
   notes?: <one-line clarification>
 }
@@ -35,7 +35,9 @@ The skill renders the batch as a markdown table and calls `AskUserQuestion` once
 | 8 | linkPullRequest | PR link | — | https://dev.azure.com/org/proj/_git/repo/pullrequest/4567 |
 ```
 
-Long bodies (`before` and `after` of `updateFields(body: ...)` or `addComment`) are abridged to:
+For a `createIssue` write there is no existing target: render `before` as `(new)`, put the new work-item type and title in the `After` cell, and note tags/priority inline (e.g. `"VMS: notifications not sending" (User Story, tags: Draft, P2)`). When the whole batch creates rather than edits, the header reads `Pending writes (<n> new items)`; abridge the long `body`/`acceptanceCriteria` after-values the same way as any other long field.
+
+Long bodies (`before` and `after` of `updateFields(body: ...)`, `createIssue(body/acceptanceCriteria: ...)`, or `addComment`) are abridged to:
 - First 6 lines, then a `...` row, then the last 2 lines.
 - A separate "Full diff" section appears below the table, rendered as a unified-diff block per multi-line field.
 

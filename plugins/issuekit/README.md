@@ -1,13 +1,13 @@
 # issuekit
 
-Shared adapter layer for issue-tracker plugins in this marketplace. `incident-postmortem` and `issue-triage` both depend on it.
+Shared adapter layer for issue-tracker plugins in this marketplace. `incident-postmortem`, `issue-triage`, `sprint-status-report`, and `draft-stories` depend on it.
 
 This plugin ships **no** MCP, **no** agent, and **no** slash command. It is a library of skills and reference files that the verb-plugins invoke.
 
 ## What it provides
 
 - **Auto-detection.** Pattern-matches the available MCP tool surface and classifies the active tracker (Azure DevOps, Jira), chat backend (Slack, Teams), doc backend (Confluence, Azure Wiki), and log backend (Datadog).
-- **Abstract verb surface.** One contract for both vendors: `getIssue`, `getIssueHistory`, `getIssueComments`, `searchIssues`, `getIssueTypeSchema`, `linkedPullRequests`, `getCurrentSprint`, `whoAmI`, `resolveUser`, `mention`, `assign`, `transition`, `updateFields`, `addComment`, `addLabel`, `removeLabel`, `linkIssue`, `linkPullRequest`.
+- **Abstract verb surface.** One contract for both vendors: `getIssue`, `getIssueHistory`, `getIssueComments`, `searchIssues`, `getIssueTypeSchema`, `linkedPullRequests`, `getCurrentSprint`, `whoAmI`, `resolveUser`, `mention`, `createIssue`, `assign`, `transition`, `updateFields`, `addComment`, `addLabel`, `removeLabel`, `linkIssue`, `linkPullRequest`.
 - **Body-format conversion.** Verb-plugins author in markdown with the reserved token `@[userRef]` for mentions. The adapter projects that down to AzDO HTML or Jira-flavored markdown before writing.
 - **Policy schema.** Reads `.claude/tracker-policy.json`; lazy-prompts for any missing key at the moment it's needed; offers to persist the answer.
 - **Diff-and-confirm contract.** A single batched diff format that both verb-plugins reuse to gate every write.
