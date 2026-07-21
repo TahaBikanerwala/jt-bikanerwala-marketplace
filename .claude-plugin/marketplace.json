@@ -35,6 +35,11 @@
       "name": "draft-stories",
       "source": "./plugins/draft-stories",
       "description": "Turns ambiguous, unclear requirements (pasted notes, a meeting transcript, or a rough brief) into INVEST user stories and creates them standalone in the tracker (Azure DevOps, Jira) tagged Draft. Brainstorms the requirements, clarifies blocking gaps, asks which candidate stories to create, probes the local codebase to self-answer open questions, then writes full stories (Problem Statement, Background, Given/When/Then acceptance criteria, In/Out of Scope, Definition of Done, Open Questions) behind a single diff-and-confirm gate. Auto-installs issuekit; bring your own MCPs."
+    },
+    {
+      "name": "acceptance-test-generator",
+      "source": "./plugins/acceptance-test-generator",
+      "description": "Turns a user story and its acceptance criteria into a rigorous BDD test suite. Reads the story from the tracker (Azure DevOps, Jira), a spec file, or pasted text, decomposes every AC with senior test-design technique (equivalence partitioning, boundary-value analysis, decision tables, state-transition and negative-path coverage), then writes canonical Gherkin .feature files with smartly consolidated scenarios and detailed steps. Test cases derive only from the story and acceptance criteria; the codebase is read read-only for reference (selectors, existing feature-file style, terminology, spec-vs-code drift) and never as the basis of a test. Optionally creates each scenario as a Test Case work item linked to the source story, behind a single diff-and-confirm gate. Auto-installs issuekit; bring your own MCPs."
     }
   ]
 }
