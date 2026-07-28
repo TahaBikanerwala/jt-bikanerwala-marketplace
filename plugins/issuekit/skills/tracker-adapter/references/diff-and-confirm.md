@@ -35,7 +35,15 @@ The skill renders the batch as a markdown table and calls `AskUserQuestion` once
 | 8 | linkPullRequest | PR link | — | https://dev.azure.com/org/proj/_git/repo/pullrequest/4567 |
 ```
 
-For a `createIssue` write there is no existing target: render `before` as `(new)`, put the new work-item type and title in the `After` cell, and note tags/priority inline (e.g. `"VMS: notifications not sending" (User Story, tags: Draft, P2)`). When the whole batch creates rather than edits, the header reads `Pending writes (<n> new items)`; abridge the long `body`/`acceptanceCriteria` after-values the same way as any other long field.
+For a `createIssue` write there is no existing target: render `before` as `(new)`, put the new work-item type and title in the `After` cell, and note tags/priority/severity inline (e.g. `"VMS: notifications not sending" (User Story, tags: Draft, P2)`). When the whole batch creates rather than edits, the header reads `Pending writes (<n> new items)`; abridge the long `body`/`acceptanceCriteria` after-values the same way as any other long field.
+
+## Chained writes on a created item
+
+A batch may contain writes that act on an item the same batch is creating (e.g. `createIssue` followed by `linkIssue` from the new bug to a related one). Those tuples carry `target: "(new)"` and a `notes` line naming the row they depend on, e.g. `id resolved from #1`.
+
+Replay resolves them positionally: when a tuple's target is `"(new)"` and an earlier `createIssue` in the same batch has already returned `{ id, url }`, substitute that id. A batch may create at most one item that later tuples depend on; when more than one `createIssue` precedes a dependent tuple, the verb-plugin must split the writes into separate batches instead of relying on ordering.
+
+If the `createIssue` fails, its dependents never run: the batch has already stopped at the first failure.
 
 Long bodies (`before` and `after` of `updateFields(body: ...)`, `createIssue(body/acceptanceCriteria: ...)`, or `addComment`) are abridged to:
 - First 6 lines, then a `...` row, then the last 2 lines.

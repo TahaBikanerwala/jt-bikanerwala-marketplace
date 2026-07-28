@@ -49,7 +49,7 @@ One `editJiraIssue` call with all supplied fields:
 
 These reject markdown and require raw ADF. Surface them as a **separate** `editJiraIssue` call with `contentFormat: "adf"` (or omit the parameter when the body is already an object). Construct the ADF from the markdown using the same converter the comment path uses.
 
-## `createIssue({ type, title, body, acceptanceCriteria?, labels?, priority?, project?, customFields? })`
+## `createIssue({ type, title, body, acceptanceCriteria?, labels?, priority?, severity?, project?, customFields? })`
 
 One `createJiraIssue` call:
 
@@ -70,7 +70,13 @@ createJiraIssue(
 | `acceptanceCriteria` | folded into `description` under an `## Acceptance Criteria` heading, unless `policy.acceptance_criteria_field` names a custom field | markdown |
 | `labels` | `fields.labels` | array of strings |
 | `priority` | `fields.priority.name` | map `P0/P1/P2` through `policy.priority_label_map` (default `P0 → Highest`, `P1 → High`, `P2 → Medium`) |
+| `severity` | same field `updateFields` resolves: `customfield_xxxxx` for "Severity" / "Severity Level" / "Bug Severity", else `fields.priority.name` | project `severity_label_map[<abstractTier>]`; object-shaped fields take `{ value: "<label>" }` or `{ name: "<label>" }` per the schema |
 | `customFields[<id-or-name>]` | as documented in the schema | as-is |
+
+Resolve the severity field through `getIssueTypeSchema(type)` before the create, since a field that
+exists on `Bug` often does not exist on `Story`. When no severity field is available and `priority` was
+also supplied, keep `priority` and drop `severity` with a one-time warning: silently overwriting the
+caller's priority with a severity label is worse than not writing severity at all.
 
 Jira has no standard acceptance-criteria field, so `acceptanceCriteria` folds into the description body by default. The new issue is **standalone** — set no `parent` and create no issue link. Read the created issue's `key` and browse URL from the response and return `{ id, url }`.
 
