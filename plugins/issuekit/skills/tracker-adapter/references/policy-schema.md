@@ -126,7 +126,7 @@ Default: shape above. Bugs get unassigned (because triage hands off to whoever p
 
 ### `state_categories` (object)
 
-Buckets vendor state names into the three report categories used by `getSprintItems` and the `sprint-status-report` plugin: `done`, `in_progress`, `todo`. Each value is a case-insensitive list of vendor state names.
+Buckets vendor state names into the three report categories used by `getSprintItems` and the `sprint-status-reporter` plugin: `done`, `in_progress`, `todo`. Each value is a case-insensitive list of vendor state names.
 
 Used only by sprint reads. When a state is not listed here, the adapter falls back to the vendor's own category signal (AzDO work-item-type `category`; Jira `statusCategory.key`). A state that matches neither becomes `stateCategory: "unknown"` and the consumer emits a one-line warning naming the unmapped state.
 
@@ -152,7 +152,7 @@ Jira-only override for the story-points custom-field name. When unset, the Jira 
 
 ### `story_work_item_type` (object)
 
-Used by `createIssue` (the `draft-stories` plugin) to choose which work-item type new stories are created as, per tracker. Keys are tracker names; values are the vendor type name.
+Used by `createIssue` (the `story-drafter` plugin) to choose which work-item type new stories are created as, per tracker. Keys are tracker names; values are the vendor type name.
 
 - **`azure-devops`** — depends on the process template: `"User Story"` (Agile), `"Product Backlog Item"` (Scrum), `"Issue"` (Basic).
 - **`jira`** — usually `"Story"`.
@@ -161,7 +161,7 @@ Used by `createIssue` (the `draft-stories` plugin) to choose which work-item typ
 
 ### `draft_label` (string)
 
-The tag/label applied to work items created by `draft-stories`, so they land in the team's draft queue for refinement. **Default:** `"Draft"`.
+The tag/label applied to work items created by `story-drafter`, so they land in the team's draft queue for refinement. **Default:** `"Draft"`.
 
 ### `priority_label_map` (object)
 
@@ -182,7 +182,7 @@ Used by `createIssue` (the `bug-reporter` plugin) to choose which work-item type
 
 ### `reported_label` (string)
 
-The tag/label applied to a bug filed or refined by `bug-reporter`, marking it as reported but not yet triaged. Pairs with `skip_labels` and `triaged_label`: a bug carrying `reported_label` is waiting for `/issue-triage:run`. Set to `null` to apply no label. **Default:** `"needs-triage"`.
+The tag/label applied to a bug filed or refined by `bug-reporter`, marking it as reported but not yet triaged. Pairs with `skip_labels` and `triaged_label`: a bug carrying `reported_label` is waiting for `/issue-triager:run`. Set to `null` to apply no label. **Default:** `"needs-triage"`.
 
 ### `bug_repro_steps_field` (string)
 

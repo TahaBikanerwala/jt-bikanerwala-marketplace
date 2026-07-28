@@ -8,7 +8,7 @@ tools: Read, AskUserQuestion
 
 # Tracker Adapter
 
-A verb dispatcher that lets `incident-postmortem` and `issue-triage` work against any supported issue tracker without naming a specific MCP tool in their agent prompts.
+A verb dispatcher that lets `postmortem-generator` and `issue-triager` work against any supported issue tracker without naming a specific MCP tool in their agent prompts.
 
 ## Setup (run once per session)
 

@@ -15,7 +15,7 @@ Two rules sit above everything else:
 
 ## Mode parameter
 
-- `mode=inject` (default; from `/testid-injector:inject`) — run all phases including the write.
+- `mode=inject` (default; from `/testid-injector:run`) — run all phases including the write.
 - `mode=audit` (from `/testid-injector:audit`) — run Phases 0–2 and print the coverage report. No gate, no writes.
 
 ## What counts as an element to tag

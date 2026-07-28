@@ -1,6 +1,6 @@
 {
   "name": "acceptance-test-generator",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Turns a user story and its acceptance criteria into a rigorous BDD test suite. Reads the story from the tracker (Azure DevOps, Jira), a local spec file, or pasted text, applies senior test-design technique (equivalence partitioning, boundary-value analysis, decision tables, state-transition and negative-path coverage) to decompose every AC into testable behaviors, then writes canonical Gherkin .feature files with smartly consolidated scenarios and detailed steps. Test cases derive ONLY from the story and acceptance criteria; the codebase is read read-only for reference (selectors, existing feature-file style, terminology, spec-vs-code drift) and never as the basis of a test. Optionally creates the scenarios as Test Case work items in the tracker, linked back to the source story, behind a single diff-and-confirm gate. Auto-installs issuekit; bring your own MCPs.",
   "author": {
     "name": "Taha Bikanerwala",

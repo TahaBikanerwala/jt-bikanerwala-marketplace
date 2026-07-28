@@ -9,16 +9,16 @@
     {
       "name": "issuekit",
       "source": "./plugins/issuekit",
-      "description": "Shared adapter layer for issue-tracker plugins. Auto-detects the active MCP (Azure DevOps, Jira) and exposes an abstract verb surface (getIssue, addComment, transition, linkIssue, ...). Auto-installed as a dependency of incident-postmortem and issue-triage. Bring your own MCPs; no .mcp.json bundled."
+      "description": "Shared adapter layer for issue-tracker plugins. Auto-detects the active MCP (Azure DevOps, Jira) and exposes an abstract verb surface (getIssue, addComment, transition, linkIssue, ...). Auto-installed as a dependency of postmortem-generator and issue-triager. Bring your own MCPs; no .mcp.json bundled."
     },
     {
-      "name": "incident-postmortem",
-      "source": "./plugins/incident-postmortem",
+      "name": "postmortem-generator",
+      "source": "./plugins/postmortem-generator",
       "description": "End-to-end incident postmortem generator. Paste an incident URL (Azure DevOps or Jira); the agent gathers evidence, builds a timeline, and writes a Google-SRE-style blameless postmortem. Auto-installs issuekit; bring your own MCPs."
     },
     {
-      "name": "issue-triage",
-      "source": "./plugins/issue-triage",
+      "name": "issue-triager",
+      "source": "./plugins/issue-triager",
       "description": "End-to-end issue triage across all archetypes (Bug, Incident, Story, Feature, Task, Spike) on any supported tracker (Azure DevOps, Jira). All writes pass through a single diff-and-confirm gate. Auto-installs issuekit; bring your own MCPs."
     },
     {
@@ -27,13 +27,13 @@
       "description": "Adds missing data-testid attributes to web UI source. Scans React/JSX/TSX (auto-detects plain HTML, Vue, Angular), finds every form control, dropdown, dropdown option, link, and interactive element without a test id, and writes stable semantic kebab-case ids. Idempotent and gated by a single diff-and-confirm step. Configurable via .claude/testid-policy.json. No MCPs required."
     },
     {
-      "name": "sprint-status-report",
-      "source": "./plugins/sprint-status-report",
+      "name": "sprint-status-reporter",
+      "source": "./plugins/sprint-status-reporter",
       "description": "Reports on the current sprint on any supported tracker (Azure DevOps, Jira) two ways: /run emits a Marp status deck (work by state, progress, blocked/stale items), and /progress-delta emits a what-changed deck (what shipped, newly started, scope added/dropped, new risk, progress movement) by comparing against an earlier snapshot or reconstructed history. Read-only and safe to run anytime. Auto-installs issuekit; bring your own MCPs."
     },
     {
-      "name": "draft-stories",
-      "source": "./plugins/draft-stories",
+      "name": "story-drafter",
+      "source": "./plugins/story-drafter",
       "description": "Turns ambiguous, unclear requirements (pasted notes, a meeting transcript, or a rough brief) into INVEST user stories and creates them standalone in the tracker (Azure DevOps, Jira) tagged Draft. Brainstorms the requirements, clarifies blocking gaps, asks which candidate stories to create, probes the local codebase to self-answer open questions, then writes full stories (Problem Statement, Background, Given/When/Then acceptance criteria, In/Out of Scope, Definition of Done, Open Questions) behind a single diff-and-confirm gate. Auto-installs issuekit; bring your own MCPs."
     },
     {

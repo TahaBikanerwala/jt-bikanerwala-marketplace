@@ -135,6 +135,6 @@ Existing `.feature` files are never clobbered — the agent merges new scenarios
 
 ## See also
 
-- `/draft-stories:run` — create the story + ACs this plugin tests against.
-- `/testid-injector:inject` — add the `data-testid`s that make the generated steps executable.
-- `/issue-triage:run` — refine a rough story before you generate tests from it.
+- `/story-drafter:run` — create the story + ACs this plugin tests against.
+- `/testid-injector:run` — add the `data-testid`s that make the generated steps executable.
+- `/issue-triager:run` — refine a rough story before you generate tests from it.

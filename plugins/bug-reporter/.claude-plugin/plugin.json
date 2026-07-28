@@ -1,6 +1,6 @@
 {
   "name": "bug-reporter",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Writes a complete Bug work item in the tracker (Azure DevOps, Jira) from a single line, or refines an ambiguously written existing Bug into one. Covers every component a bug report carries: summary, environment, preconditions, reproduction steps, expected vs actual, frequency, impact and affected scope, evidence, regression, workaround, fix verification, missing information, and open questions. Searches for duplicates first, reads the local checkout to localize the defect, and adds a proposed fix only when the suspect code was actually read and explains the symptom; when the evidence does not support one, the section is omitted rather than guessed. Every write passes through a single diff-and-confirm gate. Auto-installs issuekit; bring your own MCPs.",
   "author": {
     "name": "Taha Bikanerwala",

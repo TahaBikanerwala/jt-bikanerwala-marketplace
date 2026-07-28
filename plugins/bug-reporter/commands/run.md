@@ -71,5 +71,5 @@ The agent does not assign, transition, or set a due date. A newly reported bug i
 ## See also
 
 - `/bug-reporter:draft` — same report, printed to the terminal, nothing written anywhere.
-- `/issue-triage:run` — triage a reported bug: assign, transition, severity SLA, links, labels.
-- `/draft-stories:run` — the same idea for requirements instead of defects.
+- `/issue-triager:run` — triage a reported bug: assign, transition, severity SLA, links, labels.
+- `/story-drafter:run` — the same idea for requirements instead of defects.

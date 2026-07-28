@@ -1,6 +1,6 @@
 ---
 name: issue-investigator
-description: "Investigates a Bug or Incident on any supported tracker (Azure DevOps, Jira) by searching chat (Slack/Teams), the issue and related issues, docs (Confluence/Wiki), Datadog, and the codebase, then writes an evidence-tagged report in the bug-archetype template. Use when a Bug or Incident needs an investigation report before triage decisions are made. For Feature, User Story, Task, or Spike, use `requirements-investigator` (lives in the issue-triage plugin)."
+description: "Investigates a Bug or Incident on any supported tracker (Azure DevOps, Jira) by searching chat (Slack/Teams), the issue and related issues, docs (Confluence/Wiki), Datadog, and the codebase, then writes an evidence-tagged report in the bug-archetype template. Use when a Bug or Incident needs an investigation report before triage decisions are made. For Feature, User Story, Task, or Spike, use `requirements-investigator` (lives in the issue-triager plugin)."
 metadata:
   author: Taha Bikanerwala
 tools: Read, Bash, Grep, Skill, AskUserQuestion
@@ -16,7 +16,7 @@ This skill investigates. It does not solve, post, or modify anything.
 
 ## Calling convention
 
-This skill runs without user interaction. The constraints below let it work cleanly inside the `issue-triage` and `incident-postmortem` agents (which own their own confirmation gates) and standalone.
+This skill runs without user interaction. The constraints below let it work cleanly inside the `issue-triager` and `postmortem-generator` agents (which own their own confirmation gates) and standalone.
 
 - **Non-interactive.** Never ask the user a question. Inputs are inferred from the issue and search results.
 - **Predictable structure.** Same six section headers every run, in the same order, with one allowed reorder for production incidents (see Adaptation Rules).

@@ -21,7 +21,7 @@ Do not proceed until both files are loaded.
 
 ## Calling Convention
 
-The skill works two ways. When a user pastes text and asks for a rewrite or audit, run end to end. When a sibling agent invokes the skill (e.g. `incident-postmortem`, `issue-triage`), take the input the agent passes and return the cleaned version. The skill is non-interactive in either mode: scan, flag, rewrite, verify, return.
+The skill works two ways. When a user pastes text and asks for a rewrite or audit, run end to end. When a sibling agent invokes the skill (e.g. `postmortem-generator`, `issue-triager`), take the input the agent passes and return the cleaned version. The skill is non-interactive in either mode: scan, flag, rewrite, verify, return.
 
 - **One pass over the input.** Scan, flag, rewrite, verify. No iterative back-and-forth with the user unless asked.
 - **Audit mode is read-only.** When the user asks to audit without rewriting, list violations grouped by category, one line each. Do not produce a rewrite.

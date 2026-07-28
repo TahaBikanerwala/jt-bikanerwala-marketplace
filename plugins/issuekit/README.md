@@ -1,6 +1,6 @@
 # issuekit
 
-Shared adapter layer for issue-tracker plugins in this marketplace. `incident-postmortem`, `issue-triage`, `sprint-status-report`, `draft-stories`, `acceptance-test-generator`, and `bug-reporter` depend on it.
+Shared adapter layer for issue-tracker plugins in this marketplace. `postmortem-generator`, `issue-triager`, `sprint-status-reporter`, `story-drafter`, `acceptance-test-generator`, and `bug-reporter` depend on it.
 
 This plugin ships **no** MCP, **no** agent, and **no** slash command. It is a library of skills and reference files that the verb-plugins invoke.
 
@@ -21,7 +21,7 @@ This plugin ships **no** MCP, **no** agent, and **no** slash command. It is a li
 
 ## Install
 
-You don't install this directly — it's declared as a `dependencies` entry on `incident-postmortem` and `issue-triage`, so Claude Code auto-installs it whenever you install either verb-plugin. To install it on its own:
+You don't install this directly — it's declared as a `dependencies` entry on `postmortem-generator` and `issue-triager`, so Claude Code auto-installs it whenever you install either verb-plugin. To install it on its own:
 
 ```
 /plugin install issuekit@incubyte-plugins
