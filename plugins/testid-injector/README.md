@@ -21,14 +21,14 @@ No MCP and no config required. It works on the files in your repo using the buil
 or the slash commands:
 
 ```
-/testid-injector:audit                     # read-only coverage report, writes nothing
+/testid-injector:audit                   # read-only coverage report, writes nothing
 /testid-injector:audit src/features/checkout
-/testid-injector:inject                     # scan, show the diff, write on confirm
-/testid-injector:inject src/components/LoginForm.tsx
-/testid-injector:inject "src/**/*.tsx"
+/testid-injector:run                     # scan, show the diff, write on confirm
+/testid-injector:run src/components/LoginForm.tsx
+/testid-injector:run "src/**/*.tsx"
 ```
 
-Start with `audit` to see the size of the gap and the exact ids it would add. Run `inject` when you're ready; it pauses at the diff so nothing lands without your say-so.
+Start with `audit` to see the size of the gap and the exact ids it would add. Run the injection when you're ready; it pauses at the diff so nothing lands without your say-so.
 
 ## What gets tagged
 

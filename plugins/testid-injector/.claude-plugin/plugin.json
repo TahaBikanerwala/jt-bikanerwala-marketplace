@@ -1,6 +1,6 @@
 {
   "name": "testid-injector",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Adds missing data-testid attributes to web UI source. Scans a codebase (React/JSX/TSX first, with auto-detection for plain HTML, Vue SFC, and Angular templates), finds every form control, dropdown, dropdown option, link, and interactive element that lacks a test id, generates stable semantic kebab-case ids, and writes them in. Idempotent (never overwrites an existing id) and gated: every change passes through a single diff-and-confirm step before anything is written. Attribute name, naming scheme, scope, and include/exclude globs are configurable via .claude/testid-policy.json.",
   "author": {
     "name": "Taha Bikanerwala",

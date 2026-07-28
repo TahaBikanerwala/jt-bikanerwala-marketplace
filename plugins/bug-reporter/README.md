@@ -24,7 +24,7 @@ Auto-installs [`issuekit`](../issuekit/); bring your own MCPs.
 ```
 
 You also need a tracker MCP (`@azure-devops/mcp` or the Atlassian MCP) registered at the user or
-project level. See the [`issuekit` README](../issuekit/README.md#configure-your-mcps) for setup;
+project level. See the [marketplace README](../../README.md#configure-your-mcps) for setup;
 `issuekit` matches tools by name **suffix**, so the registration name does not matter.
 
 Run it from the repository the bug is in. The codebase probe reads the current working directory.
@@ -101,7 +101,7 @@ so the Bug form is populated the way the process template expects; set either po
 fold them into the description instead. Jira gets one description body.
 
 Created bugs are tagged `needs-triage` (configurable) and are left **unassigned and untransitioned**.
-Triage is a separate decision: run `/issue-triage:run` next.
+Triage is a separate decision: run `/issue-triager:run` next.
 
 ## Configuration
 
@@ -134,9 +134,9 @@ Reused from `issuekit`: `tracker-adapter` (detection, verbs, the diff-and-confir
 
 | Plugin | Difference |
 |---|---|
-| [`issue-triage`](../issue-triage/) | Triages an issue that already exists across every archetype: assigns, transitions, sets the severity SLA and due date, links work, labels it triaged. `bug-reporter` writes the bug in the first place and stops short of every triage decision. Its `investigate-and-refine` command refines any archetype; `bug-reporter` refines bugs specifically, and adds Environment, Frequency, Regression, Fix Verification, and the fix proposal. |
-| [`draft-stories`](../draft-stories/) | The same intake idea for requirements instead of defects. |
-| [`incident-postmortem`](../incident-postmortem/) | For an incident that is already resolved and needs a blameless writeup. |
+| [`issue-triager`](../issue-triager/) | Triages an issue that already exists across every archetype: assigns, transitions, sets the severity SLA and due date, links work, labels it triaged. `bug-reporter` writes the bug in the first place and stops short of every triage decision. Its `investigate-and-refine` command refines any archetype; `bug-reporter` refines bugs specifically, and adds Environment, Frequency, Regression, Fix Verification, and the fix proposal. |
+| [`story-drafter`](../story-drafter/) | The same intake idea for requirements instead of defects. |
+| [`postmortem-generator`](../postmortem-generator/) | For an incident that is already resolved and needs a blameless writeup. |
 
 ## Author
 

@@ -47,5 +47,5 @@ Reads `.claude/acceptance-test-policy.json` if present (this plugin's own config
 ## See also
 
 - `/acceptance-test-generator:coverage` — read-only. Reports the coverage plan and gaps for a story's ACs without writing anything.
-- `/draft-stories:run` — create the story and its ACs in the first place.
-- `/testid-injector:inject` — add the `data-testid`s that make the generated steps executable.
+- `/story-drafter:run` — create the story and its ACs in the first place.
+- `/testid-injector:run` — add the `data-testid`s that make the generated steps executable.

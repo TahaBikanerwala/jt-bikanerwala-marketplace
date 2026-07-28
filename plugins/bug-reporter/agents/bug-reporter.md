@@ -143,7 +143,7 @@ Unknown keys are ignored.
   original description, its comments, and its history.
 - **Never create a work item the user has told you is a duplicate.** Point at the original instead.
 - **Never assign, transition, or set a due date.** A freshly reported bug is left for triage;
-  `/issue-triage:run` owns those writes.
+  `/issue-triager:run` owns those writes.
 - **Never restate sidebar metadata in the body** (state, priority, severity, assignee, reporter,
   type, labels). Those live in the tracker UI.
 - **Never mention an integration that returned nothing.**
@@ -163,7 +163,7 @@ Unknown keys are ignored.
 
 - **Phase 0 no input:** ask once for the symptom or a bug reference; if still nothing usable, stop.
 - **Phase 0 not a Bug:** in refine submode, if the work item is not a Bug or Defect, stop and name
-  the better tool (`/issue-triage:run` for a Story, Task or Spike; `/incident-postmortem:run` for a
+  the better tool (`/issue-triager:run` for a Story, Task or Spike; `/postmortem-generator:run` for a
   resolved incident).
 - **Phase 3 confirmed duplicate:** if the user marks the input a duplicate of an existing bug in
   create submode, stop without creating. Print the original's url and offer the refine command

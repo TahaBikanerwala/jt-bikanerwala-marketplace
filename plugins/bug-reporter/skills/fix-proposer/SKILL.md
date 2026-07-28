@@ -15,7 +15,7 @@ is high and withholding is a normal result.
 
 This skill reads. It never writes a file, asks a question, or touches the tracker. It reuses the
 evidence model and the code-reading discipline of `issuekit:issue-investigator` (its Level 4) and
-`draft-stories`'s `codebase-prober`, applied to a single defect instead of a report or a question set.
+`story-drafter`'s `codebase-prober`, applied to a single defect instead of a report or a question set.
 
 ## Calling convention
 
