@@ -50,7 +50,7 @@ Build one patch document with one operation per supplied field. Field-name mappi
 | `storyPoints` | `/fields/Microsoft.VSTS.Scheduling.StoryPoints` | numeric |
 | `customFields[<refName>]` | `/fields/<refName>` | as-is |
 
-## `createIssue({ type, title, body, acceptanceCriteria?, labels?, priority?, project?, customFields? })`
+## `createIssue({ type, title, body, acceptanceCriteria?, labels?, priority?, severity?, project?, customFields? })`
 
 Call `wit_create_work_item` with the work-item `type` and a JSON-Patch document — one `op: add` per supplied field. The type goes in the tool's own `workItemType` argument, not in the patch; the patch carries only `/fields/*`:
 
@@ -61,7 +61,18 @@ Call `wit_create_work_item` with the work-item `type` and a JSON-Patch document 
 | `acceptanceCriteria` | `/fields/Microsoft.VSTS.Common.AcceptanceCriteria` | convert markdown → HTML via `body-format.md` |
 | `labels` | `/fields/System.Tags` | join with `; ` (semicolon-delimited string) |
 | `priority` | `/fields/Microsoft.VSTS.Common.Priority` | `P0 → 1`, `P1 → 2`, `P2 → 3` |
+| `severity` | `/fields/Microsoft.VSTS.Common.Severity` | project `severity_label_map[<abstractTier>]` |
 | `customFields[<refName>]` | `/fields/<refName>` | as-is |
+
+`Microsoft.VSTS.Common.Severity` exists on `Bug` in the Agile and CMMI templates and on `Impediment` in
+Scrum. When the target type has no severity field (`User Story`, `Task`, `Basic/Issue`), drop the
+operation, warn once, and let the create proceed. Never fail a create over a severity field.
+
+A `Bug` in the Agile and CMMI templates keeps its reproduction detail in
+`Microsoft.VSTS.TCM.ReproSteps` and its environment in `Microsoft.VSTS.TCM.SystemInfo` rather than in
+`System.Description`. Callers that file bugs pass those through `customFields` (the `bug-reporter`
+plugin resolves the field names from `policy.bug_repro_steps_field` and `policy.bug_system_info_field`);
+both take HTML, so convert their markdown the same way as `body`.
 
 Target the caller's `project` (default `whoAmI().defaultProject`). Add **no** `/relations/-` entry — created items are standalone (no parent, no related link). On success, read `id` and the browser URL (`_links.html.href`) from the response and return `{ id, url }`.
 

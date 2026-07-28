@@ -116,7 +116,7 @@ Every write call is built into a `{verb, target, before, after}` tuple, batched,
 ### `updateFields(id: IssueId, fields: { title?, body?, severity?, dueDate?, sprint?, storyPoints?, customFields? })`
 **Implements:** AzDO single `wit_update_work_item` with one `op: add` per field, paths drawn from `adapters/azure-devops/writes.md`. Jira one `editJiraIssue` call with `fields` and (separately, when needed) any custom-field side-writes documented in `adapters/jira/writes.md`. Body conversion to HTML / ADF happens here.
 
-### `createIssue(input: { type, title, body, acceptanceCriteria?, labels?, priority?, project?, customFields? })`
+### `createIssue(input: { type, title, body, acceptanceCriteria?, labels?, priority?, severity?, project?, customFields? })`
 **Out:** `{ id: IssueId, url: string }` — the new work item's vendor id and browser URL.
 **In:**
 - `type` — work-item type name (AzDO: `User Story`, `Bug`, ...; Jira: `Story`, `Bug`, ...). The caller passes the vendor-appropriate type.
@@ -125,6 +125,7 @@ Every write call is built into a `{verb, target, before, after}` tuple, batched,
 - `acceptanceCriteria?` — markdown; written to the tracker's acceptance-criteria field when one exists (AzDO `Microsoft.VSTS.Common.AcceptanceCriteria`), otherwise appended to the body.
 - `labels?` — tag/label strings (AzDO tags, Jira labels).
 - `priority?` — abstract priority `P0 | P1 | P2`, mapped per adapter.
+- `severity?` — abstract severity tier `sev1 | sev2 | sev3 | sev4`, projected through `policy.severity_label_map` exactly as `updateFields` does. Callers that file bugs (the `bug-reporter` plugin) set severity at creation time so the work item lands with a real field value rather than severity described in the body. Ignored by types that have no severity field; the adapter warns once and drops it rather than failing the create.
 - `project?` — target project; defaults to `whoAmI().defaultProject`.
 - `customFields?` — opaque map of vendor field ref-name → value for anything outside the named set.
 

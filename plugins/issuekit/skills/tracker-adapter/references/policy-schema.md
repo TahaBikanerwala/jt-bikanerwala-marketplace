@@ -54,7 +54,11 @@ Path: `.claude/tracker-policy.json` (project-root). Optional. When absent, the a
   "story_work_item_type": { "azure-devops": "User Story", "jira": "Story" },
   "draft_label": "Draft",
   "priority_label_map": { "P0": "Highest", "P1": "High", "P2": "Medium" },
-  "acceptance_criteria_field": null
+  "acceptance_criteria_field": null,
+  "bug_work_item_type": { "azure-devops": "Bug", "jira": "Bug" },
+  "reported_label": "needs-triage",
+  "bug_repro_steps_field": "Microsoft.VSTS.TCM.ReproSteps",
+  "bug_system_info_field": "Microsoft.VSTS.TCM.SystemInfo"
 }
 ```
 
@@ -167,6 +171,29 @@ Jira-only. Maps the abstract priority tiers (`P0`/`P1`/`P2`) to the vendor prior
 
 Jira-only override naming a custom field that holds acceptance criteria. When unset, `createIssue` folds acceptance criteria into the description body under an `## Acceptance Criteria` heading (Jira has no standard AC field). AzDO always uses the standard `Microsoft.VSTS.Common.AcceptanceCriteria` field and ignores this key. **Default:** `null` (fold into description).
 
+### `bug_work_item_type` (object)
+
+Used by `createIssue` (the `bug-reporter` plugin) to choose which work-item type a filed bug is created as, per tracker. Keys are tracker names; values are the vendor type name.
+
+- **`azure-devops`** — `"Bug"` in the Agile, Scrum, and CMMI templates; `"Issue"` in Basic (which has no Bug type).
+- **`jira`** — usually `"Bug"`.
+
+**Default if unset:** `{ "azure-devops": "Bug", "jira": "Bug" }`. If the value is not a valid type on the project (checked against `getIssueTypeSchema`), the adapter lazy-prompts with the live type list.
+
+### `reported_label` (string)
+
+The tag/label applied to a bug filed or refined by `bug-reporter`, marking it as reported but not yet triaged. Pairs with `skip_labels` and `triaged_label`: a bug carrying `reported_label` is waiting for `/issue-triage:run`. Set to `null` to apply no label. **Default:** `"needs-triage"`.
+
+### `bug_repro_steps_field` (string)
+
+Azure DevOps only. The field reproduction detail is written to on a Bug: preconditions, steps, expected behavior, actual behavior, and frequency. The Agile and CMMI Bug forms surface `Microsoft.VSTS.TCM.ReproSteps` as the main body, so writing that content into `System.Description` leaves the form looking empty.
+
+Set to `null` to fold those sections into the description body instead. Ignored on Jira, which has no equivalent field; the adapter warns once and folds. **Default:** `"Microsoft.VSTS.TCM.ReproSteps"`.
+
+### `bug_system_info_field` (string)
+
+Azure DevOps only. The field environment detail is written to on a Bug (environment, versions, browser and OS, device, tenant, region). Set to `null` to fold it into the description body instead. Ignored on Jira. **Default:** `"Microsoft.VSTS.TCM.SystemInfo"`.
+
 ## Lazy-prompt question text
 
 When a missing key is encountered, ask via `AskUserQuestion` using these question templates:
@@ -183,6 +210,8 @@ When a missing key is encountered, ask via `AskUserQuestion` using these questio
 | `state_categories.<bucket>` | "The sprint has a state '<state>' I couldn't classify. Is it Done, In Progress, or To Do?" | Done / In Progress / To Do |
 | `stale_after_days` | "After how many days with no update should an in-progress item be flagged at-risk?" | numeric, default 3 |
 | `points_field_name` | "Which Jira field holds story points? (Leave blank to auto-detect.)" | free text or skip |
+| `bug_work_item_type` | "Which work-item type should filed bugs be created as?" | live type list from schema |
+| `reported_label` | "What label should mark a bug as reported but not yet triaged? (Leave blank for none.)" | free text, default "needs-triage" |
 
 After every answer, offer:
 
