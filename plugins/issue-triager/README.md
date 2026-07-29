@@ -40,7 +40,22 @@ or the slash-command shorthands:
 /issue-triager:investigate-and-refine <URL or ID>
 ```
 
-The `:run` form runs the full workflow (investigation → refinement → field updates → assignment → notification). The `:investigate-and-refine` form is a lightweight subset that only investigates and refines the title/description; it does not assign, transition, set severity, or escalate.
+The `:run` form runs the full workflow (investigation → codebase dig → refinement → field updates → assignment → notification). The `:investigate-and-refine` form is a lightweight subset that only investigates and refines the title/description; it skips the codebase dig and does not assign, transition, set severity, or escalate.
+
+Run `:run` from the repository the issue is about: Phase 2b reads the working directory.
+
+## Where this sits next to `bug-reporter`
+
+The two plugins split one job at the point where it gets expensive.
+
+| | `/bug-reporter:run` | `/issue-triager:run` |
+|---|---|---|
+| Reads your codebase | No. It has no `Grep` and no `Bash`. | Yes. `fix-proposer` at Phase 2b. |
+| Searches chat, docs, logs | No | Yes, via `issuekit:issue-investigator` |
+| Produces | A complete bug report plus a Missing Information list | Investigation, suspected area, a proposed fix when the code supports one, and every triage field |
+| Cost | Seconds | The slow one, by design |
+
+File the bug while the symptom is fresh, then triage it when someone picks it up. A bug that arrives from `bug-reporter` carries no cause analysis at all, which is exactly what Phase 2b is for.
 
 ## Diff-and-confirm gate (the dry-run)
 
@@ -59,16 +74,17 @@ You confirm once. The diff IS the dry-run — decline to abort cleanly.
 
 ## Workflow
 
-The agent runs ten phases. Phase 3 is the only confirmation gate (Phase 0 has a halt for issue-type mismatches, but that's an early-exit, not a write gate).
+Phase 3 is the only confirmation gate (Phase 0 has a halt for issue-type mismatches, but that's an early-exit, not a write gate).
 
 | Phase | What happens |
 |---|---|
 | **0. Identify** | Fetch the issue. Detect archetype (Bug / Incident / Story / Feature / Task / Spike). Skip if it carries any `skip_labels`. |
 | **1. Investigate** | Bug or Incident: run `issuekit:issue-investigator` (chat → tracker+docs → Datadog → code). Story/Feature/Task/Spike: run `requirements-investigator` (bundled). |
-| **2. Datadog (Bug/Incident only)** | Build queries from investigation signals; gather error patterns. Skip if `log == none`. |
+| **2a. Datadog (Bug/Incident only)** | Build queries from investigation signals; gather error patterns. Skip if `log == none`. |
+| **2b. Localize the defect (Bug/Incident only)** | Run `fix-proposer` (bundled) over the local checkout: search the verbatim error string, find the module that owns the behavior, open the suspect code, check recent churn. Produces a suspected area, and a proposed fix when the code clears the confidence floor. Skipped in `investigate-and-refine` mode. |
 | **2.5. Gap analysis** | When the investigation has `[UNKNOWN]` items that need reporter input, prepare the follow-up question for Phase 4c. |
 | **3. Confirmation gate** | Show the full diff. User confirms or declines. **No writes have happened yet.** |
-| **4a / 4b / 4c. Post comment** | Bug/Incident: assessment comment with hypotheses + Where To Look. Story/Feature/etc: scope summary. Vague issues: follow-up question pinging the reporter. |
+| **4a / 4b / 4c. Post comment** | Bug/Incident: assessment comment with hypotheses, suspected area, the proposed fix when there is one, and Where To Look. Story/Feature/etc: scope summary. Vague issues: follow-up question pinging the reporter. |
 | **5. Refine** | Update title and description using the archetype template. Body markdown goes through the adapter's body-format converter. |
 | **6. Severity + dates** | Bug/Incident: severity + due date. Story/Feature/Task/Spike: sprint + story points. |
 | **7. Link** | Surface duplicate/related candidates from the investigation. Link PRs that mention the issue ID (AzDO only — Jira auto-links). |
@@ -111,8 +127,24 @@ Legacy config files (`.claude/azure-issue-triage.config.json`, `.claude/jira-iss
 |---|---|
 | `issue-refiner` | Re-writes title and description into the archetype-matching template; emits canonical markdown with reserved tokens. |
 | `requirements-investigator` | Investigates Story/Feature/Task/Spike issues (chat → tracker → docs → adjacent code areas). Distinct from `issuekit:issue-investigator`, which handles Bug/Incident. |
+| `fix-proposer` | Reads the local checkout to localize a Bug or Incident and propose a fix, or to establish that the code does not support one. Owns the confidence floor: a proposal needs the suspect code read and explaining the symptom at `[VERIFIED]` or `[OBSERVED]`, otherwise you get a suspected area and a where-to-look. Never asserts root cause, never writes a patch. |
+
+### The proposed fix
+
+The rule that makes it worth reading: a proposal is emitted only when the suspect code was actually opened, with a nameable path and symbol, **and** that code explains the reported symptom at `[VERIFIED]` or `[OBSERVED]`.
+
+- `[INFERRED]` alone yields a **suspected area** and a **where-to-look**, no proposal.
+- A path found by search but never read is not enough.
+- A defect pattern that usually causes this is not enough.
+- Nothing matched means neither block appears, and the summary says why.
+
+Proposals are titled **Proposed fix (unverified)**, carry their evidence tag and a confidence level, name the blast radius and the confirming check, and never assert root cause. They describe the shape of the change in prose and never ship a patch, because a triage comment is not a pull request and a fixer who reads a suggested diff stops thinking.
+
+The proposal lands in the assessment comment, never in the issue description. The description is the record of the issue; the analysis is this triage pass's, and it stays attributable.
 
 The agent also invokes `issuekit:tracker-adapter` (for every tracker read and write), `issuekit:issue-investigator` (for Bug/Incident investigation), and `issuekit:prose-style` (to clean any prose before write).
+
+`fix-proposer` shipped with `bug-reporter` until v2.1.0. It moved here because reading a codebase is a triage decision, not an intake one, and filing a bug should not wait on it.
 
 ## Legacy config import
 

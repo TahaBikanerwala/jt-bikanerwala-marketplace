@@ -19,7 +19,7 @@
     {
       "name": "issue-triager",
       "source": "./plugins/issue-triager",
-      "description": "End-to-end issue triage across all archetypes (Bug, Incident, Story, Feature, Task, Spike) on any supported tracker (Azure DevOps, Jira). All writes pass through a single diff-and-confirm gate. Auto-installs issuekit; bring your own MCPs."
+      "description": "End-to-end issue triage across all archetypes (Bug, Incident, Story, Feature, Task, Spike) on any supported tracker (Azure DevOps, Jira). Investigates, digs into the local checkout on a Bug or Incident to localize the defect and propose a fix when the code supports one, then refines and sets every triage field. All writes pass through a single diff-and-confirm gate. Auto-installs issuekit; bring your own MCPs."
     },
     {
       "name": "testid-injector",
@@ -39,7 +39,7 @@
     {
       "name": "bug-reporter",
       "source": "./plugins/bug-reporter",
-      "description": "Writes a complete Bug work item in the tracker (Azure DevOps, Jira) from a single line, or refines an ambiguously written existing Bug into one. Covers every component a bug report carries: summary, environment, preconditions, reproduction steps, expected vs actual, frequency, impact and affected scope, evidence, regression, workaround, fix verification, missing information, and open questions. Searches for duplicates first, reads the local checkout to localize the defect, and adds a proposed fix only when the suspect code was actually read and explains the symptom; otherwise the section is omitted rather than guessed. Every write passes through a single diff-and-confirm gate. Auto-installs issuekit; bring your own MCPs."
+      "description": "Writes a complete Bug work item in the tracker (Azure DevOps, Jira) from a single line, or refines an ambiguously written existing Bug into one. Covers every component a bug report carries: summary, environment, preconditions, reproduction steps, expected vs actual, frequency, impact and affected scope, evidence, regression, workaround, fix verification, missing information, and open questions. Searches for duplicates first, then asks the reporter only what the reporter alone can answer. Any section the input does not answer is omitted from the report entirely instead of carrying a not-provided placeholder, and every one of those gaps is listed as a question under Missing Information rather than invented. Fast by design: it never reads the codebase and never investigates, so no suspected area, proposed fix, or cause lands in the report. The code dig belongs to issue-triager. Every write passes through a single diff-and-confirm gate. Auto-installs issuekit; bring your own MCPs."
     },
     {
       "name": "acceptance-test-generator",
