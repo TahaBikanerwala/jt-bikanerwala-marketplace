@@ -85,7 +85,7 @@ Apply the rewrite principles from `references/classification-guide.md` (already 
 Structure the rewritten content using [`assets/template.md`](assets/template.md). Three rules are non-negotiable:
 
 - **Pick sections by archetype.** The template ships with an archetype-to-sections map. Include only the sections that map says belong to the current archetype.
-- **Skip empty sections.** A section header with no content under it is noise. Omit it.
+- **Skip empty sections.** A section header with no content under it is noise. Omit it, and never fill it with a placeholder (`Not provided`, `Unknown`, `TBD`) to keep the shape intact. Gaps belong in Open Blockers or in the follow-up comment the caller posts, not under a heading of their own.
 - **Fold raw metadata into the body.** Source-system blocks (intake forms, support escalation tables, vendor exports) get their facts extracted and placed in the appropriate template section. Do not preserve the raw block verbatim.
 
 ### Step 6: Rewrite the title

@@ -1,6 +1,6 @@
 ---
 name: fix-proposer
-description: "Reads the local checkout read-only to localize a reported defect and propose a fix, or to establish that the code does not support one. Searches the verbatim error string, finds the module that owns the behavior, opens the suspect code, and checks recent churn against the first-seen date. Emits a proposal only when the suspect code was actually read and explains the reported symptom at [VERIFIED] or [OBSERVED]; otherwise it returns suspected areas and where-to-look, or nothing at all. Never invents a path, symbol, or version, never asserts root cause, and never writes a patch. Use before filing or refining a bug, to give the fixer a real starting point instead of a guess."
+description: "Reads the local checkout read-only to localize a reported defect and propose a fix, or to establish that the code does not support one. Searches the verbatim error string, finds the module that owns the behavior, opens the suspect code, and checks recent churn against the first-seen date. Emits a proposal only when the suspect code was actually read and explains the reported symptom at [VERIFIED] or [OBSERVED]; otherwise it returns suspected areas and where-to-look, or nothing at all. Never invents a path, symbol, or version, never asserts root cause, and never writes a patch. Use when triaging a Bug or Incident, to give the fixer a real starting point instead of a guess."
 metadata:
   author: Taha Bikanerwala
 tools: Read, Bash, Grep
@@ -9,9 +9,14 @@ tools: Read, Bash, Grep
 # Fix Proposer
 
 Find where a reported defect lives in this codebase and, when the evidence is strong enough, say what
-the fix would change. When the evidence is not strong enough, say that instead. A wrong proposal in a
-bug report costs an engineer hours of chasing something that was never there, so the bar to emit one
+the fix would change. When the evidence is not strong enough, say that instead. A wrong proposal on a
+triaged bug costs an engineer hours of chasing something that was never there, so the bar to emit one
 is high and withholding is a normal result.
+
+This is the expensive step in triage, and it is expensive on purpose: it is the only part of the
+suite that opens source files to explain a symptom. `bug-reporter` does not call it, which is what
+keeps filing a bug fast. `issue-triager` calls it at Phase 2b, once, when someone commits to owning
+the issue.
 
 This skill reads. It never writes a file, asks a question, or touches the tracker. It reuses the
 evidence model and the code-reading discipline of `issuekit:issue-investigator` (its Level 4) and
@@ -25,7 +30,7 @@ evidence model and the code-reading discipline of `issuekit:issue-investigator` 
   or any application command.
 - **Output is the last thing.** End when the findings render.
 
-The caller passes, after `Calling context: phase=<n>, mode=<mode>, submode=<submode>.`:
+The caller passes, after `Calling context: phase=<n>[, mode=<mode>][, archetype=<archetype>].`:
 
 - `symptom` — the reported behavior, verbatim where possible;
 - `error_strings` — verbatim error text from the report or the investigation, if any;
@@ -33,8 +38,10 @@ The caller passes, after `Calling context: phase=<n>, mode=<mode>, submode=<subm
 - `investigation` — an evidence-tagged investigation report, or null;
 - `related_issues` — titles and states of nearby issues, for context only.
 
-Treat every input as a claim by the reporter, not as a verified fact. The code is the only thing this
-skill verifies against.
+Treat every input as a claim by the reporter, not as a verified fact. That includes anything the
+report already asserts about the cause: a filed bug carries the reporter's theory sometimes, and it
+gets tested here like any other claim, not inherited. The code is the only thing this skill verifies
+against.
 
 ## Ladder
 
@@ -75,7 +82,7 @@ Tag every claim. These are the same four tags the rest of the suite uses.
 | `[UNKNOWN]` | The checkout does not answer it. Needs runtime data, a different repository, or a person. |
 
 Never upgrade a tag to make a finding read better. A wrong `[VERIFIED]` is worse than an honest
-`[UNKNOWN]`, and in a bug report it is worse than saying nothing.
+`[UNKNOWN]`, and on a triaged issue that a team will now plan around, it is worse than saying nothing.
 
 ## The confidence floor
 
@@ -119,8 +126,9 @@ Never do any of these:
 
 - **Never invent** a path, symbol, function name, version, config key, or dependency. If you did not
   see it, it does not go in.
-- **Never write the replacement code.** No diffs, no patches, no "change it to" snippets. A bug report
-  is not a pull request, and a fixer who reads a suggested patch stops thinking. Describe the change.
+- **Never write the replacement code.** No diffs, no patches, no "change it to" snippets. A triage
+  comment is not a pull request, and a fixer who reads a suggested patch stops thinking. Describe the
+  change.
 - **Never call it the root cause** unless it is `[VERIFIED]`, and even then prefer naming the
   confirming check alongside it.
 - **Never claim you ran, built, tested, or reproduced anything.** This skill only reads.
@@ -155,8 +163,8 @@ Three blocks. Include a block only when it has content, and always include `NO P
 - <a ready-to-paste grep, path, or log query> — <what a hit or a miss tells you>
 ```
 
-Keep it terse. The caller folds these blocks into the bug report and drops the sections that are
-absent.
+Keep it terse. The caller folds these blocks into the assessment comment it posts on the issue and
+drops the sections that are absent.
 
 ## Worked example: proposal withheld
 

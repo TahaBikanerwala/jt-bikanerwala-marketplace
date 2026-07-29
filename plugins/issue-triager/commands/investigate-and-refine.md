@@ -1,5 +1,5 @@
 ---
-description: Lightweight triage — investigate and refine the title/description only. No assignment, no transition, no severity write, no escalation. Useful when you want to clean up a ticket without committing to the full triage cycle.
+description: Lightweight triage. Investigate and refine the title/description only. No codebase dig, no assignment, no transition, no severity write, no escalation. Useful when you want to clean up a ticket without committing to the full triage cycle.
 argument-hint: <issue URL or ID>
 allowed-tools: Skill
 ---
@@ -21,12 +21,13 @@ Dispatches to the `issue-triager` agent with `mode=investigate-and-refine`. The 
 
 1. **Phase 0** — Identify the issue, detect archetype.
 2. **Phase 1** — Investigate (Bug/Incident or Story/Feature/Task/Spike).
-3. **Phase 2** — Search Datadog (Bug/Incident only).
+3. **Phase 2a** — Search Datadog (Bug/Incident only).
 4. **Phase 3** — Diff-and-confirm gate. The batch contains only the title and description writes from Phase 5. Severity, transitions, comments, links, labels are **not** in this batch.
 5. **Phase 5** — Refine title and description on confirmation.
 
 What this command **does not** do:
 
+- No Phase 2b codebase dig. `fix-proposer` does not run, so there is no suspected area and no proposed fix. That step is the most expensive thing the agent does, and this command exists to be cheap. Use `/issue-triager:run` when you want the defect localized.
 - No assignment changes.
 - No state transitions.
 - No assessment comments.
@@ -40,8 +41,9 @@ What this command **does not** do:
 | Use this | Use `/issue-triager:run` |
 |---|---|
 | The reporter wrote a vague title and you want to clean it up | You're picking up the issue and committing to own it through triage |
-| You're auditing a backlog for description quality | The issue is fresh and needs the full classification + assignment workflow |
+| You're auditing a backlog for description quality | You want the defect localized in the code, with a proposed fix when the code supports one |
 | You want to preview the agent's rewrite without touching state | The team relies on the `triaged` label to filter |
+| You want it cheap | The issue is fresh and needs the full classification + assignment workflow |
 
 ## Configuration
 

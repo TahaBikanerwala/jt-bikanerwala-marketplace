@@ -14,7 +14,7 @@ The first column lists every section the template defines. The next six columns 
 | Context and Background | if present | if present | always | always | always | always |
 | Impact | if present | always | if present | if present | skip | skip |
 | Affected Scope | if present | always | if present | if present | skip | skip |
-| Reproduction, Expected, Actual | always | if present | skip | skip | skip | skip |
+| Reproduction, Expected, Actual | if present | if present | skip | skip | skip | skip |
 | Requirements and Acceptance Criteria | skip | skip | always | always | always | skip |
 | Questions to Answer | skip | skip | skip | skip | skip | always |
 | Findings | skip | skip | skip | skip | skip | if present |
@@ -27,6 +27,8 @@ The first column lists every section the template defines. The next six columns 
 | Original Metadata | last resort | last resort | last resort | last resort | last resort | last resort |
 
 **Key:** `always` includes regardless of content; `if present` includes only when the original issue has relevant material; `skip` never includes; `last resort` includes only when truly unclassifiable content has no other home.
+
+An `if present` section with nothing behind it is **omitted, heading and all.** Never write a placeholder under it: no `Not provided`, no `Unknown`, no `TBD`, no empty heading. The refined description carries what the issue knows and says nothing where it knows nothing.
 
 ---
 
@@ -155,7 +157,7 @@ The cause is verified with evidence. Plain prose. Cite the evidence. If the caus
 
 ### Workaround
 
-Steps an affected user can take right now to mitigate. If there is no workaround, write `None.` Do not omit this section for an open Bug or Incident with a confirmed Root Cause; an empty workaround answer is itself useful information.
+Steps an affected user can take right now to mitigate. When a source says there is no workaround, write `None.` and keep the section: a stated "no workaround" is content, and it is what severity depends on. When nothing in the issue speaks to a workaround either way, omit the section.
 
 ### Solutions
 

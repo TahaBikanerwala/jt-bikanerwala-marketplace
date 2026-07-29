@@ -1,5 +1,5 @@
 ---
-description: Write a complete Bug work item in the tracker from a single line, or refine an ambiguously written existing Bug into one. Searches for duplicates, reads the codebase to localize the defect, proposes a fix only when the code supports one, and creates or updates behind a single diff-and-confirm gate.
+description: Write a complete Bug work item in the tracker from a single line, or refine an ambiguously written existing Bug into one. Searches for duplicates, asks only what the reporter alone can answer, and creates or updates behind a single diff-and-confirm gate. Fast by design: no codebase dig, no investigation.
 argument-hint: <one-line symptom | bug URL or id | path to a report file> (optional)
 allowed-tools: Skill
 ---
@@ -33,28 +33,29 @@ The argument decides the mode:
 This command is a thin shell. It dispatches to the `bug-reporter` agent in `mode=run`, which:
 
 1. Bootstrap the tracker via `issuekit:tracker-adapter` and ingest the input.
-2. Search the tracker for duplicates and related bugs.
-3. Gather evidence. Refine mode runs `issuekit:issue-investigator` (chat, tracker, docs, logs, code);
-   both modes then run `fix-proposer` over the local checkout to localize the defect.
-4. **Pause** on one clarification card for what only the reporter can answer (environment, steps,
+2. Search the tracker for duplicates and related bugs. Bounded: three queries, three candidate reads.
+3. **Pause** on one clarification card for what only the reporter can answer (environment, steps,
    expected vs actual, frequency, scope) plus the duplicate question when a candidate turned up.
-   Skipping is fine: anything unanswered is recorded as **Missing Information**, never invented.
-5. Write the report (`bug-report-writer`), cleaned with `issuekit:prose-style`, and resolve severity
+   Skipping is fine: an unanswered section is left out of the report entirely and listed as
+   **Missing Information** instead, never invented and never padded with a not-provided line.
+4. Write the report (`bug-report-writer`), cleaned with `issuekit:prose-style`, and resolve severity
    from the impact evidence.
-6. **Pause at the diff-and-confirm gate**, then create the Bug (create mode) or update title,
+5. **Pause at the diff-and-confirm gate**, then create the Bug (create mode) or update title,
    description and severity (refine mode).
-7. Summarize: the work item, its severity, whether a fix proposal was included or deliberately
-   omitted, what information is still missing, and where to look next.
+6. Summarize: the work item, its severity, what information is still missing, and the triage handoff.
 
 The diff IS the dry run. Declining at the gate exits cleanly with nothing written.
 
-## The proposed fix
+## It does not investigate
 
-The agent proposes a fix only when it opened the suspect code and that code explains the reported
-symptom. A hunch is not enough: when the evidence only reaches `[INFERRED]`, you get a Suspected
-Area and a where-to-look instead, and when nothing in the checkout matches the symptom the section
-is dropped entirely. Proposals are labelled unverified, name the check that would confirm them, and
-never ship a patch.
+Filing should take seconds. The agent has no `Grep` and no `Bash`, so it cannot read your codebase,
+and it does not search chat, docs, or logs either. No suspected area, no proposed fix, no root cause,
+no hypothesis of any kind lands in the report. What the reporter observed goes in; what nobody
+supplied goes in the Missing Information list.
+
+The code dig moved to `/issue-triager:run`, which localizes the defect with `fix-proposer`, proposes a
+fix when the code actually supports one, and posts it as an assessment comment. Report first, triage
+when someone picks it up.
 
 ## Configuration
 
@@ -71,5 +72,6 @@ The agent does not assign, transition, or set a due date. A newly reported bug i
 ## See also
 
 - `/bug-reporter:draft` — same report, printed to the terminal, nothing written anywhere.
-- `/issue-triager:run` — triage a reported bug: assign, transition, severity SLA, links, labels.
+- `/issue-triager:run` — triage the reported bug: investigate, localize it in the code, propose a fix,
+  set severity SLA, links, labels.
 - `/story-drafter:run` — the same idea for requirements instead of defects.

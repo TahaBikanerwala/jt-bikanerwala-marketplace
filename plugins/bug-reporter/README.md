@@ -3,16 +3,22 @@
 Write a proper **Bug** in your tracker (Azure DevOps or Jira) from a single line, or turn an
 ambiguously written bug into one.
 
-Hand it `checkout crashes when you apply a coupon twice` and it searches for duplicates, reads your
-codebase to find where the defect lives, asks you only what you alone can answer, and files a complete
-report: environment, preconditions, reproduction steps, expected versus actual, frequency, impact and
-scope, evidence, regression, workaround, fix verification, and an explicit list of what is still
-missing. Hand it a bug URL instead and it does the same thing to an existing item, without losing a
-single fact from the original.
+Hand it `checkout crashes when you apply a coupon twice` and it searches for duplicates, asks you only
+what you alone can answer, and files the report: environment, preconditions, reproduction steps,
+expected versus actual, frequency, impact and scope, evidence, regression, workaround, fix verification,
+and an explicit list of what is still missing. Whatever you did not answer is left out rather than
+padded with a not-provided line, so the report is exactly as long as what is actually known. Hand it a
+bug URL instead and it does the same thing to an existing item, without losing a single fact from the
+original.
 
-When the code supports it, the report includes a **proposed fix** naming the file, the symbol, what the
-code does today, why that produces the reported symptom, and the check that would confirm it. When the
-code does not support one, there is no proposal. That is the point: no guessing.
+**It does not investigate, and that is the feature.** No codebase dig, no chat or log search, no
+suspected area, no proposed fix, no theory of the cause. The agent has no `Grep` and no `Bash`, so it
+cannot go looking even if it wants to. Filing a bug takes seconds, which is what you want when the
+symptom is fresh and you are trying to get it recorded before you lose it.
+
+The code dig lives in [`issue-triager`](../issue-triager/), which localizes the defect, proposes a fix
+when the code actually supports one, and posts it as an assessment comment. Report first, triage when
+someone picks it up.
 
 Auto-installs [`issuekit`](../issuekit/); bring your own MCPs.
 
@@ -27,7 +33,7 @@ You also need a tracker MCP (`@azure-devops/mcp` or the Atlassian MCP) registere
 project level. See the [marketplace README](../../README.md#configure-your-mcps) for setup;
 `issuekit` matches tools by name **suffix**, so the registration name does not matter.
 
-Run it from the repository the bug is in. The codebase probe reads the current working directory.
+Run it from anywhere. Nothing here reads your working directory except a report file you pass in.
 
 ## Usage
 
@@ -55,45 +61,62 @@ The argument picks the mode:
 1. **Bootstrap.** Detects the tracker via `issuekit` and resolves your identity and default project.
 2. **Search for duplicates.** Queries the tracker with the verbatim error string and the symptom, then
    opens the top candidates to confirm before calling anything a duplicate. A title that merely looks
-   similar does not count.
-3. **Gather evidence.** In refine mode, `issuekit:issue-investigator` runs its ladder (chat, tracker and
-   docs, Datadog, code). In both modes, `fix-proposer` reads your checkout: it searches the verbatim
-   error string, locates the module that owns the behavior, opens the suspect code, and checks recent
-   churn against the first-seen date.
-4. **Clarify (pause).** One card asks what only you can answer, grouped so environment is a single
-   question rather than four. Every question has a "Not known" option. Anything you skip becomes a
-   **Missing Information** line, never an invented fact.
-5. **Write.** `bug-report-writer` produces the title and the report, cleaned with
+   similar does not count. Bounded at three queries and three candidate reads: it is the one search the
+   agent runs, and it survives because filing the same bug twice is the failure a fast intake path
+   would otherwise make more likely.
+3. **Clarify (pause).** One card asks what only you can answer, grouped so environment is a single
+   question rather than four. Every question has a "Not known" option. Anything you skip drops that
+   section from the report and becomes a **Missing Information** line, never an invented fact and never
+   a not-provided placeholder. One card, once: the agent does not come back for a second round.
+4. **Write.** `bug-report-writer` produces the title and the report, cleaned with
    `issuekit:prose-style`. Severity is derived from the impact evidence; when the evidence cannot
    support a tier, you are asked rather than guessed at.
-6. **File (pause at the gate).** The whole batch appears in the diff-and-confirm gate, then creates the
+5. **File (pause at the gate).** The whole batch appears in the diff-and-confirm gate, then creates the
    Bug or updates title, description, and severity. Declining writes nothing.
-7. **Summarize.** The work item, its severity, whether a fix was proposed **or deliberately omitted and
-   why**, what is still missing, and where to look next.
+6. **Summarize.** The work item, its severity, what is still missing, and the triage handoff line.
 
-## The proposed fix
+## What it deliberately does not do
 
-The rule that makes it worth reading: a proposal is emitted only when the suspect code was actually
-opened, with a nameable path and symbol, **and** that code explains the reported symptom at
-`[VERIFIED]` or `[OBSERVED]`.
+| Not here | Where it lives |
+|---|---|
+| Read your codebase to localize the defect | `/issue-triager:run` (Phase 2b, `fix-proposer`) |
+| Propose a fix, name a suspected area, or state a cause | `/issue-triager:run`, as an assessment comment |
+| Search chat, docs, or Datadog | `/issue-triager:run` (`issuekit:issue-investigator`) |
+| Assign, transition, set a due date, or apply `triaged` | `/issue-triager:run` |
 
-- `[INFERRED]` alone yields a **Suspected Area** and a **Where to Look**, no proposal.
-- A path found by search but never read is not enough.
-- A defect pattern that usually causes this is not enough.
-- Nothing matched means the section does not appear, and the summary says why.
+The agent's tool list is `Skill`, `Read`, and `AskUserQuestion`. No `Grep`, no `Bash`: the boundary is
+structural, not a promise it might drift away from. `Read` exists for a report file you hand it.
 
-Proposals are titled **Proposed Fix (unverified)**, carry their evidence tag and a confidence level,
-name the blast radius and the confirming check, and never assert root cause. They describe the shape of
-the change in prose and never ship a patch, because a bug report is not a pull request and a fixer who
-reads a suggested diff stops thinking.
+This is a deliberate reversal. Earlier versions of this plugin ran the full evidence ladder plus a
+codebase dig before writing a word, which made a one-line bug report cost minutes and a large pile of
+tokens for analysis that triage would redo anyway.
 
 ## Report format
 
 The created or refined description carries, in this order: Summary, Environment, Preconditions, Steps to
 Reproduce, Expected Behavior, Actual Behavior, Frequency and Reproducibility, Impact and Affected Scope,
-Evidence, Regression, Workaround, Suspected Area, Proposed Fix (unverified), Where to Look, Missing
-Information, Fix Verification, and Open Questions. Sections with nothing behind them are omitted, except
-the core ones, which state plainly that the information was not provided.
+Evidence, Regression, Workaround, Missing Information, Fix Verification, and Open Questions.
+
+**A section you did not answer is not in the report.** No `Not provided by the reporter.`, no `Unknown`,
+no `TBD`, no empty heading, and nothing marking where it would have been. The question goes to the
+**Missing Information** list instead, which is the single place gaps live: the reporter reads it to know
+what to add, and the fixer reads it to know what is not established. A one-line bug report produces a
+short report that looks short, which is the right signal to whoever opens it.
+
+Three sections always appear, and none of them can come up empty. Summary and Actual Behavior restate
+the report itself. Fix Verification is derived from the defect rather than supplied by you, so even a
+thin report yields the check that the reported symptom no longer happens.
+
+An explicit "no" is an answer, not a gap. Say there is no workaround and the report says `None known.`,
+because that sentence is what severity depends on. Stay silent and the section is simply absent. The two
+are different and the report keeps them apart.
+
+On Azure DevOps the same rule reaches the fields: no environment details means no System Info block and
+no write to that field at all, rather than a field holding a placeholder.
+
+There is no analysis section, by design. Nothing here has read the code, so a cause in this report would
+be a guess wearing a report's authority. If you offered a theory when you reported it, the report quotes
+it as your words rather than adopting it as a finding.
 
 Severity and priority are written as **fields**, not as body text. On Azure DevOps, Environment routes to
 `Microsoft.VSTS.TCM.SystemInfo` and the reproduction sections route to `Microsoft.VSTS.TCM.ReproSteps`,
@@ -124,17 +147,18 @@ Missing keys are lazy-prompted at the moment they are needed and can be persiste
 
 - `bug-report-writer` — writes the title and the full report in the fixed template, splitting into the
   tracker's fields when asked. Refine mode output is a strict superset of the original.
-- `fix-proposer` — reads the checkout to localize the defect and propose a fix, or to establish that it
-  cannot. Owns the confidence floor.
 
-Reused from `issuekit`: `tracker-adapter` (detection, verbs, the diff-and-confirm gate),
-`issue-investigator` (the refine-mode evidence ladder), and `prose-style`.
+Reused from `issuekit`: `tracker-adapter` (detection, verbs, the diff-and-confirm gate) and
+`prose-style`.
+
+`fix-proposer` shipped here through v0.1.1. It now lives in
+[`issue-triager`](../issue-triager/skills/fix-proposer/), which is where the codebase dig belongs.
 
 ## How it relates to the other plugins
 
 | Plugin | Difference |
 |---|---|
-| [`issue-triager`](../issue-triager/) | Triages an issue that already exists across every archetype: assigns, transitions, sets the severity SLA and due date, links work, labels it triaged. `bug-reporter` writes the bug in the first place and stops short of every triage decision. Its `investigate-and-refine` command refines any archetype; `bug-reporter` refines bugs specifically, and adds Environment, Frequency, Regression, Fix Verification, and the fix proposal. |
+| [`issue-triager`](../issue-triager/) | The other half of this workflow. It triages an issue that already exists across every archetype: investigates, digs into the codebase to localize a bug and propose a fix, assigns, transitions, sets the severity SLA and due date, links work, labels it triaged. `bug-reporter` writes the bug in the first place, fast, and stops short of every triage decision. Its `investigate-and-refine` command refines any archetype; `bug-reporter` refines bugs specifically, and adds Environment, Frequency, Regression, and Fix Verification. |
 | [`story-drafter`](../story-drafter/) | The same intake idea for requirements instead of defects. |
 | [`postmortem-generator`](../postmortem-generator/) | For an incident that is already resolved and needs a blameless writeup. |
 
