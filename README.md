@@ -61,7 +61,7 @@ Register the MCP at the user level (in `~/.claude.json`) or project level (in `.
 
 Replace `YOUR_ORG_SLUG` with the slug from your AzDO URL (`https://dev.azure.com/<slug>`) and export `AZURE_DEVOPS_PAT` from your shell. PAT needs at least: Work Items (Read & Write), Code (Read), Wiki (Read), Identity (Read).
 
-`issuekit` matches on tool-name **suffix** (`*__wit_get_work_item`, `*__getJiraIssue`, etc.), so it doesn't matter how the MCP is registered — pick whatever name you like.
+`issuekit` matches on tool-name **suffix** (`*__wit_get_work_item`, `*__getJiraIssue`, etc.), so it doesn't matter how the MCP is registered — pick whatever name you like. If you somehow have two AzDO MCPs registered at once, it prefers a server named `azure-devops`/`azure_devops` and falls back to one named `ado`, then whatever else is registered — see `issuekit`'s `tracker-adapter` skill for the exact resolution order.
 
 When both an AzDO MCP and a Jira MCP are present, `issuekit` resolves the active tracker per-issue by inspecting the URL/key the user pastes.
 

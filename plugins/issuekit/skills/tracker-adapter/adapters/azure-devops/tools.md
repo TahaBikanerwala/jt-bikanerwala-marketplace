@@ -39,7 +39,7 @@ The same tool surfaces under different prefixes depending on how the user regist
 - `mcp__ado__*`
 - `mcp__plugin_<user-installed-name>__*`
 
-Never hardcode the prefix in a verb-plugin prompt. The dispatcher resolves it.
+Never hardcode the prefix in a verb-plugin prompt. The dispatcher resolves it once at detection time (see `references/detection.md` § Resolving which prefix to call — `azure_devops` preferred, `ado` as fallback, then any other registered name) and reuses that same literal prefix for every verb call in the session. If the resolved prefix doesn't expose a specific tool a verb needs, the dispatcher falls back to the next prefix in that order for that one call so the action still completes, instead of failing the verb.
 
 ## Optional tools (used when present)
 
