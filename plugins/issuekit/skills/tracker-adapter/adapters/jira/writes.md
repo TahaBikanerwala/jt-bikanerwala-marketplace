@@ -67,7 +67,7 @@ createJiraIssue(
 |---|---|---|
 | `title` | `summary` | as-is, plain text |
 | `body` | `description` | markdown; `contentFormat: "markdown"` |
-| `acceptanceCriteria` | folded into `description` under an `## Acceptance Criteria` heading, unless `policy.acceptance_criteria_field` names a custom field | markdown |
+| `acceptanceCriteria` | folded into `description` under an `## ✅ Acceptance Criteria` heading, unless `policy.acceptance_criteria_field` names a custom field | markdown |
 | `labels` | `fields.labels` | array of strings |
 | `priority` | `fields.priority.name` | map `P0/P1/P2` through `policy.priority_label_map` (default `P0 → Highest`, `P1 → High`, `P2 → Medium`) |
 | `severity` | same field `updateFields` resolves: `customfield_xxxxx` for "Severity" / "Severity Level" / "Bug Severity", else `fields.priority.name` | project `severity_label_map[<abstractTier>]`; object-shaped fields take `{ value: "<label>" }` or `{ name: "<label>" }` per the schema |

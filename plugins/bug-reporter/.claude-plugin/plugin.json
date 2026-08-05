@@ -1,6 +1,6 @@
 {
   "name": "bug-reporter",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Writes a complete Bug work item in the tracker (Azure DevOps, Jira) from a single line, or refines an ambiguously written existing Bug into one. Covers every component a bug report carries: summary, environment, preconditions, reproduction steps, expected vs actual, frequency, impact and affected scope, evidence, regression, workaround, fix verification, missing information, and open questions. Searches for duplicates first, then asks the reporter only what the reporter alone can answer. Any section the input does not answer is omitted from the report entirely instead of carrying a not-provided placeholder, and every one of those gaps is listed as a question under Missing Information rather than invented. Fast by design: it never reads the codebase and never investigates, so no suspected area, proposed fix, or cause lands in the report. The code dig belongs to issue-triager, which runs when someone picks the bug up. Every write passes through a single diff-and-confirm gate. Auto-installs issuekit; bring your own MCPs.",
   "author": {
     "name": "Taha Bikanerwala",

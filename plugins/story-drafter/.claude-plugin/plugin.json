@@ -1,6 +1,6 @@
 {
   "name": "story-drafter",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Turns ambiguous, unclear requirements (pasted notes, a meeting transcript, or a rough brief) into INVEST user stories and creates them in the tracker (Azure DevOps, Jira) tagged Draft. Brainstorms the requirements topic-by-topic, clarifies blocking gaps, asks which candidate stories to create, probes the local codebase to self-answer open questions, then writes full stories (Problem Statement, Background, Given/When/Then acceptance criteria, In/Out of Scope, Definition of Done, Open Questions) and creates them standalone through a single diff-and-confirm gate. Auto-installs issuekit; bring your own MCPs.",
   "author": {
     "name": "Taha Bikanerwala",
