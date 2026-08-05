@@ -30,7 +30,7 @@ The caller passes, after `Calling context: phase=<n>, tracker=<tracker>.`:
 
 1. **Parse the need.** Identify the core user need, the specific user role (builder vs end-user matters: e.g. a Team Admin configuring vs an End User doing the task), and the product area affected.
 2. **Fold in the inputs.** Apply blocking answers and extra notes. For each probe finding: a `[VERIFIED]` or `[OBSERVED]` answer becomes a stated fact in Background or an acceptance criterion and is **removed** from Open Questions; an `[INFERRED]` or `[UNKNOWN]` answer stays an Open Question (add a "where to look" note when the probe supplied one).
-3. **Write the story** using `references/story-template.md`. Read that file when you reach this step and follow its section list and order exactly.
+3. **Write the story** using `references/story-template.md`. Read that file when you reach this step and follow its section list, order, and fixed per-heading emoji exactly.
 4. **Set priority** (P0/P1/P2) from the urgency signals in the brainstorm and notes. When there is no signal, default to P2 and record a `(deferrable)` Open Question asking the team to confirm priority.
 
 ## Output shape

@@ -45,7 +45,18 @@ User-supplied MCPs surface tools under different prefixes depending on how the s
 - `mcp__ado__wit_get_work_item`
 - `mcp__plugin_<user-supplied-name>__wit_get_work_item`
 
-Suffix matching (`*__wit_get_work_item`) tolerates every variant. Do not hardcode the prefix.
+Suffix matching (`*__wit_get_work_item`) tolerates every variant for detecting *that* the azure-devops tracker is present. Do not hardcode the prefix when checking availability.
+
+### Resolving which prefix to call
+
+A session can have more than one AzDO-flavored MCP registered at once (e.g. a locally-registered `azure-devops` server plus an org-wide `ado` server pointed at a different project). Detection must resolve to exactly one literal prefix and use it for every verb call for the rest of the session — never mix prefixes mid-session, since that can silently talk to two different AzDO organizations.
+
+Resolve by checking in this order and taking the first one whose tools are present in the current tool list:
+1. `mcp__azure_devops__*`
+2. `mcp__ado__*`
+3. `mcp__plugin_<name>__*` (first match in tool-list order)
+
+Cache the winning literal prefix alongside `tracker=azure-devops`. If a later verb call needs a tool the winning prefix doesn't expose (a partial install), fall through this same order to find a prefix that does expose it, complete the call, and keep the original prefix as the default for everything else — do not fail the verb just because the primary prefix is missing one tool.
 
 ## Announcement format
 

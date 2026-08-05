@@ -19,6 +19,8 @@ Before serving any verb call, the caller must run the bootstrap sequence below a
    - `chat ∈ {slack, teams, none}`
    - `doc ∈ {confluence, azure-wiki, none}`
    - `log ∈ {datadog, none}`
+
+   When `tracker == azure-devops`, also resolve and cache the literal tool-name prefix to call — prefer `mcp__azure_devops__*`, fall back to `mcp__ado__*`, then any other registered name (see `references/detection.md` § Resolving which prefix to call).
 2. **Resolve multi-tracker ambiguity.** If two trackers are detected, inspect the issue URL or key the caller passed in:
    - URL containing `dev.azure.com` or `visualstudio.com` → azure-devops
    - Key matching `[A-Z][A-Z0-9_]+-\d+` (e.g. `PROJ-123`) → jira

@@ -225,11 +225,14 @@ This section is derived from the defect, not supplied by the reporter, which is 
 thin report yields fewer items, not none: the reported symptom no longer happening is always checkable.
 Do not invent a verification step for a scenario nobody described.
 
+Use a `- ☐ <item>` bullet list, not GitHub-style `- [ ]` — the latter renders as literal bracket text on
+both AzDO and Jira (see `issuekit/skills/tracker-adapter/references/body-format.md`).
+
 ```
-- [ ] Applying the same coupon twice leaves the cart total intact and shows a clear message
-- [ ] A regression test covers a repeated application of one code
-- [ ] Verified on staging on the build that ships the fix
-- [ ] No change to single-application discount totals
+- ☐ Applying the same coupon twice leaves the cart total intact and shows a clear message
+- ☐ A regression test covers a repeated application of one code
+- ☐ Verified on staging on the build that ships the fix
+- ☐ No change to single-application discount totals
 ```
 
 Keep it about proving this bug is gone. Generic release checklists belong to the team's definition of
@@ -319,9 +322,9 @@ None known.
 - Did this work in an earlier version?
 
 ## Fix Verification
-- [ ] Applying the same coupon twice leaves the cart total intact and shows a clear message
-- [ ] A regression test covers a repeated application of one code
-- [ ] No change to single-application discount totals
+- ☐ Applying the same coupon twice leaves the cart total intact and shows a clear message
+- ☐ A regression test covers a repeated application of one code
+- ☐ No change to single-application discount totals
 ```
 
 Seven of the fourteen sections appear. Environment, Preconditions, Expected Behavior, Frequency,

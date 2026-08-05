@@ -61,7 +61,7 @@ Documented as supported in [Atlassian's markdown reference](https://support.atla
 
 | Feature | Markdown syntax | What actually happens |
 |---------|------------------|------------------------|
-| Interactive checkboxes | `- [ ]`, `- [x]` | Render as escaped bracket text inside a bullet list. They are not interactive. Do not use. |
+| Interactive checkboxes | `- [ ]`, `- [x]` | Render as escaped bracket text inside a bullet list. They are not interactive. Do not use — use `- ☐ <item>` instead (see `references/body-format.md`). |
 
 ## Forbidden
 
