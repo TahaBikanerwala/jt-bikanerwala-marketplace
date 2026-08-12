@@ -35,9 +35,9 @@ Every `blurb` targets one or two plain sentences, at most ~280 characters total,
 written in the register of a status update to a client who has no visibility into the
 ticket, the codebase, or internal team vocabulary. Treat one-to-two as the normal
 size, not a hard ceiling: extend to three or four sentences only as a last resort (see
-below), and even then keep every sentence as short as it can be while still saying
-something the client needs. Concise beats complete-sounding; cut words, never
-information.
+below), capped at ~450 characters total in that case, and even then keep every
+sentence as short as it can be while still saying something the client needs. Concise
+beats complete-sounding; cut words, never information.
 
 **Sentence 1, always present: what changed.** Condense `title` and `body` into one
 sentence stating what was delivered, fixed, or changed. Drop boilerplate headings

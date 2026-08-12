@@ -48,10 +48,15 @@ search. `--tags <name>[,<name>...]` narrows the result to items with a matching 
    and (last resort only) a third or fourth sentence when two genuinely are not
    enough to say it accurately.
 4. Prints the summaries as bullets, grouped by status for query-mode runs.
+5. Offers to send the same summary to Slack or Teams: yourself by default, or the
+   target named with `--to` (a person's email, or a channel/group id or name).
+   Always asks first whether to send, and whether to include ticket ids.
 
 ## What it deliberately does not do
 
 - No tracker writes, ever.
+- No chat send without asking first, and never to anywhere but yourself unless
+  `--to` names the target explicitly.
 - No generated slide deck or PPTX file. Output is plain markdown bullets; see
   [`sprint-status-reporter`](../sprint-status-reporter/) for an actual Marp/PPTX deck
   instead.

@@ -1,6 +1,6 @@
 ---
 description: Fetch Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status, and print a concise executive summary per item (one to two sentences, three or four only as a last resort) for a client-update deck. Read-only; safe to run anytime.
-argument-hint: "<ticket ids/urls...> | --from <date> --till <date> [--status active|delivered|closed|updated] [--project <name>] [--scope <area-path-or-component>] [--tags <name>[,<name>...]] [keywords...]"
+argument-hint: "<ticket ids/urls...> | --from <date> --till <date> [--status active|delivered|closed|updated] [--project <name>] [--scope <area-path-or-component>] [--tags <name>[,<name>...]] [--to <target>] [keywords...]"
 allowed-tools: Skill
 ---
 
@@ -17,6 +17,7 @@ client-update deck.
 /ticket-summarizer:run --status active
 /ticket-summarizer:run --from 2026-07-01 --till 2026-07-31 --project "Mobile App"
 /ticket-summarizer:run --from 2026-08-11 --till 2026-08-12 --status closed --tags ecw
+/ticket-summarizer:run --status active --to #client-updates
 ```
 
 ## Behavior
@@ -35,8 +36,12 @@ This command is a thin shell. It dispatches to the `ticket-summarizer` agent, wh
    itself says so. Targets one to two sentences; extends to three or four only as a
    last resort when two are not enough to say it accurately.
 5. Prints the summaries as bullets, grouped by status when a query was run.
+6. Offers to send the same summary to Slack or Teams: yourself by default, or the
+   target named with `--to`. Asks first whether to send, and whether to include
+   ticket ids in the message.
 
-No writes, no confirmation gate.
+No tracker writes, no tracker diff-and-confirm gate. Chat delivery in step 6 is
+opt-in and always asks first.
 
 ## Query shapes
 
@@ -51,6 +56,19 @@ No writes, no confirmation gate.
 `--tags <name>[,<name>...]` narrows any query-mode result to items whose labels
 case-insensitively contain at least one given substring. This match happens
 client-side against each fetched item, not in the search itself.
+
+## Chat delivery
+
+After printing, the agent offers to send the same summary to Slack or Teams
+(whichever is detected). Defaults to a DM to yourself; add `--to <target>` to send
+elsewhere instead:
+
+- `--to jane@company.com`: resolves to that person.
+- `--to #client-updates` (or any channel/group id): sent as-is to the chat adapter.
+
+Sending anywhere but yourself always requires `--to`; it is never inferred from the
+rest of the request. Every send, self or otherwise, asks first whether to send and
+whether to include ticket ids.
 
 ## Configuration
 
