@@ -1,6 +1,6 @@
 # issuekit
 
-Shared adapter layer for issue-tracker plugins in this marketplace. `postmortem-generator`, `issue-triager`, `sprint-status-reporter`, `story-drafter`, `acceptance-test-generator`, and `bug-reporter` depend on it.
+Shared adapter layer for issue-tracker plugins in this marketplace. `postmortem-generator`, `issue-triager`, `sprint-status-reporter`, `story-drafter`, `acceptance-test-generator`, `bug-reporter`, and `ticket-summarizer` depend on it.
 
 This plugin ships **no** MCP, **no** agent, and **no** slash command. It is a library of skills and reference files that the verb-plugins invoke.
 
