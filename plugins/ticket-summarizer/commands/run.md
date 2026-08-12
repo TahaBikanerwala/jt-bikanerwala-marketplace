@@ -1,5 +1,5 @@
 ---
-description: Fetch Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status, and print a one-to-two sentence executive summary per item for a client-update deck. Read-only; safe to run anytime.
+description: Fetch Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status, and print a concise executive summary per item (one to two sentences, three or four only as a last resort) for a client-update deck. Read-only; safe to run anytime.
 argument-hint: "<ticket ids/urls...> | --from <date> --till <date> [--status active|delivered|closed|updated] [--project <name>] [--scope <area-path-or-component>] [--tags <name>[,<name>...]] [keywords...]"
 allowed-tools: Skill
 ---
@@ -30,9 +30,10 @@ This command is a thin shell. It dispatches to the `ticket-summarizer` agent, wh
 3. Resolves the matching work items: `getIssue` per reference in explicit mode, or a
    state-filtered `searchIssues` narrowed further by the exact `updated`/`resolved`
    date window in query mode.
-4. Runs each item through `executive-blurb-writer` to produce a one-to-two sentence,
+4. Runs each item through `executive-blurb-writer` to produce a concise,
    plain-language summary: what was delivered, and why it matters only when the ticket
-   itself says so.
+   itself says so. Targets one to two sentences; extends to three or four only as a
+   last resort when two are not enough to say it accurately.
 5. Prints the summaries as bullets, grouped by status when a query was run.
 
 No writes, no confirmation gate.
