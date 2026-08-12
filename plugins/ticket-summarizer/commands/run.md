@@ -1,6 +1,6 @@
 ---
 description: Fetch Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status, and print a one-to-two sentence executive summary per item for a client-update deck. Read-only; safe to run anytime.
-argument-hint: "<ticket ids/urls...> | --from <date> --till <date> [--status active|delivered|closed|updated] [--project <name>] [--scope <area-path-or-component>] [keywords...]"
+argument-hint: "<ticket ids/urls...> | --from <date> --till <date> [--status active|delivered|closed|updated] [--project <name>] [--scope <area-path-or-component>] [--tags <name>[,<name>...]] [keywords...]"
 allowed-tools: Skill
 ---
 
@@ -16,6 +16,7 @@ client-update deck.
 /ticket-summarizer:run --from 2026-07-01 --till 2026-07-31 --status delivered
 /ticket-summarizer:run --status active
 /ticket-summarizer:run --from 2026-07-01 --till 2026-07-31 --project "Mobile App"
+/ticket-summarizer:run --from 2026-08-11 --till 2026-08-12 --status closed --tags ecw
 ```
 
 ## Behavior
@@ -45,6 +46,10 @@ No writes, no confirmation gate.
   `--from`/`--till`.
 - **Updated in range:** `--from`/`--till` with no `--status`, or `--status updated`
   explicitly.
+
+`--tags <name>[,<name>...]` narrows any query-mode result to items whose labels
+case-insensitively contain at least one given substring. This match happens
+client-side against each fetched item, not in the search itself.
 
 ## Configuration
 

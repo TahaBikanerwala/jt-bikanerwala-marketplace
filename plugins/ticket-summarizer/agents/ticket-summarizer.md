@@ -35,6 +35,10 @@ Parse the raw argument string passed by `/ticket-summarizer:run`.
   - `--project <name>`: passed straight through to the search.
   - `--scope <area-path-or-component>`: AzDO area path or Jira component/label,
     passed straight through to the search.
+  - `--tags <name>[,<name>...]`: one or more tag/label substrings. An item matches
+    when at least one of its labels case-insensitively contains at least one of the
+    given substrings (OR across multiple values). Applied client-side in Phase 1, not
+    part of the `searchIssues` call; see the note there.
   - Anything else left in the free text (e.g. a product area name) becomes `keywords`.
 
 **Validation:**
@@ -91,6 +95,7 @@ the payload. Known keys: `phase`. Unknown keys are ignored.
 | `states` | Phase 0 | Phase 1 | resolved vendor-state array from `policy.state_categories`, or `null` (unfiltered by state) |
 | `status_label` | Phase 0 | Phase 3 | `"Active"`, `"Delivered"`, or `null` (no heading; flat list) |
 | `date_field` | Phase 0 | Phase 1 | `updated`, `resolved`, or `null` (no date filter) |
+| `tag_filters` | Phase 0 | Phase 1 | tag/label substrings from `--tags`, or `null` (no tag filter) |
 | `issues` | Phase 1 | Phase 2 | `Issue[]`, the resolved item set |
 | `unresolved_refs` | Phase 1 | Phase 3 | references (explicit mode) that failed to fetch |
 | `truncated` | Phase 1 | Phase 3 | bool; true when a fetch may have hit a server/page cap |
@@ -123,14 +128,19 @@ not abort the whole run over one bad reference.
 1. Call `searchIssues({ project, scope, keywords, states, limit: 100 })`, omitting
    `states` entirely when it is `null`. This is a coarse filter. `dateWindow` is
    deliberately not used here: it only filters the created date on both adapters, and
-   this agent needs `updated` or `resolved`.
+   this agent needs `updated` or `resolved`. `--tags` is not passed here either:
+   `SearchQuery` has no tags parameter, so tag filtering happens client-side in step 5,
+   the same way date filtering happens client-side in step 4.
 2. If the result count equals `100` (or the adapter's own page/server cap), set
    `truncated = true`.
-3. Call `getIssue(id)` for every result to get the full `Issue`, including `updated`
-   and `resolved`.
+3. Call `getIssue(id)` for every result to get the full `Issue`, including `updated`,
+   `resolved`, and `labels`.
 4. Keep an item only when `date_field` is `null`, or `item[date_field]` falls within
    `[from, till]` inclusive. Drop the rest.
-5. Cache the surviving set as `issues`.
+5. Keep an item only when `tag_filters` is `null`, or at least one entry in
+   `item.labels` case-insensitively contains at least one entry in `tag_filters`.
+   Drop the rest.
+6. Cache the surviving set as `issues`.
 
 If `issues` is empty after filtering, skip Phase 2 and go straight to Phase 3 with an
 explicit "no matching work items" note. Do not error.
@@ -162,7 +172,8 @@ Print the summary directly. There is no rendering skill and no file output.
 - After the list: `Ids in brackets are for your own traceability; strip them before
   this goes in front of a client.`
 - When `truncated`: `Results may be truncated by the tracker's page limit. Narrow with
-  --project, --scope, or a keyword to see the rest.`
+  --project, --scope, or a keyword to see the rest.` (`--tags` filters client-side,
+  after the fetch, so tightening it does not reduce truncation; do not suggest it here.)
 - For every entry in `unresolved_refs`: `Could not resolve <reference>.`
 
 ## Do not rules
@@ -178,6 +189,9 @@ Print the summary directly. There is no rendering skill and no file output.
 - **Never rely on `dateWindow` for `updated`/`resolved` filtering.** It filters only
   the created date on both adapters; the precise window check happens client-side
   against the fetched `Issue`.
+- **Never pass `--tags` into `searchIssues`.** `SearchQuery` has no tags parameter;
+  tag matching happens client-side against `Issue.labels`, same as the date window.
+  Never claim it narrows a truncated fetch.
 
 ## Writing rules (always active)
 

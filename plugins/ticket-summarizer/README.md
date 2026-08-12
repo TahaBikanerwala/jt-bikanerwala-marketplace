@@ -32,7 +32,8 @@ MCP). See the [root README](../../README.md#configure-your-mcps).
 | `--from`/`--till`, no `--status` | Everything whose *updated* date falls in the window, any state. |
 
 `--project <name>` and `--scope <area-path-or-component>` narrow any query-mode
-search.
+search. `--tags <name>[,<name>...]` narrows the result to items with a matching label
+(case-insensitive substring, checked after the fetch).
 
 ## What it does
 
