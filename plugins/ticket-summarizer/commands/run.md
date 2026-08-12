@@ -1,6 +1,6 @@
 ---
 description: Fetch Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status, and print a concise executive summary per item (one to two sentences, three or four only as a last resort) for a client-update deck. Read-only; safe to run anytime.
-argument-hint: "<ticket ids/urls...> | --from <date> --till <date> [--status active|delivered|closed|updated] [--project <name>] [--scope <area-path-or-component>] [--tags <name>[,<name>...]] [--to <target>] [keywords...]"
+argument-hint: "<ticket ids/urls...> | --from <date> --till <date> [--status active|delivered|closed|updated] [--project <name>] [--scope <area-path-or-component>] [--tags <name>[,<name>...]] [--to <target>] [--output <path>] [keywords...]"
 allowed-tools: Skill
 ---
 
@@ -18,6 +18,7 @@ client-update deck.
 /ticket-summarizer:run --from 2026-07-01 --till 2026-07-31 --project "Mobile App"
 /ticket-summarizer:run --from 2026-08-11 --till 2026-08-12 --status closed --tags ecw
 /ticket-summarizer:run --status active --to #client-updates
+/ticket-summarizer:run --status delivered --from 2026-07-01 --till 2026-07-31 --output ./client-update.md
 ```
 
 ## Behavior
@@ -39,9 +40,13 @@ This command is a thin shell. It dispatches to the `ticket-summarizer` agent, wh
 6. Offers to send the same summary to Slack or Teams: yourself by default, or the
    target named with `--to`. Asks first whether to send, and whether to include
    ticket ids in the message.
+7. When `--output <path>` is given, offers to save the same summary to that file.
+   Asks first whether to save, then whether to overwrite if the path already
+   exists. Reuses the ids choice from step 6 when that already answered it.
 
-No tracker writes, no tracker diff-and-confirm gate. Chat delivery in step 6 is
-opt-in and always asks first.
+No tracker writes, no tracker diff-and-confirm gate. Chat delivery (step 6) and file
+output (step 7) are both opt-in and always ask first; unlike chat, file output
+requires `--output` before it is even offered, since there is no default path.
 
 ## Query shapes
 
@@ -69,6 +74,14 @@ elsewhere instead:
 Sending anywhere but yourself always requires `--to`; it is never inferred from the
 rest of the request. Every send, self or otherwise, asks first whether to send and
 whether to include ticket ids.
+
+## File output
+
+Add `--output <path>` to also offer saving the summary to a file (relative paths
+resolve against the current working directory). Unlike chat, there is no default
+destination: without `--output`, this step does not run at all. When the path
+already exists, the agent asks before overwriting it. The ids choice is shared with
+chat delivery: if you already answered it there, you are not asked twice.
 
 ## Configuration
 

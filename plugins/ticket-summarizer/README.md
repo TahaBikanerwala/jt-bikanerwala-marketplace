@@ -51,12 +51,16 @@ search. `--tags <name>[,<name>...]` narrows the result to items with a matching 
 5. Offers to send the same summary to Slack or Teams: yourself by default, or the
    target named with `--to` (a person's email, or a channel/group id or name).
    Always asks first whether to send, and whether to include ticket ids.
+6. When `--output <path>` is given, offers to save the same summary to that file
+   too, asking before overwriting if the path already exists.
 
 ## What it deliberately does not do
 
 - No tracker writes, ever.
 - No chat send without asking first, and never to anywhere but yourself unless
   `--to` names the target explicitly.
+- No file save without asking first, and never without `--output` naming a path;
+  there is no default file destination.
 - No generated slide deck or PPTX file. Output is plain markdown bullets; see
   [`sprint-status-reporter`](../sprint-status-reporter/) for an actual Marp/PPTX deck
   instead.
