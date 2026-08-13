@@ -76,7 +76,7 @@ Maps abstract state names to the vendor-side state or transition name.
 
 The adapter looks the value up on the live state graph:
 - **Jira:** calls `getTransitionsForJiraIssue` and finds the transition by name.
-- **AzDO:** matches against the issue type's state list from `wit_get_work_item_type`; for `investigating`, the adapter also sets `System.Reason` based on a `Reason: "<value>"` suffix in the state string if present (e.g. `"Active; Reason: Investigating"`).
+- **AzDO:** matches against the issue type's state list from `wit_get_work_item_type` (or `wit_work_item` action `"get_type"` on the consolidated tool shape — see `references/detection.md`); for `investigating`, the adapter also sets `System.Reason` based on a `Reason: "<value>"` suffix in the state string if present (e.g. `"Active; Reason: Investigating"`).
 
 **Default if unset:** lazy-prompt. The adapter presents the list of valid transitions / states from the live schema and asks the user to pick.
 

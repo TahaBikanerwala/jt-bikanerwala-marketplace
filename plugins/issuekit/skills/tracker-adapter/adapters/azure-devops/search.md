@@ -1,6 +1,15 @@
 # Azure DevOps — `searchIssues` → WIQL
 
-Build a WIQL query from the normalized `SearchQuery` input and call `wit_query_by_wiql`.
+Build a WIQL query from the normalized `SearchQuery` input. The WIQL text itself is
+identical regardless of tool shape (see `references/detection.md` for shape
+resolution) — only the call that carries it differs:
+
+- **Classic shape:** `wit_query_by_wiql(wiql: "<wiql>")`.
+- **Consolidated shape:** `wit_query(action: "wiql", wiql: "<wiql>", project: "<project>",
+  top: <limit>)`. Always pass `top` explicitly — its default is `50`, well under this
+  adapter's `limit: 100` default, so an omitted `top` would silently truncate a
+  query-mode search. `project` narrows the search server-side in addition to the
+  `[System.TeamProject]` conjunct already in the WIQL; passing both is harmless.
 
 ## Skeleton
 
@@ -72,7 +81,14 @@ ORDER BY [System.CreatedDate] DESC
 
 ## Limit handling
 
-WIQL has no row-limit clause. The MCP tool returns the first N matches (server-side default ~200). If the input `limit` is smaller, trim the result client-side. If the result is exactly the server cap, append a one-line warning to the caller: `result truncated at server cap; refine the query`.
+WIQL has no row-limit clause; the cap comes from the tool call, not the query text.
+- **Classic shape:** the MCP tool returns the first N matches (server-side default ~200).
+- **Consolidated shape:** the MCP tool returns at most `top` matches (default `50`
+  when omitted — see above), not a larger server-side default.
+
+If the input `limit` is smaller than what came back, trim the result client-side. If
+the result is exactly the cap that applied for the resolved shape, append a one-line
+warning to the caller: `result truncated at server cap; refine the query`.
 
 ## Empty results
 

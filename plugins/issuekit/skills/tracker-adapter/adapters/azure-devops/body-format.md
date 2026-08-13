@@ -1,10 +1,17 @@
 # Azure DevOps — body format (markdown → safe HTML)
 
-Azure DevOps stores work-item description (`System.Description`) and discussion comments as **HTML**. The API does not perform markdown-to-HTML conversion: whatever you write into `System.Description` is rendered as-is. Convert the canonical markdown body (see `issuekit/skills/tracker-adapter/references/body-format.md`) to a safe HTML subset before calling `wit_update_work_item` or `wit_add_work_item_comment`.
+Azure DevOps stores work-item description (`System.Description`) and discussion comments as **HTML**. The API does not perform markdown-to-HTML conversion: whatever you write into `System.Description` is rendered as-is. Convert the canonical markdown body (see `issuekit/skills/tracker-adapter/references/body-format.md`) to a safe HTML subset before writing it, on either AzDO tool-name shape.
 
 ## API format rule
 
-`wit_update_work_item` accepts a JSON Patch document. The operation that writes the description looks like this (literal HTML inside the `value` field):
+The HTML rules on this page apply regardless of which tool-name shape the session
+resolved (see `tools.md` § tool-name shapes): they describe what AzDO's REST API
+accepts in `System.Description`, not a property of any particular MCP tool.
+
+`wit_update_work_item` (or `wit_work_item_write` action `"update"` on the
+consolidated shape) accepts a JSON Patch document (`updates` on the consolidated
+shape — see `writes.md`). The operation that writes the description looks like
+this (literal HTML inside the `value` field):
 
 ```json
 [
@@ -15,7 +22,13 @@ Azure DevOps stores work-item description (`System.Description`) and discussion 
 
 The HTML string must be syntactically valid. AzDO will accept malformed HTML up to a point but the rendered output is unpredictable. Run any unfamiliar tags through the safe-subset table below before emitting.
 
-For comments, `wit_add_work_item_comment` takes an HTML string in its `text` parameter (the field is sometimes named `comment` or `body` depending on the MCP tool's input shape; check the tool schema). Comments support the same safe-subset HTML.
+For comments, `wit_add_work_item_comment` (or `wit_work_item_comment_write` action
+`"add"` on the consolidated shape) takes an HTML string in its `text` parameter
+(the field is sometimes named `comment` or `body` depending on the MCP tool's
+input shape; check the tool schema). Comments support the same safe-subset HTML —
+though the consolidated tool defaults its `format` to `Markdown` rather than HTML
+(see `writes.md`), so a caller using that shape may skip this page's conversion
+for comments specifically and pass markdown as-is.
 
 ## Markdown-to-HTML conversion
 

@@ -1,14 +1,30 @@
 # Azure DevOps — `getSprintItems` and `getTeamCapacity`
 
-Implements the two sprint-read verbs from `references/verbs.md`.
+Implements the two sprint-read verbs from `references/verbs.md`. Each step below
+lists the classic tool first, then the consolidated equivalent — resolved once at
+detection time (see `references/detection.md` § Resolving which tool-name shape to
+call); never call both in the same session.
 
 ## `getSprintItems(sprint?, team?)`
 
 ### Steps
 
-1. **Resolve the iteration.** If `sprint` is given, use its `id` (an AzDO iteration path or GUID). If omitted, call `work_list_team_iterations` with `timeframe: "current"` for `team` (default `defaultTeam` from `whoAmI`) and take the current iteration — same as `getCurrentSprint`.
-2. **List the iteration's work items.** Call `wit_get_work_items_for_iteration(project, team, iterationId)`. It returns the item ids in the iteration (the sprint backlog).
-3. **Fetch details in a batch.** Call `wit_get_work_items_batch_by_ids` with those ids and `$expand: "all"` (or the fields list below). Batch in chunks of 200 if the iteration is large.
+1. **Resolve the iteration.** If `sprint` is given, use its `id` (an AzDO iteration
+   path or GUID). If omitted, resolve the current iteration for `team` (default
+   `defaultTeam` from `whoAmI`) the same way `getCurrentSprint` does:
+   - Classic: `work_list_team_iterations(team, timeframe: "current")`.
+   - Consolidated: `work(action: "list_team_iterations", team, timeframe:
+     "current")`.
+2. **List the iteration's work items.** Returns the item ids in the iteration (the sprint backlog):
+   - Classic: `wit_get_work_items_for_iteration(project, team, iterationId)`.
+   - Consolidated: `wit_work_item(action: "list_for_iteration", project, team,
+     iterationId)`.
+3. **Fetch details in a batch.** Chunk in groups of 200 if the iteration is large:
+   - Classic: `wit_get_work_items_batch_by_ids(ids, $expand: "all")` (or the fields list below).
+   - Consolidated: `wit_work_item(action: "get_batch", ids, fields: [...])`. The
+     consolidated batch action takes a `fields` array, not `$expand` — always pass
+     the fields list below explicitly rather than relying on an expand-all
+     equivalent.
 4. **Normalize** each work item into a `SprintItem`.
 
 ### Field mapping
@@ -27,15 +43,18 @@ Implements the two sprint-read verbs from `references/verbs.md`.
 | `labels` | `System.Tags` split on `; ` into an array (empty when unset) |
 | `description` | `System.Description` → strip HTML tags, decode entities, collapse whitespace, truncate to 500 chars. `""` when the field is absent. |
 
-Request `System.Description` in the `wit_get_work_items_batch_by_ids` field list (it is not
-in the default set). Some work-item types (Task, Bug) carry the body in
+Request `System.Description` in the batch-fetch field list (it is not in the
+default set) on either shape. Some work-item types (Task, Bug) carry the body in
 `Microsoft.VSTS.TCM.ReproSteps` or `System.Description`; prefer `System.Description` and
 fall back to repro steps for Bugs when `System.Description` is empty.
 
 ### `stateCategory` resolution
 
 1. If `policy.state_categories` lists `state` under `done` / `in_progress` / `todo`, use that (case-insensitive match). This wins.
-2. Otherwise derive from the work-item-type category. The item's state maps to one of the vendor categories via `wit_get_work_item_type(process, type).states[].category`:
+2. Otherwise derive from the work-item-type category. The item's state maps to one
+   of the vendor categories via the type-schema lookup's `states[].category`:
+   - Classic: `wit_get_work_item_type(process, type).states[].category`.
+   - Consolidated: `wit_work_item(action: "get_type", workItemType: type).states[].category`.
    - `Completed`, `Resolved` → `done`
    - `InProgress` → `in_progress`
    - `Proposed` → `todo`
@@ -47,18 +66,28 @@ The unit for `points` is story points; `remainingWork` is hours. The analyst kee
 ## `getTeamCapacity(team?, sprint?)`
 
 1. Resolve the iteration as above (`sprint` or current).
-2. Call `work_get_team_capacity(project, team, iterationId)` for per-member capacity and days off.
-3. Call `work_get_iteration_capacities(project, iterationId)` for the iteration total when available.
+2. Fetch per-member capacity and days off:
+   - Classic: `work_get_team_capacity(project, team, iterationId)`.
+   - Consolidated: `work(action: "get_team_capacity", project, team, iterationId)`.
+3. Fetch the iteration total when available:
+   - Classic: `work_get_iteration_capacities(project, iterationId)`.
+   - Consolidated: `work(action: "get_iteration_capacities", project, iterationId)`.
 4. Normalize to `Capacity`:
    - `totalCapacity` — sum of per-member `activities[].capacityPerDay × working days`, or the iteration-capacities total when the API returns one.
    - `perMember` — `[{ user: teamMember.displayName, capacity: <capacityPerDay summed across activities> }]`.
    - `daysOff` — team days off count from the capacity payload.
    - `committed` — null here; the analyst derives committed points from `getSprintItems` instead.
 
-If the team has no capacity configured for the iteration, the tools return empty arrays. Return a `Capacity` with zeros rather than `null` (capacity *exists* on AzDO, it's just unset) — but if the capacity tools are entirely absent from the MCP surface, return `null`.
+If the team has no capacity configured for the iteration, the tools return empty
+arrays. Return a `Capacity` with zeros rather than `null` (capacity *exists* on
+AzDO, it's just unset) — but if the capacity tools are entirely absent from the
+resolved shape's MCP surface, return `null`.
 
 ## Errors and limits
 
-- If `wit_get_work_items_for_iteration` returns an error (e.g. team/iteration mismatch), surface it verbatim to the caller; do not fall back to a project-wide query.
-- The batch fetch caps at 200 ids per call. Chunk and concatenate.
+- If the list-for-iteration call (`wit_get_work_items_for_iteration` classic,
+  `wit_work_item` `action: "list_for_iteration"` consolidated) returns an error
+  (e.g. team/iteration mismatch), surface it verbatim to the caller; do not fall
+  back to a project-wide query.
+- The batch fetch caps at 200 ids per call on either shape. Chunk and concatenate.
 - Empty iteration → return `[]` (not an error). The caller renders a "no items" report.
