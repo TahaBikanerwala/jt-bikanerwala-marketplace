@@ -25,7 +25,7 @@ Before serving any verb call, the caller must run the bootstrap sequence below a
    - URL containing `dev.azure.com` or `visualstudio.com` → azure-devops
    - Key matching `[A-Z][A-Z0-9_]+-\d+` (e.g. `PROJ-123`) → jira
    - Numeric-only ID with no URL → ask once via `AskUserQuestion`, cache for the session only (do not persist).
-3. **Bootstrap identity.** Call `whoAmI()` (see `references/verbs.md`). The adapter implementations are in `adapters/<tracker>/`. Cache `{trackerUser, defaultProject, defaultTeam}` and the chat user (if a chat backend was detected).
+3. **Bootstrap identity.** Call `whoAmI()` (see `references/verbs.md`). The adapter implementations are in `adapters/<tracker>/`. Cache `{trackerUser, defaultProject, defaultTeam, email}`. If a chat backend was detected and `email` is non-null, call `resolveChatUser({ email })` (see `references/verbs.md`'s "Chat" section) and cache the result as the running user's chat identity — `null` if the lookup misses. This is the default `sendMessage` target for a caller that wants to message "yourself"; when `email` is `null` or the lookup misses, that default is unavailable for the session.
 4. **Load policy.** Read `.claude/tracker-policy.json` if it exists. Merge with shipped defaults from `references/policy-schema.md`. Track which keys are unset; do not lazy-prompt yet.
 5. **Legacy config migration warning.** If any of the legacy paths exists, read forward once and print a one-time warning:
    - `.claude/azure-incident-postmortem.config.json`
@@ -84,6 +84,8 @@ See `references/verbs.md` for the full schemas. Quick reference:
 
 **Writes:** `createIssue`, `assign`, `transition`, `updateFields`, `addComment`, `addLabel`, `removeLabel`, `linkIssue`, `linkPullRequest`.
 
+**Chat (ungated, not tracker writes):** `resolveChatUser`, `sendMessage`. See `references/verbs.md`'s "Chat" section — these resolve and message a **chat-platform** identity (Slack/Teams), distinct from `resolveUser`'s tracker identity, and never touch the tracker or its diff-and-confirm gate.
+
 ## Adapter file map
 
 | Adapter file | Contains |
@@ -95,6 +97,12 @@ See `references/verbs.md` for the full schemas. Quick reference:
 | `adapters/<tracker>/body-format.md` | Markdown subset rules and conversion notes for that tracker. |
 | `adapters/<tracker>/states.md` | State-graph quirks and the abstract-state → vendor-state mapping rules. |
 | `adapters/<tracker>/mentions.md` | How `@[userRef]` projects to the vendor's mention syntax. |
+| `adapters/slack/tools.md` | Slack tool-name allowlist for the two chat verbs (`resolveChatUser`, `sendMessage`). |
+| `adapters/teams/tools.md` | Teams tool-name allowlist for the same two chat verbs, and the no-send-tool fallback. |
+
+Chat is not a tracker: `adapters/slack/` and `adapters/teams/` each carry only a
+`tools.md`, not the full `search/writes/body-format/states/mentions` set a tracker
+adapter has.
 
 ## Constraints
 

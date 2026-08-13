@@ -11,8 +11,14 @@ IssueId       = string                  // "1234" or "PROJ-1234"; vendor-defined
 UserRef       = opaque                  // returned by resolveUser; valid for assign/mention/comment
 Issue         = {
   id, url, title, body, type, state, severity, assignee, reporter,
-  created, updated, resolved, labels, parent, customFields, raw
+  created, updated, resolved, closed, labels, parent, customFields, raw
 }
+// `closed` is distinct from `resolved`: on AzDO some work-item types (e.g. Task)
+// can transition straight to a closed-category state without ever populating a
+// Resolved-category date, so `resolved` alone can be absent on a genuinely closed
+// item. Jira has no equivalent second date; `closed` is always absent there and
+// `resolved` already covers it. Callers that need "when did this finish" should
+// check `resolved` first and fall back to `closed`, never rely on `resolved` alone.
 Revision      = { at, by, field, from, to }
 Comment       = { at, by, body, url }       // body is markdown
 IssueSummary  = { id, url, title, state, type }
@@ -35,12 +41,53 @@ Capacity      = {
 
 ### `whoAmI()`
 **In:** none
-**Out:** `{ trackerUser: UserRef, defaultProject: string, defaultTeam: string|null }`
+**Out:** `{ trackerUser: UserRef, defaultProject: string, defaultTeam: string|null, email: string|null }`
 **Implements:** AzDO `core_list_projects` + `wit_my_work_items`; Jira `getAccessibleAtlassianResources` + `atlassianUserInfo`.
 
-### `getIssue(id: IssueId)`
+`email` is best-effort: Jira's `atlassianUserInfo` returns `emailAddress` directly, so
+it is populated there whenever the API exposes one. AzDO's identity lookup returns a
+`mail`-equivalent field only when the organization's directory exposes it; `null`
+otherwise. A caller that needs to resolve the running user's own **chat** identity
+(for example, a default self-DM target) passes this `email` to `resolveChatUser`
+below; when `email` is `null`, treat self chat-target resolution as unavailable, the
+same as any other `resolveChatUser` miss.
+
+### `getIssue(id: IssueId, fields?: string[])`
 **Out:** `Issue` (body in markdown; `customFields` is an opaque map of vendor-specific keys for the caller's use)
 **Implements:** AzDO `wit_get_work_item` with `expand: "all"`; Jira `getJiraIssue` with `responseContentFormat: "markdown"`.
+
+`fields` is optional and additive: omit it and the call is unchanged (full fetch, as
+above). When given, it names `Issue` property keys (e.g. `["title", "body",
+"labels", "updated", "resolved"]`, never vendor field names) and the adapter fetches
+only those, plus `id` and `url` which are always present. AzDO switches from
+`expand: "all"` to the tool's `fields` array, mapped through the abstract-to-vendor
+table in `adapters/azure-devops/tools.md`; Jira passes a narrower `fields` list to
+`getJiraIssue` the same way. Properties outside the requested set come back
+`undefined`, not `null` — a caller that narrowed the fetch must not read them. Use
+this when a caller only needs a handful of properties across many items; it is the
+main lever on payload size, since the default full fetch includes identity objects,
+relations, and links most callers never use.
+
+### `getIssuesBatch(ids: IssueId[], fields?: string[])`
+**Out:** `Issue[]`, one entry per id that resolved; ids that fail to resolve are
+omitted rather than erroring the whole batch. The caller diffs the returned ids
+against the requested ones to find failures, the same pattern
+`ticket-summarizer`'s `unresolved_refs` already uses for single fetches.
+**In:** `fields` behaves exactly as in `getIssue`.
+**Implements:**
+- AzDO: `wit_work_item`'s `get_batch` action (all ids in one call), `fields` passed
+  through the same way as `getIssue`. This is the same tool `getSprintItems` already
+  uses for its own batch fetch.
+- Jira has no native multi-id detail fetch. Best effort: build a `key in (<ids>)` JQL
+  and call `searchJiraIssuesUsingJql` with an explicit `fields` list wide enough to
+  populate the requested `Issue` properties in one call. If the search tool cannot
+  return the needed fields (older Atlassian MCP versions), fall back to one
+  `getIssue` call per id and warn once that Jira batching degraded to sequential
+  calls this session.
+
+Prefer this over N calls to `getIssue` whenever the caller already has more than a
+couple of ids to fetch (e.g. after `searchIssues`). Round-trip count, not just
+per-item payload size, is the dominant cost driver for many-item fetches.
 
 ### `getIssueHistory(id: IssueId)`
 **Out:** `Revision[]` sorted oldest-first
@@ -64,6 +111,15 @@ SearchQuery = {
 ```
 **Out:** `IssueSummary[]`
 **Implements:** AzDO `wit_query_by_wiql` (the adapter builds the WIQL); Jira `searchJiraIssuesUsingJql` (the adapter builds the JQL).
+
+`SearchQuery` deliberately has no `tags` parameter. A tag/label filter cannot be
+pushed into either tracker's search reliably: AzDO's WIQL `CONTAINS` on
+`System.Tags` matches whole tag tokens, not substrings within a multi-word tag (a
+tag like `"ECW Bug"` will not match `CONTAINS 'ECW'`, only a standalone `"ECW"` tag
+would), and Jira's `labels in (...)` is exact-match only. Callers that need
+substring tag matching must always filter client-side against the fetched
+`Issue.labels`, on every tracker, unconditionally; there is no fetch-volume
+optimization available here that preserves the substring semantic.
 
 ### `getIssueTypeSchema(type: string)`
 **Out:** `{ fields: FieldSpec[], severityOptions: string[], requiredFields: string[] }`
@@ -154,12 +210,62 @@ Jira `createIssueLink` with `link_type` resolved through:
 - AzDO synthesizes `vstfs:///Git/PullRequestId/<projectId>%2F<repoId>%2F<prId>` from the URL and patches `/relations/-` with `rel: "ArtifactLink"`.
 - Jira: no-op. Jira smart-links automatically when the PR description or branch name contains the issue key. The verb returns `linked: false, reason: "auto-link"` so the caller knows.
 
+## Chat (ungated)
+
+Chat delivery is a separate concern from tracker reads/writes: it never touches the
+tracker, so it never goes through the diff-and-confirm gate. Whether to ask the user
+before sending is the calling verb-plugin's own responsibility (`ticket-summarizer`'s
+Phase 4 always asks first, for example; `issue-triager`'s severity escalation does
+not, since it is a configured, unconditional notification).
+
+`chat`'s value (`slack`, `teams`, or `none`) comes from `references/detection.md`,
+same as always; these two verbs only fire when `chat != none`.
+
+```
+ChatUserRef  = opaque   // returned by resolveChatUser; valid only as a sendMessage target
+ChatTarget   = { kind: "user", ref: ChatUserRef } | { kind: "channel", value: string }
+```
+
+`ChatUserRef` is a **chat-platform** identity (a Slack or Teams user id), distinct
+from `resolveUser`'s tracker `UserRef`. Never pass one where the other is expected: a
+`ChatUserRef` is not valid for `assign`/`mention`/`comment`, and a tracker `UserRef` is
+not valid as a `sendMessage` target.
+
+### `resolveChatUser(query: { email?: string, name?: string })`
+**Out:** `ChatUserRef | null` — `null` when no match is found. The caller treats a
+miss as "unavailable," never as an error; see `adapters/<chat>/tools.md` for what
+"no match" looks like per platform.
+**Implements:** Slack `slack_search_users` (query by email, name as fallback); Teams:
+see `adapters/teams/tools.md` — a live directory-search tool is not consistently
+exposed across Microsoft 365/Graph MCP registrations, so this frequently resolves to
+`null` there even for a real user.
+
+### `sendMessage(target: ChatTarget, body: string)`
+**Out:** `{ sent: true } | { sent: false, reason: string }`. A failure (no
+send-capable tool detected for the resolved `chat` backend, target not found,
+permission denied) is returned in-band, never thrown and never retried.
+**Implements:** Slack `slack_send_message` — `target.kind == "user"` sends a DM to
+the resolved user id; `target.kind == "channel"` sends to the given channel id/name.
+Teams: see `adapters/teams/tools.md` — no send-capable tool is consistently exposed
+in this marketplace's supported Microsoft 365/Graph MCP registrations; when one is
+not present in the detected tool surface, return `{ sent: false, reason: "no
+send-capable tool found for teams" }` rather than improvising a call against an
+unrelated tool.
+
+`body` is sent as markdown, as-is. No HTML/ADF conversion happens here;
+`body-format.md` governs tracker bodies only, not chat messages.
+
+`target.kind == "channel"`'s `value` is the same opaque channel/group reference
+`policy.escalation.channel` already documents: a Slack `#channel-name` or channel id,
+or a Teams channel/chat id.
+
 ## Error handling
 
 When a verb's underlying tool returns an error:
 
 1. Reads: stop and tell the caller which call failed. Do not fabricate substitutes.
 2. Writes: stop the batch on the first failure. Print which verb failed and what was written before it. Do not roll back successful writes — the user inspects the partial state and decides.
+3. Chat (`resolveChatUser`, `sendMessage`): never throw. `resolveChatUser` returns `null` on no match; `sendMessage` returns `{ sent: false, reason }` on any failure, including no send-capable tool being present for the detected `chat` backend. The caller reports the reason and does not retry.
 
 ## Detection-time pre-checks
 

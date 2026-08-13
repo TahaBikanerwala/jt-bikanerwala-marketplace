@@ -45,6 +45,11 @@
       "name": "acceptance-test-generator",
       "source": "./plugins/acceptance-test-generator",
       "description": "Turns a user story and its acceptance criteria into a rigorous BDD test suite. Reads the story from the tracker (Azure DevOps, Jira), a spec file, or pasted text, decomposes every AC with senior test-design technique (equivalence partitioning, boundary-value analysis, decision tables, state-transition and negative-path coverage), then writes canonical Gherkin .feature files with smartly consolidated scenarios and detailed steps. Test cases derive only from the story and acceptance criteria; the codebase is read read-only for reference (selectors, existing feature-file style, terminology, spec-vs-code drift) and never as the basis of a test. Optionally creates each scenario as a Test Case work item linked to the source story, behind a single diff-and-confirm gate. Auto-installs issuekit; bring your own MCPs."
+    },
+    {
+      "name": "ticket-summarizer",
+      "source": "./plugins/ticket-summarizer",
+      "description": "Fetches Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status (active, or delivered/closed between two dates), and summarizes each into a plain-language, client-facing one-to-two sentence blurb suited for a status update deck. States what was delivered and, only when the ticket itself supports it, why it matters; never invents a business-value claim. Read-only, no confirmation gate. Auto-installs issuekit; bring your own MCPs."
     }
   ]
 }
