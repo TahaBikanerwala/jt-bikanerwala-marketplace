@@ -15,7 +15,10 @@ The adapter does not assume a process template. It always queries the live schem
 
 ## Live schema query
 
-For a given issue type, call `wit_get_work_item_type(processName, workItemTypeName)` and read the `states[]` array. Each entry is `{ name, color, category }`. Categories are vendor-canonical:
+For a given issue type, call `wit_get_work_item_type(processName, workItemTypeName)`
+(or `wit_work_item` action `"get_type"` on the consolidated tool shape — see
+`tools.md` § tool-name shapes) and read the `states[]` array. Each entry is `{
+name, color, category }`. Categories are vendor-canonical:
 
 | Category | Meaning |
 |---|---|
