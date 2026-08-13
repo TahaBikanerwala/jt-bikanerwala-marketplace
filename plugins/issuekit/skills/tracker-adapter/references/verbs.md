@@ -39,10 +39,17 @@ Capacity      = {
 
 ## Reads
 
+Every AzDO tool name below is the **classic** shape; a session may instead have the
+**consolidated** shape resolved (see `adapters/azure-devops/tools.md` and
+`references/detection.md` § Resolving which tool-name shape to call), in which case
+the adapter dispatches the same verb through that shape's tool and `action`
+argument instead. This file names the classic tool for readability; it is never the
+only implementation.
+
 ### `whoAmI()`
 **In:** none
 **Out:** `{ trackerUser: UserRef, defaultProject: string, defaultTeam: string|null, email: string|null }`
-**Implements:** AzDO `core_list_projects` + `wit_my_work_items`; Jira `getAccessibleAtlassianResources` + `atlassianUserInfo`.
+**Implements:** AzDO `core_list_projects` + `wit_my_work_items` (or `wit_work_item` action `"my"`); Jira `getAccessibleAtlassianResources` + `atlassianUserInfo`.
 
 `email` is best-effort: Jira's `atlassianUserInfo` returns `emailAddress` directly, so
 it is populated there whenever the API exposes one. AzDO's identity lookup returns a
@@ -54,7 +61,7 @@ same as any other `resolveChatUser` miss.
 
 ### `getIssue(id: IssueId, fields?: string[])`
 **Out:** `Issue` (body in markdown; `customFields` is an opaque map of vendor-specific keys for the caller's use)
-**Implements:** AzDO `wit_get_work_item` with `expand: "all"`; Jira `getJiraIssue` with `responseContentFormat: "markdown"`.
+**Implements:** AzDO `wit_get_work_item` with `expand: "all"` (or `wit_work_item` action `"get"`); Jira `getJiraIssue` with `responseContentFormat: "markdown"`.
 
 `fields` is optional and additive: omit it and the call is unchanged (full fetch, as
 above). When given, it names `Issue` property keys (e.g. `["title", "body",
@@ -91,11 +98,11 @@ per-item payload size, is the dominant cost driver for many-item fetches.
 
 ### `getIssueHistory(id: IssueId)`
 **Out:** `Revision[]` sorted oldest-first
-**Implements:** AzDO derives from the work-item revision payload (`wit_get_work_item` already returns it); Jira not currently implemented — return empty array and log a warning.
+**Implements:** AzDO derives from the work-item revision payload (`wit_get_work_item` already returns it on the classic shape). The consolidated shape has no revisions-via-expand equivalent; it exposes them only through `wit_work_item` action `"list_revisions"`, a separate call. Jira not currently implemented — return empty array and log a warning.
 
 ### `getIssueComments(id: IssueId)`
 **Out:** `Comment[]` sorted oldest-first, body in markdown
-**Implements:** AzDO `wit_list_work_item_comments`; Jira inlines the `comment` field on `getJiraIssue`.
+**Implements:** AzDO `wit_list_work_item_comments` (or `wit_work_item` action `"list_comments"`); Jira inlines the `comment` field on `getJiraIssue`.
 
 ### `searchIssues(query: SearchQuery)`
 ```
@@ -110,7 +117,7 @@ SearchQuery = {
 }
 ```
 **Out:** `IssueSummary[]`
-**Implements:** AzDO `wit_query_by_wiql` (the adapter builds the WIQL); Jira `searchJiraIssuesUsingJql` (the adapter builds the JQL).
+**Implements:** AzDO `wit_query_by_wiql` (or `wit_query` action `"wiql"`; the adapter builds the WIQL either way); Jira `searchJiraIssuesUsingJql` (the adapter builds the JQL).
 
 `SearchQuery` deliberately has no `tags` parameter. A tag/label filter cannot be
 pushed into either tracker's search reliably: AzDO's WIQL `CONTAINS` on
@@ -123,20 +130,20 @@ optimization available here that preserves the substring semantic.
 
 ### `getIssueTypeSchema(type: string)`
 **Out:** `{ fields: FieldSpec[], severityOptions: string[], requiredFields: string[] }`
-**Implements:** AzDO `wit_get_work_item_type`; Jira `getJiraIssueTypeMetaWithFields`. Severity auto-discovery (`Severity Level` → `Severity` → `Bug Severity` → `priority`) happens here for Jira.
+**Implements:** AzDO `wit_get_work_item_type` (or `wit_work_item` action `"get_type"`); Jira `getJiraIssueTypeMetaWithFields`. Severity auto-discovery (`Severity Level` → `Severity` → `Bug Severity` → `priority`) happens here for Jira.
 
 ### `linkedPullRequests(id: IssueId, window?: { from?, to? })`
 **Out:** `PRRef[]`
-**Implements:** AzDO walks the `relations` array for `ArtifactLink`+`vstfs:///Git/PullRequestId/...` URLs, plus `repo_list_pull_requests_by_repo_or_project` filtered by branch-name mentioning `AB#<id>`; Jira walks `issuelinks` and any "remote links" plus PRs that smart-link to the issue key (queried via the Atlassian dev-status API if exposed, otherwise empty).
+**Implements:** AzDO walks the `relations` array for `ArtifactLink`+`vstfs:///Git/PullRequestId/...` URLs, plus `repo_list_pull_requests_by_repo_or_project` (or `repo_pull_request` action `"list"`) filtered by branch-name mentioning `AB#<id>`; Jira walks `issuelinks` and any "remote links" plus PRs that smart-link to the issue key (queried via the Atlassian dev-status API if exposed, otherwise empty).
 
 ### `getCurrentSprint(team?: string)`
 **Out:** `Sprint | null`
-**Implements:** AzDO `work_list_team_iterations` with `timeframe: "current"`; Jira `searchJiraIssuesUsingJql` with `sprint in openSprints() AND project = <key>` then extract the sprint name from the first result.
+**Implements:** AzDO `work_list_team_iterations` with `timeframe: "current"` (or `work` action `"list_team_iterations"`); Jira `searchJiraIssuesUsingJql` with `sprint in openSprints() AND project = <key>` then extract the sprint name from the first result.
 
 ### `getSprintItems(sprint?: Sprint, team?: string)`
 **Out:** `SprintItem[]` — every work item assigned to the iteration, enriched with the fields needed for a status report.
 **Implements:** see `adapters/<tracker>/sprint.md`.
-- AzDO: `work_get_work_items_for_iteration` (item ids for the iteration) → `wit_get_work_items_batch_by_ids` with `expand: "all"` (details). `stateCategory` comes from the work-item-type category (`wit_get_work_item_type` → `states[].category`), overridden by `policy.state_categories` when the state is listed there.
+- AzDO: `wit_get_work_items_for_iteration` (item ids for the iteration; or `wit_work_item` action `"list_for_iteration"`) → `wit_get_work_items_batch_by_ids` with `expand: "all"` (or `wit_work_item` action `"get_batch"` with an explicit `fields` list — the consolidated action has no expand-all equivalent) for details. `stateCategory` comes from the work-item-type category (`wit_get_work_item_type` → `states[].category`, or `wit_work_item` action `"get_type"`), overridden by `policy.state_categories` when the state is listed there.
 - Jira: `searchJiraIssuesUsingJql` with `sprint = <sprint.id>` when a sprint is given, else `sprint in openSprints() AND project = <key>`. `stateCategory` comes from the status's `statusCategory` (`new`/`indeterminate`/`done` → `todo`/`in_progress`/`done`), overridden by `policy.state_categories`.
 
 When `sprint` is omitted the adapter resolves the current sprint first (same logic as `getCurrentSprint(team)`). `points`/`remainingWork` are numbers or `null` when the tracker or item has no value (points-field resolution is documented per-adapter). Unmapped states resolve to `stateCategory: "unknown"`; the caller decides how to bucket them. `description` is a short plain-text snippet of the item's description/body (HTML or markdown stripped, whitespace collapsed, truncated to 500 chars) so the caller can render a brief per-ticket detail without a second fetch; it is `""` when the item has no description.
@@ -144,7 +151,7 @@ When `sprint` is omitted the adapter resolves the current sprint first (same log
 ### `getTeamCapacity(team?: string, sprint?: Sprint)`
 **Out:** `Capacity | null`
 **Implements:** see `adapters/<tracker>/sprint.md`.
-- AzDO: `work_get_team_capacity` (per-member capacity + days off) plus `work_get_iteration_capacities` for the iteration total. `sprint` defaults to the current iteration when omitted.
+- AzDO: `work_get_team_capacity` (or `work` action `"get_team_capacity"`; per-member capacity + days off) plus `work_get_iteration_capacities` (or `work` action `"get_iteration_capacities"`) for the iteration total. `sprint` defaults to the current iteration when omitted.
 - Jira: no capacity concept in the core API — return `null`.
 
 Callers must treat `null` as "capacity unavailable" and omit any capacity output, never error.
@@ -160,6 +167,14 @@ Callers must treat `null` as "capacity unavailable" and omit any capacity output
 ## Writes (gated)
 
 Every write call is built into a `{verb, target, before, after}` tuple, batched, and rendered through `references/diff-and-confirm.md`. The user confirms once per batch.
+
+Every AzDO write below names `wit_update_work_item`/`wit_create_work_item`/
+`wit_add_work_item_comment`, the classic shape. On the consolidated shape the same
+patch/create/comment content goes through `wit_work_item_write` (`action:
+"update"`/`"create"`) or `wit_work_item_comment_write` (`action: "add"`) instead —
+see `adapters/azure-devops/writes.md` for the exact payload shape per action,
+which is not a bare rename for `create` and `addComment` (flat `{name, value}`
+fields instead of a JSON Patch document; a Markdown-by-default comment body).
 
 ### `assign(id: IssueId, user: UserRef | null)`
 **Implements:** AzDO `wit_update_work_item` with `path: "/fields/System.AssignedTo"`; Jira `editJiraIssue` with `fields.assignee.accountId` or `fields.assignee: null`.
