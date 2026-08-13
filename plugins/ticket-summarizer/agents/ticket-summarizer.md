@@ -65,7 +65,7 @@ mistaken for a tracker reference or folded into `keywords`):
   - `--tags <name>[,<name>...]`: one or more tag/label substrings. An item matches
     when at least one of its labels case-insensitively contains at least one of the
     given substrings (OR across multiple values). Applied client-side in Phase 1
-    step 6, not part of the `searchIssues` call; see the note there for why it can
+    step 7, not part of the `searchIssues` call; see the note there for why it can
     never be pushed into the search on either tracker.
   - Anything else left in the free text (e.g. a product area name) becomes `keywords`.
 
@@ -91,11 +91,12 @@ Run once at the start of the session and cache the results. Do not re-detect mid
 2. Announce: `Detected: tracker=<value> chat=<value>`.
 3. If `tracker == none`, stop and tell the user no tracker MCP is detected. There is
    nothing to summarize.
-4. If `chat != none`, the adapter resolves the running user's identity via
-   `whoAmI()` and looks them up on the chat side (Slack: `slack_search_users` by
-   email; Teams: equivalent lookup). Cache the result as `running_chat_user`. If the
-   lookup fails, set `running_chat_user = null` and treat chat delivery as
-   unavailable for this session; never retry or block on it.
+4. If `chat != none`, read `email` off `whoAmI()`'s result (best-effort; `null` when
+   the tracker's identity API doesn't expose one). When `email` is non-null, call
+   `resolveChatUser({ email })` and cache the result as `running_chat_user`. When
+   `email` is `null`, or the lookup misses, set `running_chat_user = null` and treat
+   chat delivery to yourself as unavailable for this session; never retry or block on
+   it. An explicit `--to` in Phase 4 does not depend on this lookup at all.
 
 ### Configuration
 
@@ -120,7 +121,7 @@ Keys this agent reads:
 |-------|-------|---------|
 | Bootstrap + all reads | `issuekit:tracker-adapter` | Detection, identity, the abstract verb dispatcher (`getIssuesBatch`, `searchIssues`). |
 | Phase 2 | `executive-blurb-writer` (this plugin) | Turn a fetched `Issue[]` into a concise, one-to-two sentence (last resort: three or four) client-facing blurb per item. |
-| Phase 4 | `issuekit:tracker-adapter` | Same adapter's chat capability (`sendMessage`, and `resolveUser` when `--to` names a person) for the optional delivery. |
+| Phase 4 | `issuekit:tracker-adapter` | Same adapter's chat capability (`sendMessage`, and `resolveChatUser` when `--to` names a person) for the optional delivery. |
 | Phase 5 | (none) | Writes the file directly with the `Write` tool; no tracker-adapter involved. |
 
 ### Skill calling-context conventions
@@ -151,7 +152,7 @@ the payload. Known keys: `phase`. Unknown keys are ignored.
 | `today` | Phase 0 | Phase 0 (validation default) | ISO date; the agent reads the clock, the skill cannot |
 | `to_target` | Phase 0 | Phase 4 | raw `--to` value, or `null` (defaults to self) |
 | `send_target_label` | Phase 4 | Phase 4 | `"yourself"` or the raw `--to` value, shown in questions and confirmations |
-| `send_target` | Phase 4 | Phase 4 | resolved `UserRef` (self or a resolved person) or an opaque channel/group string; the actual `sendMessage` target |
+| `send_target` | Phase 4 | Phase 4 | resolved `ChatTarget`: `{kind: "user", ref}` (self or a resolved person's `ChatUserRef`) or `{kind: "channel", value}` (opaque channel/group string); the actual `sendMessage` target |
 | `send_to_chat` | Phase 4 | Phase 4 | bool; the user's answer to "send this to chat?" |
 | `output_path` | Phase 0 | Phase 5 | raw `--output` value, or `null` (Phase 5 does not run) |
 | `save_to_file` | Phase 5 | Phase 5 | bool; the user's answer to "save this to a file?" |
@@ -195,7 +196,7 @@ Both also always include `closed`, alongside `resolved`: on AzDO, some work-item
 types (commonly Task) can reach a closed-category state without ever populating a
 Resolved-category date, so a `--status delivered`/`closed` query that only checked
 `resolved` would silently drop them even though they genuinely finished in the
-window. Step 5 below checks `resolved` first and falls back to `closed`. Jira has no
+window. Step 6 below checks `resolved` first and falls back to `closed`. Jira has no
 separate closed-date concept (`resolutiondate` already covers it), so `closed` is
 simply always absent there and the fallback never triggers.
 Neither list requests `severity` or `customFields`: both adapters fall back to a
@@ -223,7 +224,7 @@ reference.
    `CONTAINS` on tags matches whole tokens, not substrings within a multi-word tag,
    so pushing it into the search would silently miss real matches like a `"ECW Bug"`
    tag when filtering for `"ECW"`); tag filtering happens entirely client-side in
-   step 6.
+   step 7.
 2. If the result count equals `100` (or the adapter's own page/server cap), set
    `truncated = true`.
 3. Call `getIssuesBatch(ids, fields)` once with every id from step 1, to get the full
@@ -238,7 +239,15 @@ reference.
    instead of AND'd, for example). Never assume the search's `states` filter alone
    guarantees every returned item is actually in one of those states; verify against
    the fetched `item.state`, not the search parameters you sent.
-5. Keep an item only when `date_field` is `null`, or the relevant date falls within
+5. Keep an item only when `item.type` (case-insensitive) is one of `types`. Drop the
+   rest. Run this step unconditionally, for the same reason as step 4: `types` is
+   ANDed into the exact same compound search as `states` (see step 1), so the same
+   malformed-query risk (a clause silently dropped or OR'd instead of AND'd when
+   combined with keywords or tags) applies equally here. This is the step that
+   actually enforces the Story/Bug/Epic guarantee `mode=query` promises; without it,
+   a mishandled compound query could let a Task leak into a client-facing summary
+   with nothing to catch it.
+6. Keep an item only when `date_field` is `null`, or the relevant date falls within
    `[from, till]` inclusive. Drop the rest.
    - `date_field == "updated"`: check `item.updated` directly.
    - `date_field == "resolved"`: check `item.resolved` when it is present; when it
@@ -247,11 +256,11 @@ reference.
      some work-item types reach a closed-category state without ever populating a
      Resolved-category date (see `getIssue`'s `Issue.closed` note), so checking
      `resolved` alone silently drops genuinely delivered items from the result.
-6. Keep an item only when `tag_filters` is `null`, or at least one entry in
+7. Keep an item only when `tag_filters` is `null`, or at least one entry in
    `item.labels` case-insensitively contains at least one entry in `tag_filters`.
    Drop the rest. This is the only place tag filtering happens, on either tracker;
    there is no search-level narrowing to lean on (see step 1).
-7. Cache the surviving set as `issues`.
+8. Cache the surviving set as `issues`.
 
 If `issues` is empty after filtering, skip Phase 2 and go straight to Phase 3 with an
 explicit "no matching work items" note. Do not error.
@@ -288,8 +297,12 @@ Print the summary directly. There is no rendering skill; any file output is Phas
 - After the list: `Ids in brackets are for your own traceability; strip them before
   this goes in front of a client.`
 - When `truncated`: `Results may be truncated by the tracker's page limit. Narrow with
-  --project, --scope, or a keyword to see the rest.` (`--tags` filters client-side,
-  after the fetch, so tightening it does not reduce truncation; do not suggest it here.)
+  --from/--till, --project, --scope, or a keyword to see the rest.` When a date range
+  is active, mention `--from`/`--till` first: it is usually the fastest way to shrink
+  a date-bounded result set, since the search step itself cannot filter on
+  `updated`/`resolved` (see Phase 1's note on `dateWindow`) and only narrows on
+  keywords/project/scope/state. (`--tags` filters client-side, after the fetch, so
+  tightening it does not reduce truncation; do not suggest it here.)
 - For every entry in `unresolved_refs`: `Could not resolve <reference>.`
 
 ### Phase 4: Offer chat delivery (optional)
@@ -311,13 +324,19 @@ user, when `chat == none` or `issues` is empty (nothing to send).
    - **Without ids.** Blurb only (`- <blurb>`), client-safe as-is.
    Cache the answer as `include_ids`. `include_ids` is shared with Phase 5: if this
    is the first phase to ask this run, the answer carries over there too.
-4. Resolve `send_target`:
-   - `to_target == null`: `send_target = running_chat_user`.
+4. Resolve `send_target`, a `ChatTarget` per `issuekit:tracker-adapter`'s chat verb
+   contract:
+   - `to_target == null`: `send_target = { kind: "user", ref: running_chat_user }`.
+     (Step 1 already skipped this whole phase when `running_chat_user` is `null`, so
+     this branch is only reached with a resolved ref.)
    - `to_target` has an email shape (`@` plus a dotted domain): call
-     `resolveUser({ email: to_target })` and use the result.
-   - Any other `to_target`: pass it through unchanged, the same opaque-string
-     contract `policy.escalation.channel` already uses for a Slack `#channel-name`
-     or channel id, or a Teams channel/chat id.
+     `resolveChatUser({ email: to_target })`. If it returns `null` (no match on the
+     chat side), report `Could not resolve <to_target> on <chat>.` and stop this
+     phase; do not fall back to a default target. Otherwise `send_target = { kind:
+     "user", ref: <result> }`.
+   - Any other `to_target`: `send_target = { kind: "channel", value: to_target }`,
+     the same opaque-string contract `policy.escalation.channel` already uses for a
+     Slack `#channel-name` or channel id, or a Teams channel/chat id.
 5. Build the message body from `blurbs`, reusing Phase 3's structure exactly
    (heading and date window when `status_label` is set, one bullet per item in the
    same order, the detailed metadata line under each when `detailed`, the truncation
@@ -401,6 +420,11 @@ Runs after Phase 4. Skip this phase entirely, with no message to the user, when
   dropped or OR'd instead of AND'd when combined with keywords or tags) can return
   items outside the requested states; trust the fetched `item.state`, not the
   search parameters sent.
+- **Never skip step 5's client-side type filter, even though `types` was already
+  passed to `searchIssues`.** The same malformed-compound-query risk that motivates
+  the state re-check applies equally to `types`; skipping it would leave the
+  Story/Bug/Epic guarantee (see the next rule) unenforced on the one path that
+  actually protects it.
 - **Never request `severity` or `customFields` in the narrow or detailed `fields`
   list.** Both fall back to a full unnarrowed fetch on both adapters, silently
   undoing the whole optimization for that call.
