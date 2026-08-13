@@ -7,7 +7,8 @@ The adapter calls the tools below. Suffix-match against the available tool surfa
 | Verb | Tool (suffix) | Notes |
 |---|---|---|
 | `whoAmI` | `__getAccessibleAtlassianResources`, `__atlassianUserInfo` | run both; cloudId comes from the first, accountId/email from the second |
-| `getIssue` | `__getJiraIssue` | call with `responseContentFormat: "markdown"` |
+| `getIssue` | `__getJiraIssue` | call with `responseContentFormat: "markdown"`, plus `fields` when the caller narrowed the request |
+| `getIssuesBatch` | `__searchJiraIssuesUsingJql` with `key in (...)` | best effort; falls back to one `__getJiraIssue` call per id if the search tool can't return the needed fields |
 | `getIssueComments` | inlined in `__getJiraIssue` payload (`comment` field) | no separate call |
 | `getIssueHistory` | not implemented | returns empty array + warning |
 | `searchIssues` | `__searchJiraIssuesUsingJql` | adapter builds the JQL — see `search.md` |
@@ -31,6 +32,36 @@ The adapter calls the tools below. Suffix-match against the available tool surfa
 | `addLabel` / `removeLabel` | `__editJiraIssue` | `update.labels: [{ add: ... }]` or `{ remove: ... }` |
 | `linkIssue` | `__createIssueLink` | `link_type: "Duplicate"` or `"Relates"`; parent is set via `editJiraIssue.fields.parent` |
 | `linkPullRequest` | no-op | Jira auto-links from PR description or branch name containing the issue key |
+
+## Abstract field names → Jira fields
+
+Used when a caller passes `fields` to `getIssue` or `getIssuesBatch`. `id` and `url`
+are always present regardless of what was requested.
+
+| Abstract `Issue` property | Jira field name |
+|---|---|
+| `title` | `summary` |
+| `body` | `description` |
+| `type` | `issuetype` |
+| `state` | `status` |
+| `assignee` | `assignee` |
+| `reporter` | `reporter` |
+| `created` | `created` |
+| `updated` | `updated` |
+| `resolved` | `resolutiondate` |
+| `closed` | no mapping; always absent (see below) |
+| `labels` | `labels` |
+| `parent` | `parent` |
+
+`severity` has no fixed field name (see `getIssueTypeSchema`'s auto-discovery order:
+`Severity Level` → `Severity` → `Bug Severity` → `priority`) and `customFields` is a
+catch-all; requesting either falls back to a full fetch for that call.
+
+`closed` has no Jira equivalent: Jira sets `resolutiondate` on any transition into a
+Done-category status, regardless of which specific status, so there is no separate
+"closed but never resolved" gap the way AzDO's Task type can produce. Callers that
+check `resolved` falling back to `closed` for "when did this finish" get the right
+answer on Jira from `resolved` alone; the fallback is simply never needed here.
 
 ## Known prefix variants
 

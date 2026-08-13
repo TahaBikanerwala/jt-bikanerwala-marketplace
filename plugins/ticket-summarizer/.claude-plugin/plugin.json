@@ -1,7 +1,7 @@
 {
   "name": "ticket-summarizer",
   "version": "0.1.0",
-  "description": "Fetches Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status (active, or delivered/closed between two dates), and summarizes each into a plain-language, client-facing blurb suited for a status update deck: concise, targeting one to two sentences and extending to three or four only as a last resort. States what was delivered and, only when the ticket itself supports it, why it matters; never invents a business-value claim. Read-only against the tracker: no tracker writes, no tracker diff-and-confirm gate. Optionally sends the summary to Slack/Teams or saves it to a file, but only after asking. Auto-installs issuekit; bring your own MCPs.",
+  "description": "Fetches Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status (active, or delivered/closed between two dates, always scoped to Story/Bug/Epic types), and summarizes each into a plain-language, client-facing blurb suited for a status update deck: concise, targeting one to two sentences and extending to three or four only as a last resort. States what was delivered and, only when the ticket itself supports it, why it matters; never invents a business-value claim. Read-only against the tracker: no tracker writes, no tracker diff-and-confirm gate. Optionally sends the summary to Slack/Teams or saves it to a file, but only after asking. Auto-installs issuekit; bring your own MCPs.",
   "author": {
     "name": "Taha Bikanerwala",
     "url": "https://github.com/TahaBikanerwala"

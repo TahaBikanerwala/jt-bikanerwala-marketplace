@@ -23,6 +23,14 @@ ORDER BY created DESC
 | `dateWindow.to` | `AND created <= "<yyyy-MM-dd>"` |
 | `limit` | pass through to the MCP call as `maxResults` |
 
+`SearchQuery` has no `tags` input; label filtering is never pushed into the JQL.
+Jira's `labels` field has no substring-match operator (`labels in (...)` is
+exact-match only, a different semantic than "contains"), and AzDO's WIQL `CONTAINS`
+on tags turns out to match whole tag tokens rather than substrings within a
+multi-word tag, so it isn't reliable there either. Callers filter tag/label
+substrings client-side against the fetched item's labels on every tracker,
+unconditionally.
+
 ## Quoting and escaping
 
 - JQL strings use double quotes. Escape `"` as `\"` and `\` as `\\`.

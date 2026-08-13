@@ -7,7 +7,8 @@ The adapter calls the tools below. Suffix-match against the available tool surfa
 | Verb | Tool (suffix) | Notes |
 |---|---|---|
 | `whoAmI` | `__core_list_projects`, `__wit_my_work_items` | run both to confirm reachability and resolve identity |
-| `getIssue` | `__wit_get_work_item` | call with `expand: "all"` |
+| `getIssue` | `__wit_get_work_item` | call with `expand: "all"`, or with `fields` (see below) when the caller narrowed the request |
+| `getIssuesBatch` | `__wit_work_item` (`get_batch` action) | all ids in one call; same `fields` narrowing as `getIssue` |
 | `getIssueComments` | `__wit_list_work_item_comments` | separate fetch even when `expand: "all"` was used |
 | `getIssueHistory` | derived from `__wit_get_work_item` revisions | no separate call |
 | `searchIssues` | `__wit_query_by_wiql` | adapter builds the WIQL — see `search.md` |
@@ -30,6 +31,38 @@ The adapter calls the tools below. Suffix-match against the available tool surfa
 | `addLabel` / `removeLabel` | `__wit_update_work_item` | patch `/fields/System.Tags` (semicolon-delimited string) |
 | `linkIssue` | `__wit_update_work_item` | patch `/relations/-` with `rel` from the kind map |
 | `linkPullRequest` | `__wit_update_work_item` | patch `/relations/-` with `rel: "ArtifactLink"` + `vstfs://` URL |
+
+## Abstract field names → AzDO fields
+
+Used when a caller passes `fields` to `getIssue` or `getIssuesBatch`. `id` and `url`
+come from the response envelope, not the `fields` array, and are always present
+regardless of what was requested.
+
+| Abstract `Issue` property | AzDO field reference name |
+|---|---|
+| `title` | `System.Title` |
+| `body` | `System.Description` |
+| `type` | `System.WorkItemType` |
+| `state` | `System.State` |
+| `assignee` | `System.AssignedTo` |
+| `reporter` | `System.CreatedBy` |
+| `created` | `System.CreatedDate` |
+| `updated` | `System.ChangedDate` |
+| `resolved` | `Microsoft.VSTS.Common.ResolvedDate` |
+| `closed` | `Microsoft.VSTS.Common.ClosedDate` |
+| `labels` | `System.Tags` |
+| `parent` | derived from `relations[]` (`System.LinkTypes.Hierarchy-Reverse`), not a plain field |
+
+`severity` and `customFields` have no fixed mapping (severity's field name varies by
+process template; `customFields` is a catch-all). Requesting either falls back to a
+full fetch for that call rather than a partial one.
+
+`Microsoft.VSTS.Common.ResolvedDate` is populated when a work item passes through a
+Resolved-category state. Some work-item types (commonly Task, on process templates
+where its workflow has no Resolved state) transition directly from an in-progress
+state to Closed and never populate it, even though `Microsoft.VSTS.Common.ClosedDate`
+is set. A caller filtering "delivered/closed" items by `resolved` alone will silently
+drop these; check `closed` too.
 
 ## Known prefix variants
 

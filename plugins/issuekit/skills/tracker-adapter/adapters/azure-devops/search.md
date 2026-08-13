@@ -25,6 +25,13 @@ ORDER BY [System.CreatedDate] DESC
 | `dateWindow.to` | `AND [System.CreatedDate] <= '<iso-date>'` |
 | `limit` | append `ORDER BY [System.CreatedDate] DESC` (WIQL has no row limit; trim client-side after the result returns) |
 
+`SearchQuery` has no `tags` input; do not add a `System.Tags` conjunct here. WIQL's
+`CONTAINS` on `System.Tags` matches whole tag tokens, not substrings within a
+multi-word tag: a work item tagged `"ECW Bug"` will not match `CONTAINS 'ECW'`, only
+a standalone `"ECW"` tag would. This silently drops real matches for exactly the
+compound tags real projects use, so tag filtering is never pushed into the search;
+it happens entirely client-side against the fetched `Issue.labels` instead.
+
 ## Quoting and escaping
 
 - Single quotes in user input → double them: `O'Brien` → `O''Brien`.

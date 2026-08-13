@@ -1,6 +1,6 @@
 ---
 description: Fetch Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status, and print a concise executive summary per item (one to two sentences, three or four only as a last resort) for a client-update deck. Read-only; safe to run anytime.
-argument-hint: "<ticket ids/urls...> | --from <date> --till <date> [--status active|delivered|closed|updated] [--project <name>] [--scope <area-path-or-component>] [--tags <name>[,<name>...]] [--to <target>] [--output <path>] [keywords...]"
+argument-hint: "<ticket ids/urls...> | --from <date> --till <date> [--status active|delivered|closed|updated] [--project <name>] [--scope <area-path-or-component>] [--tags <name>[,<name>...]] [--to <target>] [--output <path>] [--detailed] [keywords...]"
 allowed-tools: Skill
 ---
 
@@ -19,6 +19,7 @@ client-update deck.
 /ticket-summarizer:run --from 2026-08-11 --till 2026-08-12 --status closed --tags ecw
 /ticket-summarizer:run --status active --to #client-updates
 /ticket-summarizer:run --status delivered --from 2026-07-01 --till 2026-07-31 --output ./client-update.md
+/ticket-summarizer:run --status active --tags ecw --detailed
 ```
 
 ## Behavior
@@ -29,9 +30,13 @@ This command is a thin shell. It dispatches to the `ticket-summarizer` agent, wh
    date-range/status query.
 2. Bootstraps the tracker through `issuekit:tracker-adapter` (Azure DevOps or Jira,
    auto-detected).
-3. Resolves the matching work items: `getIssue` per reference in explicit mode, or a
-   state-filtered `searchIssues` narrowed further by the exact `updated`/`resolved`
-   date window in query mode.
+3. Resolves the matching work items with one batched fetch (never one call per
+   item), narrowed to a small field set by default for speed and cost (`--detailed`
+   widens it). A state-filtered `searchIssues` call, narrowed further by the exact
+   `updated`/`resolved` date window in query mode; `--tags` always filters
+   client-side after the fetch, on both trackers. Query-mode results are always
+   scoped to Story, Bug, and Epic types only, a fixed default with no flag to widen
+   it; a pasted ticket reference resolves regardless of its type.
 4. Runs each item through `executive-blurb-writer` to produce a concise,
    plain-language summary: what was delivered, and why it matters only when the ticket
    itself says so. Targets one to two sentences; extends to three or four only as a
@@ -58,9 +63,23 @@ requires `--output` before it is even offered, since there is no default path.
 - **Updated in range:** `--from`/`--till` with no `--status`, or `--status updated`
   explicitly.
 
+Every query shape above is scoped to Story, Bug, and Epic types only, always. This
+is not configurable per run: it keeps a client-facing summary to the units
+stakeholders actually care about, not internal Task-level work. Explicit-list mode
+is exempt: paste a Task's id and you get it back regardless.
+
 `--tags <name>[,<name>...]` narrows any query-mode result to items whose labels
-case-insensitively contain at least one given substring. This match happens
-client-side against each fetched item, not in the search itself.
+case-insensitively contain at least one given substring. This always filters
+client-side, after the fetch, on both trackers: Azure DevOps' WIQL `CONTAINS` on
+tags matches whole tokens rather than substrings within a multi-word tag, so a tag
+like `"ECW Bug"` would not match a search for `"ECW"`, and Jira's JQL has no
+substring operator for labels either. Pushing the filter into the search would
+silently miss real matches on both, so it never is.
+
+Add `--detailed` to fetch a richer field set per item (assignee, exact state,
+parent) and print one extra line under each bullet. Omit it (the default) for the
+narrow, fast fetch; this is the tradeoff to reach for when you need more context on
+a specific run, not something to leave on by default.
 
 ## Chat delivery
 

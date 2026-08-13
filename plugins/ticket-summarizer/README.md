@@ -32,17 +32,29 @@ MCP). See the [root README](../../README.md#configure-your-mcps).
 | `--status delivered` (or `closed`) + `--from`/`--till` | Everything whose resolved/closed date falls in the window. |
 | `--from`/`--till`, no `--status` | Everything whose *updated* date falls in the window, any state. |
 
+Every query-mode shape above is scoped to Story, Bug, and Epic types only, always;
+this keeps a client-facing summary to the units stakeholders care about, not
+internal Task-level work, and is not configurable per run. Pasted ticket ids/urls
+are exempt: you get back exactly what you named, regardless of its type.
+
 `--project <name>` and `--scope <area-path-or-component>` narrow any query-mode
 search. `--tags <name>[,<name>...]` narrows the result to items with a matching label
-(case-insensitive substring, checked after the fetch).
+(case-insensitive substring, always filtered client-side after the fetch on both
+trackers: Azure DevOps' WIQL `CONTAINS` on tags matches whole tokens, not substrings
+within a multi-word tag, so it can't be pushed into the search without silently
+missing real matches). `--detailed` fetches a richer field set per item (assignee,
+exact state, parent) instead of the fast default.
 
 ## What it does
 
 1. Detects the active tracker MCP through `issuekit:tracker-adapter`.
-2. Resolves the item set: direct fetch for pasted references, or a state-filtered
-   search narrowed to the exact date window for a query (the tracker-adapter's search
-   verb only filters by created date, so this plugin fetches full items and checks the
-   requested date field itself).
+2. Resolves the item set: one batched fetch (never one call per item), narrowed by
+   default to just the fields this plugin actually uses (`--detailed` widens that).
+   Direct fetch for pasted references (any type), or a state-filtered,
+   Story/Bug/Epic-only search narrowed to the exact date window for a query (the
+   tracker-adapter's search verb only filters by created date, so this plugin
+   fetches full items and checks the requested date field itself); `--tags` always
+   filters client-side after the fetch, on both trackers.
 3. Runs every item through `executive-blurb-writer`: one sentence on what changed, a
    second sentence only when the ticket's own text supports a why-it-matters claim,
    and (last resort only) a third or fourth sentence when two genuinely are not

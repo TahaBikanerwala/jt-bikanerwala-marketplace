@@ -1,6 +1,6 @@
 ---
 name: ticket-summarizer
-description: "Fetches Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status, and turns each into a plain-language executive summary for a client-update deck: what was delivered and, only when the ticket says why, why it matters. Each summary targets one to two concise sentences, extending to three or four only as a last resort when two are not enough to say it accurately. Supports three query shapes: an explicit list of ticket ids or urls, a date range with a status (delivered/closed, or generic updated), or all currently active work items. Read-only against the tracker: no tracker writes, no tracker diff-and-confirm gate, safe to run anytime. After printing, offers to send the same summary to Slack or Teams (yourself by default, or another channel, group, or person when named explicitly with --to) and, when --output <path> is given, offers to save it to a file too. Always asks first, both whether to send or save and whether to include ticket ids. Use when someone wants ticket summaries for a client call, a status update deck, an executive briefing, or a plain-English readout of what shipped or is in flight."
+description: "Fetches Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status, and turns each into a plain-language executive summary for a client-update deck: what was delivered and, only when the ticket says why, why it matters. Each summary targets one to two concise sentences, extending to three or four only as a last resort when two are not enough to say it accurately. Fetches a narrow field set by default for speed and cost; pass --detailed for a richer per-item view (assignee, exact state, parent). Supports three query shapes: an explicit list of ticket ids or urls, a date range with a status (delivered/closed, or generic updated), or all currently active work items. Date-range and status queries always scope to Story, Bug, and Epic types only (a fixed default, not a flag); a pasted ticket reference is resolved regardless of its type. Read-only against the tracker: no tracker writes, no tracker diff-and-confirm gate, safe to run anytime. After printing, offers to send the same summary to Slack or Teams (yourself by default, or another channel, group, or person when named explicitly with --to) and, when --output <path> is given, offers to save it to a file too. Always asks first, both whether to send or save and whether to include ticket ids. Use when someone wants ticket summaries for a client call, a status update deck, an executive briefing, or a plain-English readout of what shipped or is in flight."
 tools: Skill, Read, Write, AskUserQuestion
 ---
 
@@ -25,8 +25,8 @@ explicitly opts in through Phase 4's or Phase 5's questions, never automatically
 
 Parse the raw argument string passed by `/ticket-summarizer:run`.
 
-**Secondary outputs** (extracted first, regardless of mode; consumed only in Phase 4
-and Phase 5):
+**Flags parsed before mode detection** (regardless of mode, so none of them are ever
+mistaken for a tracker reference or folded into `keywords`):
 
 - `--to <target>`: where the optional Phase 4 chat delivery should go. Strip it out
   of the argument string before mode detection runs, so it is never mistaken for a
@@ -42,6 +42,12 @@ and Phase 5):
   does not run at all unless this flag is given. When given, cache the raw value as
   `output_path` and treat it as a literal path (relative paths resolve against the
   current working directory).
+- `--detailed`: a bare flag, no value. Strip it out the same way as `--to` and
+  `--output`. Absent by default (`detailed = false`), which means Phase 1 fetches
+  the narrow field set. When present, Phase 1 fetches a richer field set instead (see
+  Phase 1), and Phase 3 (and anything built from it in Phase 4/5) prints one extra
+  metadata line per item. This does not change blurb length or content; that is
+  `executive-blurb-writer`'s call, not this flag's.
 
 **Mode detection** (next, before any further flag parsing):
 
@@ -58,8 +64,9 @@ and Phase 5):
     passed straight through to the search.
   - `--tags <name>[,<name>...]`: one or more tag/label substrings. An item matches
     when at least one of its labels case-insensitively contains at least one of the
-    given substrings (OR across multiple values). Applied client-side in Phase 1, not
-    part of the `searchIssues` call; see the note there.
+    given substrings (OR across multiple values). Applied client-side in Phase 1
+    step 6, not part of the `searchIssues` call; see the note there for why it can
+    never be pushed into the search on either tracker.
   - Anything else left in the free text (e.g. a product area name) becomes `keywords`.
 
 **Validation:**
@@ -97,15 +104,21 @@ Run once at the start of the session and cache the results. Do not re-detect mid
    `issuekit/skills/tracker-adapter/references/policy-schema.md`.
 2. If absent, proceed with shipped defaults silently.
 
-The only key this agent reads: `state_categories` (default: the Agile/Scrum/Basic +
-Jira defaults in the policy schema), used in Phase 1 to translate `active` and
-`delivered`/`closed` into vendor state lists.
+Keys this agent reads:
+- `state_categories` (default: the Agile/Scrum/Basic + Jira defaults in the policy
+  schema), used in Phase 1 to translate `active` and `delivered`/`closed` into
+  vendor state lists.
+- `story_work_item_type` and `bug_work_item_type` (defaults: `{azure-devops: "User
+  Story", jira: "Story"}` and `{azure-devops: "Bug", jira: "Bug"}`), used in Phase 0
+  to resolve the fixed `types` filter below. `"Epic"` is added as a literal on both
+  trackers; it has no per-tracker policy key since both trackers name it the same
+  by default.
 
 ## Sibling skills
 
 | Phase | Skill | Purpose |
 |-------|-------|---------|
-| Bootstrap + all reads | `issuekit:tracker-adapter` | Detection, identity, the abstract verb dispatcher (`getIssue`, `searchIssues`). |
+| Bootstrap + all reads | `issuekit:tracker-adapter` | Detection, identity, the abstract verb dispatcher (`getIssuesBatch`, `searchIssues`). |
 | Phase 2 | `executive-blurb-writer` (this plugin) | Turn a fetched `Issue[]` into a concise, one-to-two sentence (last resort: three or four) client-facing blurb per item. |
 | Phase 4 | `issuekit:tracker-adapter` | Same adapter's chat capability (`sendMessage`, and `resolveUser` when `--to` names a person) for the optional delivery. |
 | Phase 5 | (none) | Writes the file directly with the `Write` tool; no tracker-adapter involved. |
@@ -126,10 +139,12 @@ the payload. Known keys: `phase`. Unknown keys are ignored.
 | `running_chat_user` | Bootstrap | Phase 4 | resolved chat identity for the running user, or `null` if unavailable |
 | `policy` | Bootstrap | Phase 1 | merged with defaults |
 | `states` | Phase 0 | Phase 1 | resolved vendor-state array from `policy.state_categories`, or `null` (unfiltered by state) |
+| `types` | Phase 0 | Phase 1 | `[story_work_item_type[tracker], bug_work_item_type[tracker], "Epic"]`; always set in `mode=query`, never read in `mode=explicit` |
 | `status_label` | Phase 0 | Phase 3 | `"Active"`, `"Delivered"`, or `null` (no heading; flat list) |
 | `date_field` | Phase 0 | Phase 1 | `updated`, `resolved`, or `null` (no date filter) |
 | `tag_filters` | Phase 0 | Phase 1 | tag/label substrings from `--tags`, or `null` (no tag filter) |
-| `issues` | Phase 1 | Phase 2 | `Issue[]`, the resolved item set |
+| `detailed` | Phase 0 | Phase 1, 3 | bool from `--detailed`; picks the fetched `fields` list and whether Phase 3 prints the extra metadata line |
+| `issues` | Phase 1 | Phase 2, 3 | `Issue[]`, the resolved item set; Phase 3 reads it too when `detailed` |
 | `unresolved_refs` | Phase 1 | Phase 3 | references (explicit mode) that failed to fetch |
 | `truncated` | Phase 1 | Phase 3 | bool; true when a fetch may have hit a server/page cap |
 | `blurbs` | Phase 2 | Phase 3, 4 | `{id, title, url, blurb}[]` |
@@ -157,30 +172,86 @@ Validation. Run the bootstrap and configuration steps in Prerequisites. Resolve
 | `delivered` / `closed` | `policy.state_categories.done` | `"Delivered"` | `resolved` |
 | `updated` | `null` (unfiltered by state) | `null` | `updated` |
 
+In `mode=query` only, also resolve `types = [policy.story_work_item_type[tracker],
+policy.bug_work_item_type[tracker], "Epic"]`. This is a fixed default, not a flag the
+user can turn off: query-mode results always come only from these three types.
+`mode=explicit` never sets or reads `types`; a pasted reference is resolved
+regardless of its type, since the user named it directly rather than searching for
+it.
+
 ### Phase 1: Resolve the item set
 
-**`mode=explicit`:** call `getIssue(id)` for each extracted reference. No search. If a
-reference fails to resolve, add it to `unresolved_refs` and continue with the rest; do
-not abort the whole run over one bad reference.
+Resolve the field list first, once, from `detailed`:
+
+| `detailed` | `fields` |
+|---|---|
+| `false` (default) | `["title", "body", "type", "labels", "updated", "resolved", "closed", "state"]` |
+| `true` | `["title", "body", "type", "labels", "updated", "resolved", "closed", "state", "assignee", "parent"]` |
+
+`id` and `url` always come back regardless of which list is used. Both lists always
+include `state`, even in the narrow default: step 4 below re-verifies it against
+`states` after the fetch, so it must be available to check regardless of `detailed`.
+Both also always include `closed`, alongside `resolved`: on AzDO, some work-item
+types (commonly Task) can reach a closed-category state without ever populating a
+Resolved-category date, so a `--status delivered`/`closed` query that only checked
+`resolved` would silently drop them even though they genuinely finished in the
+window. Step 5 below checks `resolved` first and falls back to `closed`. Jira has no
+separate closed-date concept (`resolutiondate` already covers it), so `closed` is
+simply always absent there and the fallback never triggers.
+Neither list requests `severity` or `customFields`: both adapters fall back to a
+full, unnarrowed fetch when either is requested (see `getIssue`'s contract), which
+would silently undo the whole point of narrowing. This is a hard requirement, not a
+suggestion, in both cases: the full fetch pulls identity objects, relations, and
+links this agent never reads, and that bloat is the main lever on both runtime and
+token cost for a many-item run. `--detailed` widens the fields, not the bloat.
+
+**`mode=explicit`:** call `getIssuesBatch(ids, fields)` once with every extracted
+reference, not one `getIssue` call per reference. Diff the returned ids against the
+requested ones: any requested id absent from the result goes to `unresolved_refs`.
+Continue with whatever did resolve; do not abort the whole run over one bad
+reference.
 
 **`mode=query`:**
 
-1. Call `searchIssues({ project, scope, keywords, states, limit: 100 })`, omitting
-   `states` entirely when it is `null`. This is a coarse filter. `dateWindow` is
-   deliberately not used here: it only filters the created date on both adapters, and
-   this agent needs `updated` or `resolved`. `--tags` is not passed here either:
-   `SearchQuery` has no tags parameter, so tag filtering happens client-side in step 5,
-   the same way date filtering happens client-side in step 4.
+1. Call `searchIssues({ project, scope, keywords, states, types, limit: 100 })`,
+   omitting `states` entirely when it is `null`. `types` is always the
+   `[story_work_item_type[tracker], bug_work_item_type[tracker], "Epic"]` triple
+   resolved in Phase 0; never omit it in query mode. This is a coarse filter.
+   `dateWindow` is deliberately not used here: it only filters the created date on
+   both adapters, and this agent needs `updated` or `resolved`. `--tags` is never
+   passed here: `SearchQuery` has no `tags` parameter on either tracker (AzDO's WIQL
+   `CONTAINS` on tags matches whole tokens, not substrings within a multi-word tag,
+   so pushing it into the search would silently miss real matches like a `"ECW Bug"`
+   tag when filtering for `"ECW"`); tag filtering happens entirely client-side in
+   step 6.
 2. If the result count equals `100` (or the adapter's own page/server cap), set
    `truncated = true`.
-3. Call `getIssue(id)` for every result to get the full `Issue`, including `updated`,
-   `resolved`, and `labels`.
-4. Keep an item only when `date_field` is `null`, or `item[date_field]` falls within
+3. Call `getIssuesBatch(ids, fields)` once with every id from step 1, to get the full
+   details (`updated`, `resolved`, `labels`, and the rest of `fields`) for the whole
+   result set in one call. Never call `getIssue` per item here; that is exactly the
+   round-trip-per-item pattern `getIssuesBatch` exists to replace.
+4. Keep an item only when `states` is `null`, or `item.state` (case-insensitive) is
+   one of `states`. Drop the rest. Run this step unconditionally, even though
+   `states` was already passed to `searchIssues` in step 1: a compound WIQL/JQL
+   query that combines a state clause with a keyword or tag clause is exactly the
+   kind of query that can end up malformed (the state clause dropped or OR'd
+   instead of AND'd, for example). Never assume the search's `states` filter alone
+   guarantees every returned item is actually in one of those states; verify against
+   the fetched `item.state`, not the search parameters you sent.
+5. Keep an item only when `date_field` is `null`, or the relevant date falls within
    `[from, till]` inclusive. Drop the rest.
-5. Keep an item only when `tag_filters` is `null`, or at least one entry in
+   - `date_field == "updated"`: check `item.updated` directly.
+   - `date_field == "resolved"`: check `item.resolved` when it is present; when it
+     is absent, fall back to `item.closed` instead of dropping the item outright.
+     Only drop the item when both are absent. This is not an edge case to skip:
+     some work-item types reach a closed-category state without ever populating a
+     Resolved-category date (see `getIssue`'s `Issue.closed` note), so checking
+     `resolved` alone silently drops genuinely delivered items from the result.
+6. Keep an item only when `tag_filters` is `null`, or at least one entry in
    `item.labels` case-insensitively contains at least one entry in `tag_filters`.
-   Drop the rest.
-6. Cache the surviving set as `issues`.
+   Drop the rest. This is the only place tag filtering happens, on either tracker;
+   there is no search-level narrowing to lean on (see step 1).
+7. Cache the surviving set as `issues`.
 
 If `issues` is empty after filtering, skip Phase 2 and go straight to Phase 3 with an
 explicit "no matching work items" note. Do not error.
@@ -210,6 +281,10 @@ Print the summary directly. There is no rendering skill; any file output is Phas
 - `mode=query` with `status_label` set: a heading naming the label and the date window
   when one applied (e.g. `Delivered (2026-07-01 to 2026-07-31)`, `Active`), then the
   same bullet format underneath.
+- When `detailed`, append one indented line under each bullet, pulled from that
+  item's entry in `issues` (matched by id): `  Assignee: <assignee, or "unassigned">
+  | State: <state> | Parent: <parent title, or "none">`. This never changes the
+  blurb text itself, only what prints alongside it.
 - After the list: `Ids in brackets are for your own traceability; strip them before
   this goes in front of a client.`
 - When `truncated`: `Results may be truncated by the tracker's page limit. Narrow with
@@ -245,9 +320,10 @@ user, when `chat == none` or `issues` is empty (nothing to send).
      or channel id, or a Teams channel/chat id.
 5. Build the message body from `blurbs`, reusing Phase 3's structure exactly
    (heading and date window when `status_label` is set, one bullet per item in the
-   same order, the truncation note, the unresolved-refs notes) but rendering each
-   bullet per `include_ids` and omitting the "ids are for your own traceability"
-   trailer, since the user's answer already resolved that choice.
+   same order, the detailed metadata line under each when `detailed`, the truncation
+   note, the unresolved-refs notes) but rendering each bullet per `include_ids` and
+   omitting the "ids are for your own traceability" trailer, since the user's answer
+   already resolved that choice.
 6. Call the adapter's `sendMessage` verb, targeting `send_target`, with the built
    body.
 7. Confirm: `Sent to <send_target_label> on <chat>.` On a send failure, report it
@@ -282,6 +358,9 @@ Runs after Phase 4. Skip this phase entirely, with no message to the user, when
 ## Do not rules
 
 - **Never write to the tracker.** This agent has no write verbs in its flow.
+- **Never call `getIssue` per item when `getIssuesBatch` covers the same ids.** One
+  batched call with a narrow `fields` list, not N individual full fetches; this is
+  the single biggest lever on runtime and token cost for a many-item run.
 - **Never send to chat without asking first.** Phase 4's two questions are not
   optional convenience defaults; if either cannot be asked, skip the send rather
   than assume an answer.
@@ -300,16 +379,38 @@ Runs after Phase 4. Skip this phase entirely, with no message to the user, when
 - **Never invent a business-value claim.** The second sentence of a blurb exists only
   when the ticket's own text supports it; that discipline belongs to
   `executive-blurb-writer`, and this agent does not override it.
-- **Never fabricate a date.** An item without the requested `date_field` populated is
-  dropped from a query-mode result, not guessed into range.
+- **Never fabricate a date.** An item without a usable date for `date_field` (after
+  the `resolved`-to-`closed` fallback, when that applies) is dropped from a
+  query-mode result, not guessed into range.
+- **Never check `resolved` alone for a `--status delivered`/`closed` query without
+  falling back to `closed`.** Some work-item types reach a closed-category state
+  without ever populating a Resolved-category date; checking `resolved` only
+  silently drops them even though they genuinely finished in the window.
 - **Never fail the run because a fetch was truncated.** Warn and show what was found.
 - **Never re-run tracker detection mid-flow.**
 - **Never rely on `dateWindow` for `updated`/`resolved` filtering.** It filters only
   the created date on both adapters; the precise window check happens client-side
   against the fetched `Issue`.
-- **Never pass `--tags` into `searchIssues`.** `SearchQuery` has no tags parameter;
-  tag matching happens client-side against `Issue.labels`, same as the date window.
-  Never claim it narrows a truncated fetch.
+- **Never pass `--tags` into `searchIssues`.** `SearchQuery` has no `tags`
+  parameter on either tracker: AzDO's WIQL `CONTAINS` on tags matches whole tokens,
+  not substrings within a multi-word tag, so pushing it into the search would
+  silently miss real matches. Tag matching happens client-side against
+  `Issue.labels`, same as the date window.
+- **Never skip step 4's client-side state filter, even though `states` was already
+  passed to `searchIssues`.** A malformed compound WIQL/JQL query (state clause
+  dropped or OR'd instead of AND'd when combined with keywords or tags) can return
+  items outside the requested states; trust the fetched `item.state`, not the
+  search parameters sent.
+- **Never request `severity` or `customFields` in the narrow or detailed `fields`
+  list.** Both fall back to a full unnarrowed fetch on both adapters, silently
+  undoing the whole optimization for that call.
+- **Never omit `types` from a `mode=query` search.** Story, Bug, and Epic are the
+  fixed default scope; there is no flag to widen it to every type. This is
+  deliberate, not a gap: it keeps a client-facing summary to the units stakeholders
+  actually care about and out of internal Task-level noise.
+- **Never apply the `types` filter in `mode=explicit`.** A pasted reference is
+  resolved regardless of its type; the user named it directly, they were not
+  searching for it.
 
 ## Writing rules (always active)
 

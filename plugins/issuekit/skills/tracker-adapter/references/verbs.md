@@ -11,8 +11,14 @@ IssueId       = string                  // "1234" or "PROJ-1234"; vendor-defined
 UserRef       = opaque                  // returned by resolveUser; valid for assign/mention/comment
 Issue         = {
   id, url, title, body, type, state, severity, assignee, reporter,
-  created, updated, resolved, labels, parent, customFields, raw
+  created, updated, resolved, closed, labels, parent, customFields, raw
 }
+// `closed` is distinct from `resolved`: on AzDO some work-item types (e.g. Task)
+// can transition straight to a closed-category state without ever populating a
+// Resolved-category date, so `resolved` alone can be absent on a genuinely closed
+// item. Jira has no equivalent second date; `closed` is always absent there and
+// `resolved` already covers it. Callers that need "when did this finish" should
+// check `resolved` first and fall back to `closed`, never rely on `resolved` alone.
 Revision      = { at, by, field, from, to }
 Comment       = { at, by, body, url }       // body is markdown
 IssueSummary  = { id, url, title, state, type }
@@ -38,9 +44,42 @@ Capacity      = {
 **Out:** `{ trackerUser: UserRef, defaultProject: string, defaultTeam: string|null }`
 **Implements:** AzDO `core_list_projects` + `wit_my_work_items`; Jira `getAccessibleAtlassianResources` + `atlassianUserInfo`.
 
-### `getIssue(id: IssueId)`
+### `getIssue(id: IssueId, fields?: string[])`
 **Out:** `Issue` (body in markdown; `customFields` is an opaque map of vendor-specific keys for the caller's use)
 **Implements:** AzDO `wit_get_work_item` with `expand: "all"`; Jira `getJiraIssue` with `responseContentFormat: "markdown"`.
+
+`fields` is optional and additive: omit it and the call is unchanged (full fetch, as
+above). When given, it names `Issue` property keys (e.g. `["title", "body",
+"labels", "updated", "resolved"]`, never vendor field names) and the adapter fetches
+only those, plus `id` and `url` which are always present. AzDO switches from
+`expand: "all"` to the tool's `fields` array, mapped through the abstract-to-vendor
+table in `adapters/azure-devops/tools.md`; Jira passes a narrower `fields` list to
+`getJiraIssue` the same way. Properties outside the requested set come back
+`undefined`, not `null` — a caller that narrowed the fetch must not read them. Use
+this when a caller only needs a handful of properties across many items; it is the
+main lever on payload size, since the default full fetch includes identity objects,
+relations, and links most callers never use.
+
+### `getIssuesBatch(ids: IssueId[], fields?: string[])`
+**Out:** `Issue[]`, one entry per id that resolved; ids that fail to resolve are
+omitted rather than erroring the whole batch. The caller diffs the returned ids
+against the requested ones to find failures, the same pattern
+`ticket-summarizer`'s `unresolved_refs` already uses for single fetches.
+**In:** `fields` behaves exactly as in `getIssue`.
+**Implements:**
+- AzDO: `wit_work_item`'s `get_batch` action (all ids in one call), `fields` passed
+  through the same way as `getIssue`. This is the same tool `getSprintItems` already
+  uses for its own batch fetch.
+- Jira has no native multi-id detail fetch. Best effort: build a `key in (<ids>)` JQL
+  and call `searchJiraIssuesUsingJql` with an explicit `fields` list wide enough to
+  populate the requested `Issue` properties in one call. If the search tool cannot
+  return the needed fields (older Atlassian MCP versions), fall back to one
+  `getIssue` call per id and warn once that Jira batching degraded to sequential
+  calls this session.
+
+Prefer this over N calls to `getIssue` whenever the caller already has more than a
+couple of ids to fetch (e.g. after `searchIssues`). Round-trip count, not just
+per-item payload size, is the dominant cost driver for many-item fetches.
 
 ### `getIssueHistory(id: IssueId)`
 **Out:** `Revision[]` sorted oldest-first
@@ -64,6 +103,15 @@ SearchQuery = {
 ```
 **Out:** `IssueSummary[]`
 **Implements:** AzDO `wit_query_by_wiql` (the adapter builds the WIQL); Jira `searchJiraIssuesUsingJql` (the adapter builds the JQL).
+
+`SearchQuery` deliberately has no `tags` parameter. A tag/label filter cannot be
+pushed into either tracker's search reliably: AzDO's WIQL `CONTAINS` on
+`System.Tags` matches whole tag tokens, not substrings within a multi-word tag (a
+tag like `"ECW Bug"` will not match `CONTAINS 'ECW'`, only a standalone `"ECW"` tag
+would), and Jira's `labels in (...)` is exact-match only. Callers that need
+substring tag matching must always filter client-side against the fetched
+`Issue.labels`, on every tracker, unconditionally; there is no fetch-volume
+optimization available here that preserves the substring semantic.
 
 ### `getIssueTypeSchema(type: string)`
 **Out:** `{ fields: FieldSpec[], severityOptions: string[], requiredFields: string[] }`
