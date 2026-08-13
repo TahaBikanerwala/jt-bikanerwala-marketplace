@@ -10,8 +10,10 @@ Match against the full tool name (everything after the `mcp__` prefix family). P
 |---|---|---|
 | `*__getJiraIssue` | tracker | `jira` |
 | `*__editJiraIssue` | tracker | `jira` (confirms write surface) |
-| `*__wit_get_work_item` | tracker | `azure-devops` |
-| `*__wit_update_work_item` | tracker | `azure-devops` (confirms write surface) |
+| `*__wit_get_work_item` | tracker | `azure-devops` (classic tool shape) |
+| `*__wit_update_work_item` | tracker | `azure-devops` (classic tool shape; confirms write surface) |
+| `*__wit_work_item` | tracker | `azure-devops` (consolidated tool shape) |
+| `*__wit_work_item_write` | tracker | `azure-devops` (consolidated tool shape; confirms write surface) |
 | `*__slack_search_public` | chat | `slack` |
 | `*__slack_search_public_and_private` | chat | `slack` |
 | `*__teams_search_messages` | chat | `teams` |
@@ -24,7 +26,7 @@ If a category has no match, set the value to `none`. The verb-plugin handles gra
 
 ## Multi-tracker tiebreak
 
-When both `*__getJiraIssue` and `*__wit_get_work_item` match, the session has access to two trackers. Resolve as follows when the verb-plugin needs to act on a specific issue:
+When both a Jira pattern (`*__getJiraIssue`) and an AzDO pattern (`*__wit_get_work_item` or `*__wit_work_item`, whichever shape matched) match, the session has access to two trackers. Resolve as follows when the verb-plugin needs to act on a specific issue:
 
 1. **URL inference.** If the issue reference contains:
    - `dev.azure.com` or `*.visualstudio.com` → `tracker=azure-devops`
@@ -40,12 +42,20 @@ If only one of the two tracker patterns matches, that tracker is the resolved va
 
 ## MCP prefix drift
 
-User-supplied MCPs surface tools under different prefixes depending on how the server is registered:
-- `mcp__azure_devops__wit_get_work_item`
-- `mcp__ado__wit_get_work_item`
-- `mcp__plugin_<user-supplied-name>__wit_get_work_item`
+User-supplied MCPs surface tools under different prefixes depending on how the server is registered, and the same prefix conventions show up on either tool-name shape:
+- `mcp__azure_devops__wit_get_work_item` (classic shape)
+- `mcp__ado__wit_work_item` (consolidated shape — this is the shape the official
+  Microsoft Azure DevOps MCP server ships under its default `ado` registration name)
+- `mcp__plugin_<user-supplied-name>__wit_get_work_item` or
+  `mcp__plugin_<user-supplied-name>__wit_work_item`, depending on which server the
+  user installed under that name
 
-Suffix matching (`*__wit_get_work_item`) tolerates every variant for detecting *that* the azure-devops tracker is present. Do not hardcode the prefix when checking availability.
+Suffix matching (`*__wit_get_work_item` or `*__wit_work_item`) tolerates every prefix
+variant for detecting *that* the azure-devops tracker is present, regardless of
+shape. Do not hardcode the prefix when checking availability, and do not assume the
+`ado` name always means consolidated shape or the `azure_devops` name always means
+classic shape — a user can register either server under either name. Resolve shape
+by signature-tool presence (below), never by prefix name.
 
 ### Resolving which prefix to call
 
@@ -57,6 +67,45 @@ Resolve by checking in this order and taking the first one whose tools are prese
 3. `mcp__plugin_<name>__*` (first match in tool-list order)
 
 Cache the winning literal prefix alongside `tracker=azure-devops`. If a later verb call needs a tool the winning prefix doesn't expose (a partial install), fall through this same order to find a prefix that does expose it, complete the call, and keep the original prefix as the default for everything else — do not fail the verb just because the primary prefix is missing one tool.
+
+### Resolving which tool-name shape to call
+
+Independently of which literal prefix wins, an AzDO-flavored MCP server exposes its
+work-item and work-tracking tools in one of two shapes. The prefix says *who
+registered the server*; the shape says *what its tools are named*, and the two vary
+independently — do not assume a prefix implies a shape.
+
+- **Classic shape** — one tool per operation: `wit_get_work_item`,
+  `wit_update_work_item`, `wit_create_work_item`, `wit_query_by_wiql`,
+  `wit_list_work_item_comments`, `wit_add_work_item_comment`,
+  `work_list_team_iterations`, and the rest of the granular names in
+  `adapters/azure-devops/tools.md`'s Classic column.
+- **Consolidated shape** — a handful of multi-purpose tools dispatched by an
+  `action` argument: `wit_work_item` (`action: get|get_batch|list_comments|my|
+  list_revisions|list_for_iteration|get_type`), `wit_work_item_write` (`action:
+  create|update|update_batch|add_child`), `wit_work_item_comment_write` (`action:
+  add|update`), `wit_query` (`action: get|get_results|wiql`), `work` (`action:
+  list_iterations|list_team_iterations|get_team_settings|get_team_capacity|
+  get_iteration_capacities`), and the rest of the granular names in
+  `adapters/azure-devops/tools.md`'s Consolidated column. This is the shape the
+  official Microsoft Azure DevOps MCP server (commonly registered under the `ado`
+  name) ships as of 2026.
+
+For the winning prefix from the step above, resolve the shape by checking which
+signature tool it exposes, checking classic first:
+
+1. `<prefix>__wit_get_work_item` present → `shape=classic`.
+2. Else `<prefix>__wit_work_item` present → `shape=consolidated`.
+3. Neither present → the prefix matched on a different tracker signal only (rare);
+   treat as `shape=unknown` and let the first verb call that needs a shape-specific
+   tool surface the error rather than guessing.
+
+Cache `shape` alongside the winning prefix and reuse it for every verb call this
+session — never probe per-call, and never mix shapes mid-session even if a second
+AzDO-flavored MCP with a different shape is also registered. If the winning prefix
+falls through to a different prefix for one missing tool (see above), re-resolve the
+shape for that fallback prefix before building the call; a fallback prefix is not
+guaranteed to share the primary prefix's shape.
 
 ## Announcement format
 

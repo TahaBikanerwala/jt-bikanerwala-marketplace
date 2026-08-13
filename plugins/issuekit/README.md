@@ -41,7 +41,8 @@ See [`skills/tracker-adapter/references/detection.md`](skills/tracker-adapter/re
 | Tool name pattern | Adapter |
 |---|---|
 | `*__getJiraIssue` / `*__editJiraIssue` | Jira |
-| `*__wit_get_work_item` / `*__wit_update_work_item` | Azure DevOps |
+| `*__wit_get_work_item` / `*__wit_update_work_item` (classic shape) | Azure DevOps |
+| `*__wit_work_item` / `*__wit_work_item_write` (consolidated shape, e.g. the official `ado`-registered MCP server) | Azure DevOps |
 | `*__slack_search_*` | Slack |
 | `*__teams_search_messages` | Teams |
 | `*__searchConfluenceUsingCql` | Confluence |
