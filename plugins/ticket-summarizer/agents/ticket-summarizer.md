@@ -1,6 +1,6 @@
 ---
 name: ticket-summarizer
-description: "Fetches Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status, and turns each into a plain-language executive summary for a client-update deck: what was delivered and, only when the ticket says why, why it matters. Each summary targets one to two concise sentences, extending to three or four only as a last resort when two are not enough to say it accurately. Fetches a narrow field set by default for speed and cost; pass --detailed for a richer per-item view (assignee, exact state, parent). Supports three query shapes: an explicit list of ticket ids or urls, a date range with a status (delivered/closed, or generic updated), or all currently active work items. Date-range and status queries always scope to Story, Bug, and Epic types only (a fixed default, not a flag); a pasted ticket reference is resolved regardless of its type. Read-only against the tracker: no tracker writes, no tracker diff-and-confirm gate, safe to run anytime. After printing, offers to send the same summary to Slack or Teams (yourself by default, or another channel, group, or person when named explicitly with --to) and, when --output <path> is given, offers to save it to a file too. Always asks first, both whether to send or save and whether to include ticket ids. Use when someone wants ticket summaries for a client call, a status update deck, an executive briefing, or a plain-English readout of what shipped or is in flight."
+description: "Fetches Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status, and turns each into a plain-language executive summary for a client-update deck: what was delivered and, only when the ticket says why, why it matters. Each summary targets one to two concise sentences, extending to three or four only as a last resort when two are not enough to say it accurately. Fetches a narrow field set by default for speed and cost; pass --detailed for a richer per-item view (assignee, exact state, parent). Supports three query shapes: an explicit list of ticket ids or urls, a date range with a status (delivered/closed, or generic updated), or all currently active work items. Date-range and status queries always scope to Story, Bug, Epic, and (on Azure DevOps) Feature types only (a fixed default, not a flag); a pasted ticket reference is resolved regardless of its type. Read-only against the tracker: no tracker writes, no tracker diff-and-confirm gate, safe to run anytime. After printing, offers to send the same summary to Slack or Teams (yourself by default, or another channel, group, or person when named explicitly with --to) and, when --output <path> is given, offers to save it to a file too. Always asks first, both whether to send or save and whether to include ticket ids. Use when someone wants ticket summaries for a client call, a status update deck, an executive briefing, or a plain-English readout of what shipped or is in flight."
 tools: Skill, Read, Write, AskUserQuestion
 ---
 
@@ -63,10 +63,16 @@ mistaken for a tracker reference or folded into `keywords`):
   - `--scope <area-path-or-component>`: AzDO area path or Jira component/label,
     passed straight through to the search.
   - `--tags <name>[,<name>...]`: one or more tag/label substrings. An item matches
-    when at least one of its labels case-insensitively contains at least one of the
-    given substrings (OR across multiple values). Applied client-side in Phase 1
-    step 7, not part of the `searchIssues` call; see the note there for why it can
-    never be pushed into the search on either tracker.
+    when at least one of its labels case-insensitively **contains** at least one of
+    the given substrings (OR across multiple values) — this is substring
+    containment, never exact string equality. `--tags ECW` must match a label of
+    exactly `"ECW"`, and equally match compound labels like `"ECW Story"` or
+    `"ECW Bug"`, because each of those labels contains `"ECW"` as a substring. Do
+    not narrow this to "label equals filter" or "label starts with filter"; the
+    only requirement is that the filter substring appears anywhere in the label,
+    case-insensitively. Applied client-side in Phase 1 step 7, not part of the
+    `searchIssues` call; see the note there for why it can never be pushed into the
+    search on either tracker.
   - Anything else left in the free text (e.g. a product area name) becomes `keywords`.
 
 **Validation:**
@@ -114,6 +120,11 @@ Keys this agent reads:
   to resolve the fixed `types` filter below. `"Epic"` is added as a literal on both
   trackers; it has no per-tracker policy key since both trackers name it the same
   by default.
+- `feature_work_item_type` (default: `{azure-devops: "Feature"}`, no `jira` entry),
+  used in Phase 0 to widen `types` on trackers where this key resolves to a value.
+  Azure DevOps is widened by default; Jira is not, since its default workflow has
+  no standard equivalent between Epic and Story — set
+  `feature_work_item_type.jira` in policy to opt a Jira project in.
 
 ## Sibling skills
 
@@ -140,7 +151,7 @@ the payload. Known keys: `phase`. Unknown keys are ignored.
 | `running_chat_user` | Bootstrap | Phase 4 | resolved chat identity for the running user, or `null` if unavailable |
 | `policy` | Bootstrap | Phase 1 | merged with defaults |
 | `states` | Phase 0 | Phase 1 | resolved vendor-state array from `policy.state_categories`, or `null` (unfiltered by state) |
-| `types` | Phase 0 | Phase 1 | `[story_work_item_type[tracker], bug_work_item_type[tracker], "Epic"]`; always set in `mode=query`, never read in `mode=explicit` |
+| `types` | Phase 0 | Phase 1 | `[story_work_item_type[tracker], bug_work_item_type[tracker], "Epic"]`, plus `feature_work_item_type[tracker]` appended when that key resolves to a value (Azure DevOps by default); always set in `mode=query`, never read in `mode=explicit` |
 | `status_label` | Phase 0 | Phase 3 | `"Active"`, `"Delivered"`, or `null` (no heading; flat list) |
 | `date_field` | Phase 0 | Phase 1 | `updated`, `resolved`, or `null` (no date filter) |
 | `tag_filters` | Phase 0 | Phase 1 | tag/label substrings from `--tags`, or `null` (no tag filter) |
@@ -174,11 +185,14 @@ Validation. Run the bootstrap and configuration steps in Prerequisites. Resolve
 | `updated` | `null` (unfiltered by state) | `null` | `updated` |
 
 In `mode=query` only, also resolve `types = [policy.story_work_item_type[tracker],
-policy.bug_work_item_type[tracker], "Epic"]`. This is a fixed default, not a flag the
-user can turn off: query-mode results always come only from these three types.
-`mode=explicit` never sets or reads `types`; a pasted reference is resolved
-regardless of its type, since the user named it directly rather than searching for
-it.
+policy.bug_work_item_type[tracker], "Epic"]`, then append
+`policy.feature_work_item_type[tracker]` when that key resolves to a value for the
+active `tracker` (default: appends `"Feature"` on `azure-devops`; nothing appended
+on `jira` unless the project's policy sets `feature_work_item_type.jira`). This is
+a fixed default, not a flag the user can turn off: query-mode results always come
+only from these types. `mode=explicit` never sets or reads `types`; a pasted
+reference is resolved regardless of its type, since the user named it directly
+rather than searching for it.
 
 ### Phase 1: Resolve the item set
 
@@ -215,9 +229,10 @@ reference.
 **`mode=query`:**
 
 1. Call `searchIssues({ project, scope, keywords, states, types, limit: 100 })`,
-   omitting `states` entirely when it is `null`. `types` is always the
-   `[story_work_item_type[tracker], bug_work_item_type[tracker], "Epic"]` triple
-   resolved in Phase 0; never omit it in query mode. This is a coarse filter.
+   omitting `states` entirely when it is `null`. `types` is always the value
+   resolved in Phase 0 (Story, Bug, Epic, plus Feature when
+   `feature_work_item_type[tracker]` resolves); never omit it in query mode. This
+   is a coarse filter.
    `dateWindow` is deliberately not used here: it only filters the created date on
    both adapters, and this agent needs `updated` or `resolved`. `--tags` is never
    passed here: `SearchQuery` has no `tags` parameter on either tracker (AzDO's WIQL
@@ -244,9 +259,10 @@ reference.
    ANDed into the exact same compound search as `states` (see step 1), so the same
    malformed-query risk (a clause silently dropped or OR'd instead of AND'd when
    combined with keywords or tags) applies equally here. This is the step that
-   actually enforces the Story/Bug/Epic guarantee `mode=query` promises; without it,
-   a mishandled compound query could let a Task leak into a client-facing summary
-   with nothing to catch it.
+   actually enforces the fixed-type-scope guarantee `mode=query` promises (Story,
+   Bug, Epic, plus Feature when resolved for the tracker); without it, a mishandled
+   compound query could let a Task leak into a client-facing summary with nothing
+   to catch it.
 6. Keep an item only when `date_field` is `null`, or the relevant date falls within
    `[from, till]` inclusive. Drop the rest.
    - `date_field == "updated"`: check `item.updated` directly.
@@ -258,7 +274,13 @@ reference.
      `resolved` alone silently drops genuinely delivered items from the result.
 7. Keep an item only when `tag_filters` is `null`, or at least one entry in
    `item.labels` case-insensitively contains at least one entry in `tag_filters`.
-   Drop the rest. This is the only place tag filtering happens, on either tracker;
+   Drop the rest. **This is a substring containment check, in the direction
+   `label.includes(filter)` — never `label === filter` and never
+   `filter.includes(label)`.** A filter of `"ECW"` must keep every item whose
+   labels include `"ECW"`, `"ECW Story"`, `"ECW Bug"`, or any other label that
+   contains `"ECW"` anywhere in it; treating the filter as requiring an exact
+   label match is a bug, not a stricter interpretation, and will silently drop
+   real matches. This is the only place tag filtering happens, on either tracker;
    there is no search-level narrowing to lean on (see step 1).
 8. Cache the surviving set as `issues`.
 
@@ -415,6 +437,11 @@ Runs after Phase 4. Skip this phase entirely, with no message to the user, when
   not substrings within a multi-word tag, so pushing it into the search would
   silently miss real matches. Tag matching happens client-side against
   `Issue.labels`, same as the date window.
+- **Never treat `--tags` matching as exact equality.** `"ECW"` must match
+  `"ECW"`, `"ECW Story"`, and `"ECW Bug"` alike — the check is
+  `label.includes(filter)`, case-insensitive, not `label === filter`. Requiring an
+  exact match silently drops every compound-named label a short filter is meant to
+  catch.
 - **Never skip step 4's client-side state filter, even though `states` was already
   passed to `searchIssues`.** A malformed compound WIQL/JQL query (state clause
   dropped or OR'd instead of AND'd when combined with keywords or tags) can return
@@ -422,16 +449,18 @@ Runs after Phase 4. Skip this phase entirely, with no message to the user, when
   search parameters sent.
 - **Never skip step 5's client-side type filter, even though `types` was already
   passed to `searchIssues`.** The same malformed-compound-query risk that motivates
-  the state re-check applies equally to `types`; skipping it would leave the
-  Story/Bug/Epic guarantee (see the next rule) unenforced on the one path that
+  the state re-check applies equally to `types`; skipping it would leave the fixed
+  type-scope guarantee (see the next rule) unenforced on the one path that
   actually protects it.
 - **Never request `severity` or `customFields` in the narrow or detailed `fields`
   list.** Both fall back to a full unnarrowed fetch on both adapters, silently
   undoing the whole optimization for that call.
-- **Never omit `types` from a `mode=query` search.** Story, Bug, and Epic are the
-  fixed default scope; there is no flag to widen it to every type. This is
-  deliberate, not a gap: it keeps a client-facing summary to the units stakeholders
-  actually care about and out of internal Task-level noise.
+- **Never omit `types` from a `mode=query` search.** Story, Bug, Epic, and (on
+  Azure DevOps by default, or any tracker where `feature_work_item_type[tracker]`
+  is set) Feature are the fixed default scope; there is no flag to widen it beyond
+  that to every type. This is deliberate, not a gap: it keeps a client-facing
+  summary to the units stakeholders actually care about and out of internal
+  Task-level noise.
 - **Never apply the `types` filter in `mode=explicit`.** A pasted reference is
   resolved regardless of its type; the user named it directly, they were not
   searching for it.

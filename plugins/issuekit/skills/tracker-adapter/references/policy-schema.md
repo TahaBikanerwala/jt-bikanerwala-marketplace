@@ -52,6 +52,7 @@ Path: `.claude/tracker-policy.json` (project-root). Optional. When absent, the a
   "stale_after_days": 3,
   "points_field_name": null,
   "story_work_item_type": { "azure-devops": "User Story", "jira": "Story" },
+  "feature_work_item_type": { "azure-devops": "Feature" },
   "draft_label": "Draft",
   "priority_label_map": { "P0": "Highest", "P1": "High", "P2": "Medium" },
   "acceptance_criteria_field": null,
@@ -158,6 +159,25 @@ Used by `createIssue` (the `story-drafter` plugin) to choose which work-item typ
 - **`jira`** — usually `"Story"`.
 
 **Default if unset:** `{ "azure-devops": "User Story", "jira": "Story" }`. If the value is not a valid type on the project (checked against `getIssueTypeSchema`), the adapter lazy-prompts with the live type list.
+
+### `feature_work_item_type` (object)
+
+Used by `ticket-summarizer` to widen its fixed query-mode type scope beyond Story,
+Bug, and Epic, per tracker. Keys are tracker names; values are the vendor type
+name; a tracker with no key here is not widened at all.
+
+- **`azure-devops`** — `"Feature"` on every stock process template (Agile, Scrum,
+  Basic, CMMI); a standard portfolio-level type sitting between Epic and
+  User Story/PBI.
+- **`jira`** — no default. Jira's default workflow has no standard equivalent
+  team-backlog type between Epic and Story, so `ticket-summarizer` does not widen
+  the Jira type scope unless a project explicitly sets this key.
+
+**Default if unset:** `{ "azure-devops": "Feature" }` (no `jira` entry). Set
+`feature_work_item_type.jira` explicitly if a project has added a comparable type
+and wants it included too. Unlike `story_work_item_type`/`bug_work_item_type`,
+this key is not used by any `createIssue` caller — it only widens read-side type
+filtering.
 
 ### `draft_label` (string)
 

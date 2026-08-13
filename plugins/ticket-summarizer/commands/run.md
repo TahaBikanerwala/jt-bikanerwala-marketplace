@@ -35,8 +35,9 @@ This command is a thin shell. It dispatches to the `ticket-summarizer` agent, wh
    widens it). A state-filtered `searchIssues` call, narrowed further by the exact
    `updated`/`resolved` date window in query mode; `--tags` always filters
    client-side after the fetch, on both trackers. Query-mode results are always
-   scoped to Story, Bug, and Epic types only, a fixed default with no flag to widen
-   it; a pasted ticket reference resolves regardless of its type.
+   scoped to Story, Bug, Epic, and (on Azure DevOps) Feature types only, a fixed
+   default with no flag to widen it; a pasted ticket reference resolves regardless
+   of its type.
 4. Runs each item through `executive-blurb-writer` to produce a concise,
    plain-language summary: what was delivered, and why it matters only when the ticket
    itself says so. Targets one to two sentences; extends to three or four only as a
@@ -63,13 +64,18 @@ requires `--output` before it is even offered, since there is no default path.
 - **Updated in range:** `--from`/`--till` with no `--status`, or `--status updated`
   explicitly.
 
-Every query shape above is scoped to Story, Bug, and Epic types only, always. This
-is not configurable per run: it keeps a client-facing summary to the units
-stakeholders actually care about, not internal Task-level work. Explicit-list mode
-is exempt: paste a Task's id and you get it back regardless.
+Every query shape above is scoped to Story, Bug, Epic, and (on Azure DevOps)
+Feature types only, always. This is not configurable per run: it keeps a
+client-facing summary to the units stakeholders actually care about, not internal
+Task-level work. Explicit-list mode is exempt: paste a Task's id and you get it
+back regardless. Jira has no standard equivalent to Feature between Epic and
+Story, so a Jira query stays at Story/Bug/Epic unless a project's
+`.claude/tracker-policy.json` explicitly sets `feature_work_item_type.jira`.
 
 `--tags <name>[,<name>...]` narrows any query-mode result to items whose labels
-case-insensitively contain at least one given substring. This always filters
+case-insensitively **contain** at least one given substring — a filter of `ecw`
+matches `"ECW"`, `"ECW Story"`, and `"ECW Bug"` alike, since each label contains
+the substring; it is never an exact-match comparison. This always filters
 client-side, after the fetch, on both trackers: Azure DevOps' WIQL `CONTAINS` on
 tags matches whole tokens rather than substrings within a multi-word tag, so a tag
 like `"ECW Bug"` would not match a search for `"ECW"`, and Jira's JQL has no
