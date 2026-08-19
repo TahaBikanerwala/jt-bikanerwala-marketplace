@@ -157,7 +157,7 @@ the payload. Known keys: `phase`. Unknown keys are ignored.
 | `tag_filters` | Phase 0 | Phase 1 | tag/label substrings from `--tags`, or `null` (no tag filter) |
 | `detailed` | Phase 0 | Phase 1, 3 | bool from `--detailed`; picks the fetched `fields` list and whether Phase 3 prints the extra metadata line |
 | `issues` | Phase 1 | Phase 2, 3 | `Issue[]`, the resolved item set; Phase 3 reads it too when `detailed` |
-| `unresolved_refs` | Phase 1 | Phase 3 | references (explicit mode) that failed to fetch |
+| `unresolved_refs` | Phase 1 | Phase 3 | ids/references, either mode, that failed to fetch (explicit: a pasted reference; query: an id returned by `searchIssues` but missing from the `getIssuesBatch` result) |
 | `truncated` | Phase 1 | Phase 3 | bool; true when a fetch may have hit a server/page cap |
 | `blurbs` | Phase 2 | Phase 3, 4 | `{id, title, url, blurb}[]` |
 | `today` | Phase 0 | Phase 0 (validation default) | ISO date; the agent reads the clock, the skill cannot |
@@ -245,7 +245,13 @@ reference.
 3. Call `getIssuesBatch(ids, fields)` once with every id from step 1, to get the full
    details (`updated`, `resolved`, `labels`, and the rest of `fields`) for the whole
    result set in one call. Never call `getIssue` per item here; that is exactly the
-   round-trip-per-item pattern `getIssuesBatch` exists to replace.
+   round-trip-per-item pattern `getIssuesBatch` exists to replace. Diff the returned
+   ids against the ids requested from step 1: any requested id absent from the
+   result goes to `unresolved_refs`, the same mechanism `mode=explicit` uses. An item
+   can vanish between the `searchIssues` call and this fetch (deleted, or permission
+   scope changed in between); without this diff it would silently drop out of the
+   result with no note. Continue with whatever did resolve; do not abort the whole
+   run over one missing id.
 4. Keep an item only when `states` is `null`, or `item.state` (case-insensitive) is
    one of `states`. Drop the rest. Run this step unconditionally, even though
    `states` was already passed to `searchIssues` in step 1: a compound WIQL/JQL

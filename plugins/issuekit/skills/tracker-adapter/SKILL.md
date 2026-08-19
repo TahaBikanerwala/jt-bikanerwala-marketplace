@@ -80,7 +80,7 @@ The gate is a hard boundary. Writes cannot bypass it, even for "small" updates l
 
 See `references/verbs.md` for the full schemas. Quick reference:
 
-**Reads:** `getIssue`, `getIssueHistory`, `getIssueComments`, `searchIssues`, `getIssueTypeSchema`, `linkedPullRequests`, `getCurrentSprint`, `getSprintItems`, `getTeamCapacity`, `whoAmI`, `resolveUser`, `mention`.
+**Reads:** `getIssue`, `getIssueHistory`, `getIssueComments`, `getIssuesBatch`, `searchIssues`, `getIssueTypeSchema`, `linkedPullRequests`, `getCurrentSprint`, `getSprintItems`, `getTeamCapacity`, `whoAmI`, `resolveUser`, `mention`.
 
 **Writes:** `createIssue`, `assign`, `transition`, `updateFields`, `addComment`, `addLabel`, `removeLabel`, `linkIssue`, `linkPullRequest`.
 

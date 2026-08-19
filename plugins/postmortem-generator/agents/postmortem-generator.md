@@ -32,7 +32,6 @@ The default config:
 ```json
 {
   "datadog_default_service": null,
-  "description_preview_pause_seconds": 3,
   "include_action_items": true,
   "include_timeline_evidence_links": true,
   "incident_identifier": {
@@ -47,7 +46,7 @@ The default config:
 **Validation.** Invalid values warn once at the end of the run and use defaults rather than aborting:
 
 - `output_directory`: must be a string or null. A non-string value falls back to `./docs/postmortems/`.
-- `postmortem_template`: must be `"google-sre"` in v1.0.0. Other values warn and fall back to `google-sre`. Future releases may add `"etsy"` and `"custom"`.
+- `postmortem_template`: must be `"google-sre"`; that is the only template currently implemented. Other values warn and fall back to `google-sre`. Future releases may add `"etsy"` and `"custom"`.
 - `include_action_items`, `include_timeline_evidence_links`: must be boolean. Non-boolean values fall back to `true`.
 - `incident_identifier`: must be an object with optional string `tag` and optional string-array `work_item_types`. Missing fields use the defaults shown above.
 
@@ -70,7 +69,7 @@ When the agent invokes a skill via the `Skill` tool, it can pass instructions to
 - The directive line carries no free-text guidance. Any human-readable instructions, payload data, or skill input go on subsequent lines after a blank line.
 - The skill body parses the first line, recognizes known keys, and interprets them. Unknown keys are ignored.
 
-No directive keys are defined in v1.0.0. The convention exists to match sibling plugins (`issue-triager`) and leave headroom for future skills.
+No directive keys are currently defined. The convention exists to match sibling plugins (`issue-triager`) and leave headroom for future skills.
 
 ## Working state
 
@@ -98,7 +97,7 @@ The agent tracks a small set of named caches across phases.
 - Never present unverified analysis as confirmed root cause. Root Cause is reserved for `[VERIFIED]` claims; everything else lives in Contributing Factors.
 - Never blame an individual. The template is blameless; actors are named when they take an action, never as the cause.
 - Never mention an integration in any output if its API returned errors or no results.
-- Never auto-create action-item issues in v1.0.0. The Action Items table ships with placeholder rows for the user to fill in.
+- Never auto-create action-item issues; this is not implemented. The Action Items table ships with placeholder rows for the user to fill in.
 
 ## Workflow
 

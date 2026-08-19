@@ -284,6 +284,4 @@ When a verb's underlying tool returns an error:
 
 ## Detection-time pre-checks
 
-If `tracker == jira` and the policy requests AzDO-specific fields (`area_path_prefix`, `iteration_path_strategy`), warn once and ignore those keys. Same in reverse for `sprint_field_name`, `severity_field_name` when `tracker == azure-devops`.
-
 `points_field_name` is Jira-only (AzDO uses the standard `Microsoft.VSTS.Scheduling.StoryPoints` field). If `tracker == azure-devops` and `points_field_name` is set, warn once and ignore it.

@@ -35,6 +35,8 @@ Bind the attribute so each iteration is unique. `editKind=dynamic`.
 
 Note: `:data-testid="..."` (bound) for dynamic values; `data-testid="..."` (static) for literals. Don't mix — a static attribute with an interpolation `data-testid="x-{{c.code}}"` does not work in Vue templates the way it does in text nodes.
 
+**Idempotency:** an element already carrying `:data-testid="..."` or `v-bind:data-testid="..."` is already tagged. Treat it the same as a literal `data-testid="..."` match and skip it — never add a second, conflicting static attribute alongside a bound one. See the idempotency check in `element-catalog`'s `SKILL.md` ("Do not tag" and "Detection tactic for large scopes").
+
 ## Component libraries
 
 | Component | Forwarding |

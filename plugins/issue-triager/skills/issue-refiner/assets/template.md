@@ -30,6 +30,8 @@ The first column lists every section the template defines. The next six columns 
 
 An `if present` section with nothing behind it is **omitted, heading and all.** Never write a placeholder under it: no `Not provided`, no `Unknown`, no `TBD`, no empty heading. The refined description carries what the issue knows and says nothing where it knows nothing.
 
+This is the opposite convention from `requirements-investigator`'s report template (which always keeps every heading, with a one-line note when empty) — intentionally: this document becomes the issue's own description, read cold by a stranger who benefits from it being exactly as long as what's known, while `requirements-investigator` produces an internal investigation report where a reader scanning for "was X checked?" needs every heading present to tell "checked, nothing found" apart from "not checked."
+
 ---
 
 ## Section definitions

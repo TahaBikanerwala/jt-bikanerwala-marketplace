@@ -10,7 +10,7 @@ Process a tracker issue through the full triage workflow regardless of archetype
 
 **This is where the code dig lives.** `/bug-reporter:run` files a bug fast and deliberately never opens the checkout, so a freshly reported Bug arrives here with a symptom, an impact read, and a Missing Information list, and nothing else. Phase 2b is the phase that turns that into a localized defect with a proposed fix. Expect this agent to be the slow, expensive one in the pair; that is the split working as designed.
 
-All tracker access goes through `issuekit:tracker-adapter`. No vendor-specific MCP tool name appears in this prompt.
+All tracker access goes through `issuekit:tracker-adapter`, so no vendor-specific tracker tool name appears in this prompt. Chat-user lookup (`slack_search_users`) and log search (`search_datadog_logs`) are the two exceptions: `issuekit` has no abstraction for chat *search* (only `resolveChatUser`/`sendMessage` for outbound identity/delivery) or for log search, so those two steps name concrete vendor MCP tools directly. If either tool is renamed or re-versioned upstream, those two steps — and only those two — need updating here.
 
 **Phase 3 is the single confirmation gate.** Phases 4–9 are gated writes that execute only after the user confirms the diff. The diff is the dry-run.
 
@@ -138,7 +138,7 @@ For each issue the user pastes, execute these phases in order.
 6. **Detect archetype.** Map `issue_payload.type` (and labels for `incident`/`spike` overrides) to the archetype taxonomy:
    - `Bug`, `Defect` → `Bug`
    - `Incident`, `Outage`, or any type carrying the `incident` label → `Incident`
-   - `Story`, `User Story`, `Product Backlog Item`, `Requirement`, `Feature`, `Enhancement`, `New Feature` → `Story` (when leaf-level) or `Feature` (when epic-level)
+   - `Story`, `User Story`, `Product Backlog Item`, `Requirement`, `Feature`, `Enhancement`, `New Feature` → `Story` (when leaf-level) or `Feature` (when epic-level). **Leaf-level vs epic-level test:** epic-level means the item has one or more child work items linked via a parent/child hierarchy relation (AzDO: a `System.LinkTypes.Hierarchy-Forward` relation to another work item; Jira: one or more other issues whose `parent` or Epic Link field points back at this issue). No such children → leaf-level.
    - `Task`, `Sub-task`, `Chore`, `Tech Debt` → `Task` (with `spike` label → `Spike`)
    - `Spike`, `Research`, `Investigation` → `Spike`
    - Unknown → halt per the Stops list.
@@ -384,7 +384,7 @@ Resolve `policy.archetype_assignment_after_triage[archetype]`:
 Then transition:
 
 - Phase 4c was taken (follow-up posted) → transition to `policy.states.waiting_reply`.
-- Otherwise → transition to `policy.states.backlog` for Bug archetype only; Story/Feature/Task/Spike stay in `policy.states.investigating` (the running user is actively working on them).
+- Otherwise → transition to `policy.states.backlog` for Bug archetype only (assignment above just unassigned it, so it's unclaimed until someone picks it up); every other archetype — Incident, Story, Feature, Task, Spike — stays in `policy.states.investigating` (assignment above kept it on the running user, who is actively working on it).
 
 ---
 

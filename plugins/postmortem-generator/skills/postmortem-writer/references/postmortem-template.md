@@ -10,7 +10,7 @@ The catalog below is the full ordered list. Every postmortem includes every sect
 
 ### Section 1: Header
 
-The YAML-style block at the very top of the document. See the skill's Step 2 for the exact fields.
+The YAML-style block at the very top of the document. See the skill's Step 2 for the exact fields, including **Responders**, which sits directly after **Author** and lists the deduplicated responder names/mentions (comma-joined), formatted the same way as the other header fields. Use "None identified" when the list is empty.
 
 Status is always `Draft` when the skill emits the document; the user changes it to `Approved` or `Reviewed` after stakeholder review.
 

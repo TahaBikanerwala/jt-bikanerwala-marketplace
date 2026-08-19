@@ -96,12 +96,14 @@ Ids in brackets are for your own traceability; strip them before this goes in fr
 
 ## Configuration
 
-Reads two keys from `.claude/tracker-policy.json`, shared with every other plugin
+Reads four keys from `.claude/tracker-policy.json`, shared with every other plugin
 in this suite:
 
 | Key | Default | Used for |
 |---|---|---|
 | `state_categories` | Agile/Scrum/Basic + Jira defaults | Translating `active`/`delivered`/`closed` into vendor state names |
+| `story_work_item_type` | `{azure-devops: "User Story", jira: "Story"}` | Resolving the Story entry of the fixed query-mode type scope, per tracker |
+| `bug_work_item_type` | `{azure-devops: "Bug", jira: "Bug"}` | Resolving the Bug entry of the fixed query-mode type scope, per tracker |
 | `feature_work_item_type` | `{azure-devops: "Feature"}` (no `jira` entry) | Widening the fixed query-mode type scope beyond Story/Bug/Epic, per tracker |
 
 See [`issuekit`'s policy schema](../issuekit/skills/tracker-adapter/references/policy-schema.md)

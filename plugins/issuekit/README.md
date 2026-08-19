@@ -22,10 +22,10 @@ This plugin ships **no** MCP, **no** agent, and **no** slash command. It is a li
 
 ## Install
 
-You don't install this directly — it's declared as a `dependencies` entry on `postmortem-generator` and `issue-triager`, so Claude Code auto-installs it whenever you install either verb-plugin. To install it on its own:
+You don't install this directly — it's declared as a `dependencies` entry on every verb-plugin in this marketplace (`postmortem-generator`, `issue-triager`, `sprint-status-reporter`, `story-drafter`, `acceptance-test-generator`, `bug-reporter`, and `ticket-summarizer`), so Claude Code auto-installs it whenever you install any of them. To install it on its own:
 
 ```
-/plugin install issuekit@incubyte-plugins
+/plugin install issuekit@jt-bikanerwala-marketplace
 ```
 
 You also need at least one tracker MCP (`@azure-devops/mcp` or the Atlassian MCP) configured at the user or project level. See each verb-plugin's README for the chat/doc/log MCPs it can use opportunistically.

@@ -40,7 +40,7 @@ The argument is the raw requirements: pasted text, a path to a notes/transcript 
 
 Each created story carries:
 
-- **Description field:** Problem Statement, Background (citing the source input), Description (`As a <role>, I want <capability>, so that <benefit>` + expansion), In Scope / Out of Scope, Definition of Done, Open Questions. Each heading carries a fixed emoji (🧩/🏁/📝/🟢/🔴/🏁/❓) matching the house style already used on Rolai's Azure DevOps stories.
+- **Description field:** Problem Statement, Background (citing the source input), Description (`As a <role>, I want <capability>, so that <benefit>` + expansion), In Scope / Out of Scope, Definition of Done, Open Questions. Each heading carries a fixed emoji (🧩/🏁/📝/🟢/🔴/🏁/❓) that is this plugin's own house style for every generated story.
 - **Acceptance Criteria field:** Given/When/Then criteria (happy path, error states, edge cases). On Azure DevOps this is the standard `Microsoft.VSTS.Common.AcceptanceCriteria` field; on Jira the criteria fold into the description unless `acceptance_criteria_field` names a custom field.
 - **Tag:** `Draft` (configurable via `draft_label`).
 - **Priority:** from the story's P0/P1/P2 (AzDO `Microsoft.VSTS.Common.Priority` 1/2/3; Jira via `priority_label_map`).

@@ -16,7 +16,7 @@ paginate: true
 # {{ sprint.name }} · Progress delta
 
 **Changes from {{ window.from }} to {{ window.to }}**
-Team: {{ team }} · Generated {{ today }}
+Generated {{ today }}
 
 <!-- when window.baseline_source == "history", add: -->
 _Baseline reconstructed from item history._

@@ -9,7 +9,7 @@ Plug-and-play in this suite = `issuekit` + `postmortem-generator` + your own MCP
 ## Install
 
 ```
-/plugin install postmortem-generator@incubyte-plugins
+/plugin install postmortem-generator@jt-bikanerwala-marketplace
 ```
 
 `issuekit` is declared as a dependency and Claude Code auto-installs it for you.
@@ -59,8 +59,11 @@ Six phases, with confirmation gates only where the user actually has a decision 
 Read from `.claude/tracker-policy.json`. The keys this plugin cares about:
 
 - `output_directory` — where postmortems are saved. Default: `./docs/postmortems/`.
-- `postmortem_template` — `"google-sre"` is the only supported value in v1.0.0.
+- `postmortem_template` — `"google-sre"` is the only supported value; other values warn and fall back to `google-sre`.
 - `incident_identifier` — `{tag, work_item_types}` used to identify incident-type issues vs. other tracker artifacts.
+- `datadog_default_service` — fallback Datadog service name used when it can't be inferred from the incident title or description. Default: `null`.
+- `include_action_items` — whether the Action Items section is included in the generated postmortem. Default: `true`.
+- `include_timeline_evidence_links` — whether the Timeline table's Source column (evidence links) is rendered. Default: `true`.
 
 When `.claude/tracker-policy.json` is absent, defaults are used and the agent lazy-prompts for any key it needs, offering to persist the answer.
 

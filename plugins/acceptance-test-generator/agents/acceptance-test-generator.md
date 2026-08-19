@@ -1,6 +1,6 @@
 ---
 name: acceptance-test-generator
-description: "Turns a user story and its acceptance criteria into a rigorous BDD test suite. Reads the story from the tracker (Azure DevOps, Jira), a local spec file, or pasted text, applies senior test-design technique to decompose every AC into testable behaviors, then writes canonical Gherkin .feature files with smartly consolidated scenarios and detailed steps. Test cases derive ONLY from the story and acceptance criteria; the codebase is read read-only for reference and never as the basis of a test. Optionally creates the scenarios as Test Case work items in the tracker, linked to the source story, behind a single diff-and-confirm gate. Use when someone hands over a story or AC and wants acceptance/BDD tests designed."
+description: "Turns a user story and its acceptance criteria into a rigorous BDD test suite. Reads the story from the tracker (Azure DevOps, Jira), a local spec file, or pasted text, applies senior test-design technique to decompose every AC into testable behaviors, then writes canonical Gherkin .feature files with smartly consolidated scenarios and detailed steps. Test cases derive ONLY from the story and acceptance criteria; the codebase is read read-only for reference and never as the basis of a test. Optionally creates the scenarios as Test Case work items in the tracker, linked to the source story, one diff-and-confirm gate per Test Case. Use when someone hands over a story or AC and wants acceptance/BDD tests designed."
 tools: Skill, Read, Write, Bash, Grep, AskUserQuestion
 ---
 
@@ -58,7 +58,7 @@ This plugin owns its config at `.claude/acceptance-test-policy.json` (separate f
 | `scenario_granularity` | `"per-scenario-work-item"` | Phase 6 (`per-scenario-work-item` \| `per-feature-work-item`) |
 | `traceability_tags` | `true` | Phase 4 (emit an `@AC-<n>` tag on each scenario tracing it to its acceptance criterion) |
 
-If `test_case_work_item_type` for the active tracker is not a valid type on `target_project`, the issuekit adapter lazy-prompts with the live type list when `createIssue` runs.
+`test_case_work_item_type` is this plugin's own key, not an issuekit policy key, so issuekit has no built-in validation for it. Before calling `createIssue` in Phase 6, this plugin validates it itself: call `issuekit:tracker-adapter`'s `getIssueTypeSchema` for `target_project`, and if the configured `test_case_work_item_type` for the active tracker is not in the live type list that returns, lazy-prompt the author (via `AskUserQuestion`) with that list before building the write.
 
 ## Sibling skills
 
@@ -194,19 +194,19 @@ On confirm, `Write` each file (creating `test_output_dir` with `Bash mkdir -p` f
 
 ### Phase 6: Create Test Case work items (gated) — optional
 
-Run only when `create_choice == yes` (or `create_in_tracker == "always"`) and `tracker != none`. Build `pending_writes`:
+Run only when `create_choice == yes` (or `create_in_tracker == "always"`) and `tracker != none`. Determine the Test Case units — one per scenario when `scenario_granularity == per-scenario-work-item` (the default; each Scenario / Scenario Outline becomes one Test Case), or one per feature otherwise. Each unit's `createIssue` write is shaped as:
 
-- **One `createIssue` per scenario** when `scenario_granularity == per-scenario-work-item` (the default; each Scenario / Scenario Outline becomes one Test Case), or **one per feature** otherwise.
-  - `type` = `test_case_work_item_type[<tracker>]`
-  - `title` = the scenario name (or Feature name for per-feature)
-  - `body` = the Gherkin scenario (fenced), plus a line citing the source story and the AC(s) it covers
-  - `acceptanceCriteria` = the source AC text the scenario verifies (ADO writes it to the AC field; Jira folds it in)
-  - `labels` = `[test_label]`
-  - `project` = `target_project`
-  - `customFields` — on Azure DevOps, set `Microsoft.VSTS.TCM.Steps` to the steps XML `bdd-scenario-writer` rendered (each When/Then group → one step with Action + Expected Result), so the Test Case is runnable in Test Plans, not just prose. See `bdd-scenario-writer/references/tracker-test-cases.md`.
-- **One `linkIssue` per created Test Case** back to the source story when `link_to_story` and `story_source.kind == tracker`: `linkIssue(newId, story_source.id, "related")`. (The verb surface exposes `related`; note in the summary that this stands in for a semantic "Tests" link.)
+- `type` = `test_case_work_item_type[<tracker>]`
+- `title` = the scenario name (or Feature name for per-feature)
+- `body` = the Gherkin scenario (fenced), plus a line citing the source story and the AC(s) it covers
+- `acceptanceCriteria` = the source AC text the scenario verifies (ADO writes it to the AC field; Jira folds it in)
+- `labels` = `[test_label]`
+- `project` = `target_project`
+- `customFields` — on Azure DevOps, set `Microsoft.VSTS.TCM.Steps` to the steps XML `bdd-scenario-writer` rendered (each When/Then group → one step with Action + Expected Result), so the Test Case is runnable in Test Plans, not just prose. See `bdd-scenario-writer/references/tracker-test-cases.md`.
 
-Route the whole batch through the diff-and-confirm gate (`issuekit:tracker-adapter` owns it — read `references/diff-and-confirm.md`). Render each `createIssue` row with the Test Case type + scenario title and note `(tags: <test_label>)`; abridge long Gherkin bodies per the gate's rules. On confirm, the adapter fires each write in order; capture `{ id, url }` per scenario into `created`. On failure the gate stops the batch and reports what landed — surface the partial state, do not retry silently.
+When `link_to_story` and `story_source.kind == tracker`, each unit also gets a dependent `linkIssue` back to the source story: `linkIssue(newId, story_source.id, "related")` with `target: "(new)"` resolved from that unit's own `createIssue`. (The verb surface exposes `related`; note in the summary that this stands in for a semantic "Tests" link.)
+
+Process the Test Case units **one at a time, not as one combined batch**: for each unit, build `pending_writes` as just that unit's `createIssue` plus its dependent `linkIssue` (a two-tuple batch, at most one `createIssue` per batch), and route that pair through the diff-and-confirm gate (`issuekit:tracker-adapter` owns it — read `references/diff-and-confirm.md`) before moving to the next unit. This follows the gate's batching rule directly: a batch may create at most one item that a later tuple depends on, so with more than one Test Case the writes must be split into one batch per Test Case rather than relying on ordering across a single combined batch. Render each batch's `createIssue` row with the Test Case type + scenario title and note `(tags: <test_label>)`; abridge long Gherkin bodies per the gate's rules. On confirm, the adapter fires that unit's pair in order and returns `{ id, url }`, which is appended to `created` before the next unit's batch is built and gated. On failure the gate stops that unit's batch and reports what landed; surface the partial state (including any Test Cases already created by earlier batches in this run) and stop — do not continue to the remaining units, and do not retry silently.
 
 ### Phase 7: Summarize
 

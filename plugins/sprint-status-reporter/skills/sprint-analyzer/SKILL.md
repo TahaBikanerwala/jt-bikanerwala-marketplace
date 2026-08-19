@@ -22,7 +22,8 @@ The caller passes a JSON payload:
   "items":   [ SprintItem, ... ],
   "capacity": Capacity | null,
   "policy":  { "state_categories", "blocked_indicators", "stale_after_days" },
-  "today":   "YYYY-MM-DD"
+  "today":   "YYYY-MM-DD",
+  "tracker": "azure-devops" | "jira"
 }
 ```
 
@@ -131,10 +132,11 @@ is left to the deck composer (pass the full count via a warning:
 `<n> more items in To Do beyond the top 8.` only when truncating).
 
 ### Capacity summary
-- `capacity == null` → `capacity_summary = null` and warning `Team capacity unavailable on
-  this tracker.` ONLY if the caller expected it (Azure); for Jira, omit the warning (the
-  agent knows capacity is N/A). Rule: if `capacity == null`, set `capacity_summary = null`
-  and add no warning (silence is correct; the deck simply omits the slide).
+- `capacity == null` → `capacity_summary = null` always. Add the warning `Team capacity
+  unavailable on this tracker.` only when `tracker == azure-devops` (capacity exists as a
+  concept there, so a null value is an unexpected miss worth flagging). Stay silent when
+  `tracker == jira` (Jira has no capacity concept at all, so a null value is expected;
+  silence is correct and the deck simply omits the slide).
 - `capacity != null` → `total` = `capacity.totalCapacity`;
   `committed` = sum of `in_progress` + `todo` points (the work still on the board), or null
   when basis is count; `per_member` passed through; `note` = a one-line read such as

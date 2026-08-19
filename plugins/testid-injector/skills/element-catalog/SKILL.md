@@ -66,7 +66,7 @@ Tag an element when **any** of these hold:
 - `input[type=hidden]`.
 - Purely presentational elements with no handler and no interactive role (`div`, `span`, `p`, `img`, `svg`, headings) — even inside a form.
 - `label`, `fieldset`, `legend` — they describe controls, they aren't the control. (Their text is a *signal* for naming the control they wrap.)
-- An element that already has the configured attribute (idempotency — the agent skips it).
+- An element that already has the configured attribute (idempotency — the agent skips it). This check matches the literal static form (`data-testid="..."`) **and** the framework's bound/dynamic form: Vue's `:data-testid="expr"` / `v-bind:data-testid="expr"`, and Angular's `[attr.data-testid]="expr"`. An element bound to a dynamic id is already tagged; never inject a second, conflicting static attribute alongside it. See the framework references (`references/vue.md`, `references/angular.md`) for the exact bound-form syntax.
 - `<option>` inside a `<datalist>` used only for native autocomplete, unless the user asks.
 
 ## Reading naming signals
@@ -93,3 +93,11 @@ For a big scan, Grep first to skip files with no UI, then Read only the hits. Us
 - Angular: `<(input|select|textarea|button|mat-select|mat-option)\b`, `\(click\)`, `\(change\)`.
 
 Then Read each hit file to get accurate element boundaries, attributes, and the surrounding label/text context. Do not rely on Grep alone to place edits — attribute insertion needs the real opening-tag span.
+
+**Existing-id (tagged) detection is not a single literal match.** When deciding `currentTestid`/`status` for a candidate, check for the configured attribute in *any* of the forms the target framework allows, not just `data-testid="literal"`:
+
+- Static, all frameworks: `data-testid="..."`.
+- Vue bound: `:data-testid="expr"` or `v-bind:data-testid="expr"`.
+- Angular bound: `[attr.data-testid]="expr"`.
+
+If a Grep pre-pass is used to shortlist files, include the bound-form patterns alongside the literal one (e.g. `data-testid=|:data-testid=|v-bind:data-testid=|\[attr\.data-testid\]=`) so a file whose only test id is bound isn't miscounted as untagged. Any of these forms marks the element `tagged`; never add a second, conflicting attribute next to one that's already bound.

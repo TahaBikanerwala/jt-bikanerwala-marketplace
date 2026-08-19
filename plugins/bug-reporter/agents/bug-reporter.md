@@ -77,7 +77,6 @@ The keys this agent reads:
 | `reported_label` | `"needs-triage"` | Phase 4 (both submodes; `null` skips the label) |
 | `bug_repro_steps_field` | `"Microsoft.VSTS.TCM.ReproSteps"` | Phase 3, 4 (AzDO field routing; `null` folds into the body) |
 | `bug_system_info_field` | `"Microsoft.VSTS.TCM.SystemInfo"` | Phase 3, 4 (AzDO field routing; `null` folds into the body) |
-| `severity_scheme` | `sev1..sev4` | Phase 3 (tier semantics) |
 | `severity_label_map` | `sev1: [1 - Critical, Sev-1, Critical], ...` | Phase 4 (the adapter projects the tier) |
 | `priority_label_map` | `{ P0: Highest, P1: High, P2: Medium }` (Jira only) | Phase 4 |
 
@@ -105,7 +104,8 @@ The first line of a skill invocation is the directive:
 
 Known directive keys:
 
-- `phase` — this agent's phase number.
+- `phase` — this agent's phase number (the one exception: the bootstrap call before Phase 0 sends
+  the literal string `bootstrap` instead of a number).
 - `mode` — `run | draft`.
 - `submode` — `create | refine`.
 - `tracker` — `azure-devops | jira`, so a skill can tailor field guidance.
@@ -119,7 +119,7 @@ Unknown keys are ignored.
 | `submode` | Phase 0 | all phases | `"create" \| "refine"` | |
 | `source_label` | Phase 0 | Phase 3, 5 | string | e.g. `"one-line report"`, `"support-escalation.md"`, `"AB#1234"` |
 | `raw_input` | Phase 0 | Phases 1, 3 | string | the symptom text as given, verbatim |
-| `issue_payload` | Phase 0 | Phases 1, 3, 4 | `Issue` | refine submode only |
+| `issue_payload` | Phase 0 | Phases 1, 3, 4 | `Issue & { comments: Comment[], history: Revision[] }` | refine submode only |
 | `dup_candidates` | Phase 1 | Phases 2, 3, 4, 5 | array of `{ id, url, title, state, why }` | confirmed by reading the candidate, not by title alone |
 | `related_candidates` | Phase 1 | Phases 3, 4 | array of `{ id, url, title, state }` | same area, different symptom |
 | `gaps` | Phase 2 | Phases 2, 3 | array of gap names | the report components the input does not answer |
@@ -149,9 +149,9 @@ Unknown keys are ignored.
   file the user hands over in Phase 0. The code dig belongs to `/issue-triager:run`.
 - **Never search chat, docs, or logs.** The only searching this agent does is the tracker duplicate
   search in Phase 1.
-- **Never fabricate severity.** It comes from impact evidence read against `severity_scheme`. When
-  the reporter's answers cannot support a tier, lazy-prompt once; do not guess and do not hedge in
-  writing.
+- **Never fabricate severity.** It comes from impact evidence read against the sev1..sev4 evidence
+  table in Phase 3. When the reporter's answers cannot support a tier, lazy-prompt once; do not guess
+  and do not hedge in writing.
 - **Never drop a fact in refine submode.** The refined description is a strict superset of the
   original description, its comments, and its history.
 - **Never create a work item the user has told you is a duplicate.** Point at the original instead.
@@ -172,6 +172,9 @@ Unknown keys are ignored.
 
 **Stops (exit cleanly):**
 
+- **No tracker MCP detected:** at bootstrap, when `tracker == none`: `mode=run` stops (nowhere to
+  file the bug); `mode=draft` with `submode=refine` stops (the existing bug cannot be read);
+  `mode=draft` with `submode=create` continues without Phase 1.
 - **Phase 0 no input:** ask once for the symptom or a bug reference; if still nothing usable, stop.
 - **Phase 0 not a Bug:** in refine submode, if the work item is not a Bug or Defect, stop and name
   the better tool (`/issue-triager:run` for a Story, Task or Spike; `/postmortem-generator:run` for a
@@ -318,7 +321,7 @@ populated.
 Then run `issuekit:prose-style` on each returned block. Cache the cleaned result as `report`.
 
 **Resolve severity.** Read the impact evidence (the `scope` answer, the affected counts in the input)
-against `severity_scheme`:
+against the evidence table below:
 
 | Tier | Evidence that supports it |
 |---|---|

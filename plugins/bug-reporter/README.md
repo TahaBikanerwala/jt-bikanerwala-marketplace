@@ -137,8 +137,7 @@ Optional `.claude/tracker-policy.json`, shared with the other tracker plugins (s
 | `reported_label` | `"needs-triage"` | Tag applied to reported bugs. `null` skips it. |
 | `bug_repro_steps_field` | `"Microsoft.VSTS.TCM.ReproSteps"` | AzDO only: field the reproduction sections write to. `null` folds them into the description. |
 | `bug_system_info_field` | `"Microsoft.VSTS.TCM.SystemInfo"` | AzDO only: field Environment writes to. `null` folds it into the description. |
-| `severity_scheme` | `sev1..sev4` | Tier semantics severity is resolved against. |
-| `severity_label_map` | `sev1: ["1 - Critical", ...]` | Abstract tier to the vendor's label. |
+| `severity_label_map` | `sev1: ["1 - Critical", ...]` | Abstract tier (resolved against the hardcoded sev1..sev4 evidence table in `bug-report-writer`) to the vendor's label. |
 | `priority_label_map` | `{ P0: Highest, P1: High, P2: Medium }` | Jira only: abstract priority to vendor priority name. |
 
 Missing keys are lazy-prompted at the moment they are needed and can be persisted.

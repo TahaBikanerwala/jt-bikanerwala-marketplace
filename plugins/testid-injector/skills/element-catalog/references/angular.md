@@ -34,6 +34,8 @@ Bind the attribute so each row is unique. `editKind=dynamic`.
 
 Use `[attr.data-testid]="..."` for bound/dynamic values on native elements (this sets the real DOM attribute). A plain static `data-testid="literal"` is fine for constant values.
 
+**Idempotency:** an element already carrying `[attr.data-testid]="..."` is already tagged. Treat it the same as a literal `data-testid="..."` match and skip it — never add a second, conflicting static attribute alongside a bound one. See the idempotency check in `element-catalog`'s `SKILL.md` ("Do not tag" and "Detection tactic for large scopes").
+
 ## Angular Material
 
 | Component | How the test id reaches the DOM |

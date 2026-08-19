@@ -8,7 +8,7 @@ tools: Read
 
 # Postmortem Writer
 
-Take a cached timeline (already built by `incident-timeline-builder`) and the original source materials, and produce the full postmortem document as a single block of markdown. The output uses the Google-SRE-style blameless template by default; future plugin releases may add other templates, but v1.0.0 ships only this one.
+Take a cached timeline (already built by `incident-timeline-builder`) and the original source materials, and produce the full postmortem document as a single block of markdown. The output uses the Google-SRE-style blameless template by default; future plugin releases may add other templates, but only this one is implemented today.
 
 This skill writes prose. It does not gather evidence (the agent does that in Phase 1), reconstruct the timeline (`incident-timeline-builder` does that in Phase 2), or render the output to the user (the agent does that in Phase 5). Its job is the document.
 
@@ -79,6 +79,7 @@ Render the YAML-style header block at the top of the document with these fields 
 
 **Status:** Draft
 **Author:** {author display name or "Unknown"}
+**Responders:** {comma-joined responder names/mentions from incident.responders, or "None identified" when the list is empty}
 **Severity:** {severity}
 **Duration:** {created_at} to {resolved_at} ({duration in minutes or hours})
 **Detection:** {how the incident was detected — derived from the first non-deploy event in the timeline, or [UNKNOWN] when not derivable}
@@ -100,7 +101,7 @@ Walk the section catalog in `references/postmortem-template.md` in order and emi
 
 Concatenate the header and the populated sections into a single markdown document. Add no preamble, no trailing summary, no commentary. The output is the document; the agent or user will render or save it.
 
-When `config.include_action_items` is `false`, omit the Action Items section header entirely and adjust the section numbering in the table of contents (when one is present, which the v1.0.0 template doesn't ship by default).
+When `config.include_action_items` is `false`, omit the Action Items section header entirely and adjust the section numbering in the table of contents (when one is present, which the template doesn't ship by default).
 
 When `config.include_timeline_evidence_links` is `false`, the Timeline section's table is rendered with an empty Source column. (The cached `timeline_markdown` already includes the source links; the skill must rewrite the table to drop the column when this flag is false. Use the table's column-count as the only signal that needs adjusting.)
 
