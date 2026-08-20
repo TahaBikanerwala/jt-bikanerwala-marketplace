@@ -80,7 +80,7 @@ Then search:
   - `{ keywords: "<feature area>", states: ["!Closed"] }`
   - `{ scope: "<component or area>", types: ["Bug", "Incident"] }`
 - **Linked issues.** Walk every entry in the issue's `customFields.linkedIssues` (or the equivalent `relations` array for AzDO, `issuelinks` for Jira — both surfaced via the adapter). Read the linked issue's title, state, and the most relevant scope statement.
-- **Docs** via the resolved doc backend (Confluence: `searchConfluenceUsingCql`; Azure Wiki: `wiki_search` or `search_wiki`). Look for runbooks, architecture pages, known-issues pages, onboarding docs. Use the feature area, system name, or entity type as the search term. Skip if `doc == none`.
+- **Docs** via the doc backend's `searchPages` (Confluence: `searchConfluenceUsingCql`; Azure Wiki: `wiki_search` or `search_wiki`). Look for runbooks, architecture pages, known-issues pages, onboarding docs. Use the feature area, system name, or entity type as the search term. Skip if `doc == none`.
 
 For each related issue, record: ID, title, state, assignee, the most relevant finding from description or comments.
 For each doc page, record: URL and a 1-line summary.

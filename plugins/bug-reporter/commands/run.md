@@ -62,7 +62,7 @@ when someone picks it up.
 Reads `.claude/tracker-policy.json` if present (issuekit's shared policy file). Keys this plugin
 uses: `bug_work_item_type`, `reported_label` (default `needs-triage`, `null` to skip),
 `bug_repro_steps_field` and `bug_system_info_field` (Azure DevOps field routing),
-`severity_scheme`, `severity_label_map`, `priority_label_map`. Missing keys are lazy-prompted at the
+`severity_label_map`, `priority_label_map`. Missing keys are lazy-prompted at the
 moment they are needed, with an offer to persist the answer.
 
 ## Boundaries

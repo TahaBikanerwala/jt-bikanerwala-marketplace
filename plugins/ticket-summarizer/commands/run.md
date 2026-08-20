@@ -32,9 +32,11 @@ This command is a thin shell. It dispatches to the `ticket-summarizer` agent, wh
    auto-detected).
 3. Resolves the matching work items with one batched fetch (never one call per
    item), narrowed to a small field set by default for speed and cost (`--detailed`
-   widens it). A state-filtered `searchIssues` call, narrowed further by the exact
-   `updated`/`resolved` date window in query mode; `--tags` always filters
-   client-side after the fetch, on both trackers. Query-mode results are always
+   widens it). Direct fetch for pasted references (any type), or a state-filtered
+   search for a query (the tracker-adapter's search verb only filters by created
+   date, so this plugin fetches full items and checks the exact `updated`/`resolved`
+   date window itself); `--tags` always filters client-side after the fetch, on both
+   trackers. Query-mode results are always
    scoped to Story, Bug, Epic, and (on Azure DevOps) Feature types only, a fixed
    default with no flag to widen it; a pasted ticket reference resolves regardless
    of its type.
@@ -111,10 +113,11 @@ chat delivery: if you already answered it there, you are not asked twice.
 ## Configuration
 
 Reads `.claude/tracker-policy.json` for `state_categories` (how vendor state names map
-to "active"/"delivered"). See
-`issuekit/skills/tracker-adapter/references/policy-schema.md` for the schema. Works
-with zero config; the shipped defaults cover the common Agile/Scrum/Basic AzDO states
-and the default Jira workflow.
+to "active"/"delivered"), and `feature_work_item_type`, `story_work_item_type`,
+`bug_work_item_type` (per-tracker vendor type names used to build the fixed query-mode
+type filter). See `issuekit/skills/tracker-adapter/references/policy-schema.md` for the
+schema. Works with zero config; the shipped defaults cover the common Agile/Scrum/Basic
+AzDO states and the default Jira workflow.
 
 ## See also
 

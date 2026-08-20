@@ -28,8 +28,8 @@ Anything not in the table above. Common cases:
 - Tables — AzDO renders them but Jira's MCP markdown→ADF converter is inconsistent. If a verb-plugin really needs a table, format the data as a bullet list of `field: value` lines.
 - Strikethrough — `~~text~~` works on Jira but not AzDO. Avoid.
 - Nested blockquotes — inconsistent everywhere.
-- Inline images — supported by both vendors but only when the image URL is an attachment on the same issue. Out of scope for v1.0.0.
-- Interactive checkboxes (`- [ ]`) — render as escaped bracket text on Jira; render as the literal characters on AzDO. When checkbox semantics are needed (e.g. a Definition of Done list), use a plain bullet list prefixed with the `☐` character (`- ☐ <item>`) instead — it renders as a static box glyph on both vendors and is the convention already in use on Rolai's Azure DevOps tickets.
+- Inline images — supported by both vendors but only when the image URL is an attachment on the same issue. Not implemented by any verb-plugin currently.
+- Interactive checkboxes (`- [ ]`) — render as escaped bracket text on Jira; render as the literal characters on AzDO. When checkbox semantics are needed (e.g. a Definition of Done list), use a plain bullet list prefixed with the `☐` character (`- ☐ <item>`) instead — it renders as a static box glyph on both vendors and is this adapter's own convention.
 - HTML tags inside the markdown — escaped to literal text by both vendors' converters.
 
 When out-of-subset content appears, the adapter renders it literally and surfaces a single warning at the end of the run:

@@ -19,7 +19,7 @@ Run these once at the start of the session and cache the results.
 ### Tracker bootstrap
 
 1. Invoke `issuekit:tracker-adapter` with `Calling context: phase=bootstrap.` Cache the resulting `{ tracker, chat, doc, log }` 4-tuple.
-2. Announce: `Detected: tracker=<value> chat=<value> doc=<value> log=<value>`.
+2. Announce: `Detected: tracker=<value>`. This plugin only ever uses the tracker backend, so `chat`, `doc`, and `log` are not announced even though the adapter's bootstrap 4-tuple includes them.
 3. If `tracker == none`, stop and tell the user that no tracker MCP is detected — there is nowhere to create stories.
 4. The adapter calls `whoAmI()` during bootstrap and caches `{ trackerUser, defaultProject, defaultTeam }`. Cache `defaultProject` as `target_project` (the project new stories are created in unless the user names another).
 

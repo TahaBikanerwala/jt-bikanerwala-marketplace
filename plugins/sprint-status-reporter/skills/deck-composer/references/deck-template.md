@@ -16,7 +16,7 @@ paginate: true
 # {{ sprint.name }}
 
 **{{ sprint.start }} → {{ sprint.end }}**
-Team: {{ team }} · Generated {{ today }}
+Generated {{ today }}
 
 ---
 

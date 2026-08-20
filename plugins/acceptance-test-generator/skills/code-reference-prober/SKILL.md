@@ -3,7 +3,7 @@ name: code-reference-prober
 description: "Reads the local checkout read-only to enrich BDD test generation — real data-testid/route/field names to make steps executable, the project's existing .feature/step-definition style and directory, domain terminology, the test framework in use, and spec-vs-code drift where the implementation appears to contradict an acceptance criterion. Never sources, adds, or reshapes a test behavior; behaviors come only from the story and its acceptance criteria. Returns evidence-tagged facts. Invoked by the acceptance-test-generator agent in Phase 3."
 metadata:
   author: Taha Bikanerwala
-tools: Read, Grep, Bash
+tools: Read, Grep, Bash, Glob
 ---
 
 # Code Reference Prober

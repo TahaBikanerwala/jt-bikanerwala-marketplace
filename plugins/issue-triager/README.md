@@ -9,7 +9,7 @@ Plug-and-play in this suite = `issuekit` + `issue-triager` + your own MCPs. This
 ## Install
 
 ```
-/plugin install issue-triager@incubyte-plugins
+/plugin install issue-triager@jt-bikanerwala-marketplace
 ```
 
 `issuekit` is declared as a dependency and Claude Code auto-installs it for you.
@@ -100,8 +100,8 @@ Phases 4–9 run only on Phase 3 confirmation. They execute as a batch through t
 |---|---|---|
 | Bug | `Bug` | `Bug`, `Defect` |
 | Incident | `Issue` (Agile) / `Impediment` (Scrum); with `incident` tag/label | `Incident`, `Outage`, anything tagged `incident` or `Sev-` |
-| Story | `User Story` (Agile), `Product Backlog Item` (Scrum), `Requirement` (CMMI) | `Story`, `Feature`, `Enhancement`, `New Feature` |
-| Feature | `Feature` | `Feature` (when not classified as Story) |
+| Story | `User Story` (Agile), `Product Backlog Item` (Scrum), `Requirement` (CMMI); `Feature` when leaf-level (no linked children) | `Story`, `Feature`, `Enhancement`, `New Feature` when leaf-level (no linked children) |
+| Feature | `User Story` (Agile), `Product Backlog Item` (Scrum), `Requirement` (CMMI), `Feature` when epic-level (has one or more linked child work items) | `Story`, `Feature`, `Enhancement`, `New Feature` when epic-level (has one or more linked child work items) |
 | Task | `Task` | `Task`, `Sub-task`, `Chore`, `Tech Debt` |
 | Spike | `Task` with `spike` tag | `Spike`, `Research`, `Investigation` |
 

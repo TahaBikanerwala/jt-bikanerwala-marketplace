@@ -82,6 +82,8 @@ Drop a `.claude/testid-policy.json` in your project root to override defaults:
 | `overwriteExisting` | `false` | Leave off to stay idempotent. |
 | `dynamicListStrategy` | `key-field` | How mapped/looped elements get per-item ids. |
 
+`include`, `exclude`, `elements`, and `maxLength` (shown in the JSON above) round out the schema. The full key list, defaults, and meanings live in the canonical reference: `skills/element-catalog/references/testid-policy-schema.md`.
+
 If no file is present, the agent uses defaults and offers to write one with the choices you made during the run.
 
 ## How it works

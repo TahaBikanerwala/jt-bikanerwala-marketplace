@@ -47,7 +47,7 @@ Emit the story as two clearly labelled fenced blocks so the caller can map each 
 <markdown: the Given/When/Then criteria only>
 ```
 
-The **DESCRIPTION** block holds every section except acceptance criteria; the **ACCEPTANCE CRITERIA** block holds only the Given/When/Then list. The caller writes the description block to the tracker's description field and the acceptance-criteria block to the tracker's acceptance-criteria field (on Jira, the caller folds AC into the body). Bodies are markdown; the tracker adapter converts them to HTML/ADF at write time. Do not add a parent or link reference — the story is standalone.
+The **DESCRIPTION** block holds every section except acceptance criteria; the **ACCEPTANCE CRITERIA** block holds only the Given/When/Then list. The caller passes the description block as `body` and the acceptance-criteria block as `acceptanceCriteria` to `createIssue`, uniformly for every tracker; `createIssue` (via issuekit) automatically folds `acceptanceCriteria` into the body on Jira when no custom AC field is configured, so the caller does nothing tracker-specific here. Bodies are markdown; the tracker adapter converts them to HTML/ADF at write time. Do not add a parent or link reference — the story is standalone.
 
 ## Writing rules
 

@@ -71,7 +71,7 @@ Core Jira has no native Test Case work item; test management comes from apps (Xr
 - When Xray is present and exposes a Cucumber/Gherkin field via `customFields`, put the scenario there so Xray recognises it as a Cucumber test; otherwise the description is the source of truth.
 - Link back to the story with `linkIssue(newId, storyId, "related")`.
 
-If the configured `test_case_work_item_type["jira"]` isn't valid on the project, the adapter lazy-prompts with the live type list at `createIssue` time — let it.
+`test_case_work_item_type["jira"]` is validated by this plugin before Phase 6 ever calls `createIssue`: call `issuekit:tracker-adapter`'s `getIssueTypeSchema` for `target_project`, and if the configured type isn't in the live list it returns, lazy-prompt the author (via `AskUserQuestion`) with that list before building the write. See `agents/acceptance-test-generator.md`'s Configuration section.
 
 ## Diff-and-confirm rendering
 

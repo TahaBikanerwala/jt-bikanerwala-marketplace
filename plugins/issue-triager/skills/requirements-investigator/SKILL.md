@@ -78,7 +78,7 @@ Then search:
   - `{ keywords: "<feature name>", types: ["Story", "Feature", "Task", "Spike"] }`
   - `{ scope: "<component>", types: ["Story", "Feature", "Task", "Spike"], dateWindow: { from: <issue.created - 90d> } }`
   - `{ parent: "<epic id>" }` when the issue has an epic parent.
-- **Docs** via the resolved doc backend (Confluence: `searchConfluenceUsingCql`; Azure Wiki: `wiki_search` / `search_wiki`). Search for product briefs, design docs, ADRs, RFCs, runbooks for the area. Use the feature area, system name, or product theme as the search term. Skip if `doc == none`.
+- **Docs** via the doc backend's `searchPages` (Confluence: `searchConfluenceUsingCql`; Azure Wiki: `wiki_search` / `search_wiki`). Search for product briefs, design docs, ADRs, RFCs, runbooks for the area. Use the feature area, system name, or product theme as the search term. Skip if `doc == none`.
 
 For each related issue, record: id, title, state, assignee, the most relevant scope or AC finding.
 For each doc page, record: URL and a 1-line summary of what it contains.

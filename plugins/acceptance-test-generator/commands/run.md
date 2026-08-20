@@ -35,7 +35,7 @@ This command is a thin shell. It dispatches to the `acceptance-test-generator` a
 5. **Pause** to pick which behaviors to generate, whether to also create tracker Test Cases, plus a free-form notes box.
 6. Write canonical Gherkin (`bdd-scenario-writer`), cleaned with `issuekit:prose-style`.
 7. **Pause at the local write gate**, then write the `.feature` files.
-8. If chosen, **pause at the tracker diff-and-confirm gate**, then create each scenario as a Test Case work item linked back to the story.
+8. If chosen, create each scenario as a Test Case work item linked back to the story, **pausing at one diff-and-confirm gate per Test Case**.
 9. Summarize with an AC→scenario traceability matrix, files/work items created, and any Open Questions or drift the author must close.
 
 The one rule: **test cases come only from the story and its acceptance criteria.** The code is consulted for reference, never as the source of a behavior. Every gate's diff is the dry-run; declining exits cleanly with nothing written.

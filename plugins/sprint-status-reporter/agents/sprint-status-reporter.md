@@ -151,7 +151,7 @@ Calling context: phase=3.
 
 Compute the sprint metrics.
 
-{ "sprint": <sprint>, "items": <items>, "capacity": <capacity>, "policy": <relevant policy keys>, "today": "<today>" }
+{ "sprint": <sprint>, "items": <items>, "capacity": <capacity>, "policy": <relevant policy keys>, "today": "<today>", "tracker": "<tracker>" }
 ```
 
 The skill returns a metrics model (buckets, percentages, remaining, blocked/stale, up-next,
@@ -219,7 +219,14 @@ Find the "before" state to compare against, in this order:
 3. **No snapshot, `since_arg` set, `tracker == azure-devops`** → reconstruct. For each item
    in `items`, call `getIssueHistory(id)` via the adapter and replay its `Revision[]`
    (`{ at, by, field, from, to }`, oldest-first) up to and including `since_arg`, deriving
-   each item's `state`, `points`, `assignee`, and `updated` as they were on that date.
+   each item's `state`, `points`, `assignee`, and `updated` as they were on that date. Then
+   derive each reconstructed item's `stateCategory` the same way `getSprintItems` does: if
+   `policy.state_categories` lists the reconstructed `state` under `done` / `in_progress` /
+   `todo` (case-insensitive), use that; otherwise fall back to the work-item-type category
+   lookup (`Completed`/`Resolved` → `done`, `InProgress` → `in_progress`, `Proposed` →
+   `todo`, `Removed` → `done`); if neither resolves it, set `stateCategory: "unknown"`. This
+   keeps the reconstructed items shape-compatible with what `sprint-analyzer` expects (it
+   buckets strictly on `stateCategory`, never on raw `state`).
    Items created after `since_arg` are excluded from the reconstructed set (they surface as
    "added" in the delta). Run `sprint-analyzer` on the reconstructed item set (same policy,
    `today = since_arg`) to produce baseline metrics. Assemble

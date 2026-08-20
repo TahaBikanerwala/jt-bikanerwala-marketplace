@@ -2,14 +2,13 @@
 
 The fixed structure for every story. Sections appear in this order. The first group is the **DESCRIPTION (body)** block; the acceptance criteria are the separate **ACCEPTANCE CRITERIA** block (see the skill's Output shape). Write in markdown; the tracker adapter converts it.
 
-Use `## <emoji> <heading>` for section titles inside the body (not `#`, so the work-item title stays the visual top heading after conversion). The emoji per heading is fixed — match it exactly; it is the house style already in use on Rolai's Azure DevOps tickets (e.g. work item 3491), not decoration to vary per story.
+Use `## <emoji> <heading>` for section titles inside the body (not `#`, so the work-item title stays the visual top heading after conversion). The emoji per heading is fixed — match it exactly; it is this plugin's house style for every generated story, not decoration to vary per story.
 
 | Heading | Emoji |
 |---|---|
 | Problem Statement | 🧩 |
 | Background | 🏁 |
 | Description | 📝 |
-| Acceptance Criteria | ✅ |
 | In Scope | 🟢 |
 | Out of Scope | 🔴 |
 | Definition of Done | 🏁 |

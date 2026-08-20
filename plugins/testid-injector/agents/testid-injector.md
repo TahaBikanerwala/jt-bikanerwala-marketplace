@@ -10,7 +10,7 @@ Find every interactive and form element in the targeted UI source that is missin
 
 Two rules sit above everything else:
 
-- **Idempotent.** If an element already carries the configured attribute, never touch it. The agent only fills gaps.
+- **Idempotent.** If an element already carries the configured attribute, never touch it. This includes the framework's bound/dynamic form of the attribute (Vue `:data-testid="expr"` / `v-bind:data-testid="expr"`, Angular `[attr.data-testid]="expr"`), not just the literal string form — see `element-catalog`'s idempotency check. The agent only fills gaps.
 - **Gated.** No file is edited until the user confirms the full diff. The diff is the dry-run. Declining writes nothing.
 
 ## Mode parameter
@@ -34,19 +34,9 @@ Delegate to the `testid-namer` skill — load it in Phase 2. The short version: 
 
 ## Configuration
 
-Look for `.claude/testid-policy.json` in the project root. If present, merge over the shipped defaults below. If absent, use defaults silently and, at the end, offer to write the file with the choices made this run.
+Look for `.claude/testid-policy.json` in the project root. If present, merge over the shipped defaults. If absent, use defaults silently and, at the end, offer to write the file with the choices made this run.
 
-| Key | Default | Meaning |
-|---|---|---|
-| `attribute` | `"data-testid"` | The attribute to add. Switch to `data-test`, `data-cy`, `data-qa`, etc. for other harnesses. |
-| `naming` | `"semantic-kebab"` | `semantic-kebab` \| `component-scoped` \| `camelCase`. |
-| `scopePrefix` | `"none"` | `none` \| `"auto"` (prefix from the component/file name) \| a literal string. |
-| `include` | `["src/**/*.{jsx,tsx,js,ts,html,vue,svelte}"]` | Globs to scan. |
-| `exclude` | `["**/node_modules/**", "**/*.test.*", "**/*.spec.*", "**/*.stories.*", "**/dist/**", "**/build/**"]` | Globs to skip. |
-| `elements` | `{ forms: true, interactive: true, links: true, options: true }` | Toggle element classes. |
-| `maxLength` | `40` | Max id length before truncation. |
-| `overwriteExisting` | `false` | When true, replace existing ids that don't match the scheme. Off by default — keep it idempotent. |
-| `dynamicListStrategy` | `"key-field"` | For `.map`/`v-for`/`*ngFor`: `key-field` (derive from the item's id/key) or `index`. |
+Nine keys control the attribute name, naming scheme, scope prefix, scan `include`/`exclude` globs, which `elements` classes are tagged, `maxLength`, `overwriteExisting`, and `dynamicListStrategy`. The full key list, defaults, and meanings are the canonical `element-catalog` reference: `skills/element-catalog/references/testid-policy-schema.md`. Load it whenever the exact schema matters (merging a project's file, or offering to write one).
 
 ## Working state
 
@@ -57,7 +47,7 @@ Look for `.claude/testid-policy.json` in the project root. If present, merge ove
 | `scope_files` | Phase 0 | 1 | resolved file list |
 | `candidates` | Phase 1 | 2, 3 | array of `{file, line, snippet, elementType, role, currentTestid, status, signals}` |
 | `assignments` | Phase 2 | 3, 4 | candidates that need a tag, each with `proposedTestid` (literal or template) and `editKind` |
-| `manual_review` | Phase 1, 2 | 5 | elements that can't be edited mechanically (e.g. a component that doesn't forward the attribute) |
+| `manual_review` | Phase 1, 2 | 2, 3, 6 | elements that can't be edited mechanically (e.g. a component that doesn't forward the attribute) |
 | `confirmed` | Phase 3 | 4 | bool |
 
 ## Do-not rules
@@ -88,7 +78,7 @@ Load the `element-catalog` skill. For each file in `scope_files`:
 2. Enumerate every element matching the catalog, respecting the `policy.elements` toggles.
 3. **When a file imports or renders a composite widget** (any date picker / calendar / autocomplete / combobox / multi-select / time picker / slider / pagination / tabs / accordion / rating / OTP / dropzone / color picker / menu — detect via imported component names and JSX/template usage), load `element-catalog`'s `references/composite-widgets.md` and enumerate the widget's parts, not just its wrapper. Each part is its own candidate.
 4. For each, record `{file, line, snippet, elementType, role, currentTestid, signals, widget?}` where `signals` collects `id`, `name`, label text, `aria-label`, `placeholder`, visible text, `value`, and enclosing component/section name; `widget` names the parent composite and the part (e.g. `{widget: "start-date", part: "day-cell"}`) when applicable.
-5. Set `status`: `tagged` (already has the attribute → skip), `needs-tag`, or `manual-review` (a custom component or widget part that may not forward the attribute — see the framework and composite-widget references). Append manual-review items to `manual_review` with the documented hook to use.
+5. Set `status`: `tagged` (already has the attribute, literal or framework bound/dynamic form → skip), `needs-tag`, or `manual-review` (a custom component or widget part that may not forward the attribute — see the framework and composite-widget references). Append manual-review items to `manual_review` with the documented hook to use.
 
 Cache `candidates`.
 

@@ -6,9 +6,11 @@ The report template differs by archetype. Pick the matching template based on th
 
 Each template has a fixed section list and order. Do not omit a section heading. If a section has nothing meaningful to say, write a one-line note under the heading ("Not applicable for this issue" or "Nothing prior found"). The absence is itself signal, and keeping the heading lets a reader scan for the section even when it is empty.
 
+This is the opposite convention from `issue-refiner`'s template (which omits empty sections entirely, heading and all) — intentionally: this report is an internal investigation artifact where a reader scanning for "was X checked?" needs every heading present to tell "checked, nothing found" apart from "not checked," while `issue-refiner` produces the issue's own description, read cold by a stranger who benefits from it being exactly as long as what's known.
+
 ## Story / Feature template
 
-Six sections. The agent routes Story and Feature archetypes through this template. (Story = leaf-level; Feature = epic-level. The template handles both; the Lead section names which scale.)
+Six sections. The agent routes Story and Feature archetypes through this template. (Story = leaf-level, i.e. no child work items linked via a parent/child hierarchy relation; Feature = epic-level, i.e. one or more such children — see the issue-triager agent's Phase 0 archetype detection for the exact test. The template handles both; the Lead section names which scale.)
 
 ### 1. Lead
 
