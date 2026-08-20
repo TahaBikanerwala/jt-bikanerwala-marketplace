@@ -10,7 +10,7 @@ Process a tracker issue through the full triage workflow regardless of archetype
 
 **This is where the code dig lives.** `/bug-reporter:run` files a bug fast and deliberately never opens the checkout, so a freshly reported Bug arrives here with a symptom, an impact read, and a Missing Information list, and nothing else. Phase 2b is the phase that turns that into a localized defect with a proposed fix. Expect this agent to be the slow, expensive one in the pair; that is the split working as designed.
 
-All tracker access goes through `issuekit:tracker-adapter`, so no vendor-specific tracker tool name appears in this prompt. Chat-user lookup (`slack_search_users`) and log search (`search_datadog_logs`) are the two exceptions: `issuekit` has no abstraction for chat *search* (only `resolveChatUser`/`sendMessage` for outbound identity/delivery) or for log search, so those two steps name concrete vendor MCP tools directly. If either tool is renamed or re-versioned upstream, those two steps — and only those two — need updating here.
+All tracker access goes through `issuekit:tracker-adapter`, so no vendor-specific tracker tool name appears in this prompt. Chat-user lookup goes through `resolveChatUser({ email })`, the same abstraction `tracker-adapter`'s bootstrap and `ticket-summarizer` use. Log search (`search_datadog_logs`) is the one exception: `issuekit` has no abstraction for log search, so that step names the concrete vendor MCP tool directly. If it is renamed or re-versioned upstream, that step needs updating here.
 
 **Phase 3 is the single confirmation gate.** Phases 4–9 are gated writes that execute only after the user confirms the diff. The diff is the dry-run.
 
@@ -33,7 +33,7 @@ Run these once at the start of the session and cache the results.
 2. Announce: `Detected: tracker=<value> chat=<value> doc=<value> log=<value>`.
 3. If `tracker == none`, stop and tell the user that no tracker MCP is detected.
 4. The adapter calls `whoAmI()` during bootstrap and caches `{ trackerUser, defaultProject, defaultTeam }`. Cache `trackerUser` as `running_user` for assignment writes.
-5. If a chat MCP is detected, resolve the running user on the chat side too (Slack: `slack_search_users` by email; Teams: equivalent lookup). Cache as `running_chat_user`. If lookup fails, treat chat as unavailable for outbound posts but keep it available for inbound searches.
+5. If a chat MCP is detected, resolve the running user on the chat side too via `resolveChatUser({ email })`. Cache as `running_chat_user`. If lookup fails, treat chat as unavailable for outbound posts but keep it available for inbound searches.
 6. **Resolve escalation contacts** from `policy.escalation.primary_contact` and `policy.escalation.fallback_contact`. For each, call `resolveUser({ email })` on the tracker side AND look up on the chat side. Cache as `escalation_target` and `escalation_fallback`. If a lookup fails on either side, leave the slot null and append a deferred warning for the Phase 10 summary. Never abort for an escalation lookup failure.
 
 ### Configuration
