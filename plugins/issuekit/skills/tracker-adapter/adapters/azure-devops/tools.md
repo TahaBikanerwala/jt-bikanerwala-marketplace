@@ -15,7 +15,7 @@ switch shapes mid-session.
 
 | Verb | Classic tool (suffix) | Consolidated tool (suffix) | Notes |
 |---|---|---|---|
-| `whoAmI` | `__core_list_projects`, `__wit_my_work_items` | `__core_list_projects`, `__wit_work_item` (`action: "my"`) | run both to confirm reachability and resolve identity |
+| `whoAmI` | `__core_list_projects`, `__wit_my_work_items` | `__core_list_projects`, `__wit_work_item` (`action: "my"`) | run both to confirm reachability and resolve identity; `core_list_projects` alone never resolves `defaultProject` on a multi-project org — see `references/verbs.md`'s "Resolving AzDO's `defaultProject`/`defaultTeam`" for the full precedence |
 | `getIssue` | `__wit_get_work_item` | `__wit_work_item` (`action: "get"`, `id`) | call with `expand: "all"`, or with `fields` (see below) when the caller narrowed the request; the consolidated tool rejects combining `fields` with `expand` on the same call, same as classic |
 | `getIssuesBatch` | `__wit_get_work_items_batch_by_ids` | `__wit_work_item` (`action: "get_batch"`, `ids`) | all ids in one call; same `fields` narrowing as `getIssue` |
 | `getIssueComments` | `__wit_list_work_item_comments` | `__wit_work_item` (`action: "list_comments"`, `workItemId`) | separate fetch even when `expand: "all"` was used |
