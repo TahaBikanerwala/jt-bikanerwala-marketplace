@@ -59,7 +59,9 @@ Path: `.claude/tracker-policy.json` (project-root). Optional. When absent, the a
   "bug_work_item_type": { "azure-devops": "Bug", "jira": "Bug" },
   "reported_label": "needs-triage",
   "bug_repro_steps_field": "Microsoft.VSTS.TCM.ReproSteps",
-  "bug_system_info_field": "Microsoft.VSTS.TCM.SystemInfo"
+  "bug_system_info_field": "Microsoft.VSTS.TCM.SystemInfo",
+  "default_project": null,
+  "default_team": null
 }
 ```
 
@@ -214,6 +216,26 @@ Set to `null` to fold those sections into the description body instead. Ignored 
 
 Azure DevOps only. The field environment detail is written to on a Bug (environment, versions, browser and OS, device, tenant, region). Set to `null` to fold it into the description body instead. Ignored on Jira. **Default:** `"Microsoft.VSTS.TCM.SystemInfo"`.
 
+### `default_project` (string)
+
+Overrides `whoAmI()`'s live-lookup resolution of the tracker's default project (see
+`references/verbs.md`'s "Resolving AzDO's `defaultProject`/`defaultTeam`" for the
+full precedence — this key is checked first, ahead of the AzDO MCP server's own
+`ado_mcp_project` config and the single-project auto-resolve). Works on both
+trackers: the AzDO project name, or the Jira project key.
+
+**Default if unset:** resolved live per the precedence in `verbs.md` (server config,
+then single-project auto-resolve, then lazy-prompt). The lazy-prompt path writes its
+answer here so the question is never asked twice.
+
+### `default_team` (string)
+
+Same role as `default_project`, for the team used by sprint/capacity reads
+(`getCurrentSprint`, `getSprintItems`, `getTeamCapacity`). AzDO-only in practice —
+Jira has no first-class team concept in this adapter (see `adapters/jira/sprint.md`).
+
+**Default if unset:** resolved live alongside `default_project`, same precedence.
+
 ## Lazy-prompt question text
 
 When a missing key is encountered, ask via `AskUserQuestion` using these question templates:
@@ -232,6 +254,8 @@ When a missing key is encountered, ask via `AskUserQuestion` using these questio
 | `points_field_name` | "Which Jira field holds story points? (Leave blank to auto-detect.)" | free text or skip |
 | `bug_work_item_type` | "Which work-item type should filed bugs be created as?" | live type list from schema |
 | `reported_label` | "What label should mark a bug as reported but not yet triaged? (Leave blank for none.)" | free text, default "needs-triage" |
+| `default_project` | "Which project should this session default to?" | live list from `core_list_projects` (AzDO) or accessible resources (Jira) |
+| `default_team` | "Which team should this session default to?" | live team list for the resolved `default_project` |
 
 After every answer, offer:
 
