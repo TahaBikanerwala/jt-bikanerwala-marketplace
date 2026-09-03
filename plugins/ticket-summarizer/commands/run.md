@@ -134,6 +134,18 @@ destination: without `--output`, this step does not run at all. When the path
 already exists, the agent asks before overwriting it. The ids choice is shared with
 chat delivery: if you already answered it there, you are not asked twice.
 
+## Clipboard delivery
+
+After printing (and after any chat send or file save above), the agent checks the
+machine for a clipboard tool: `xclip`, `xsel`, `wl-copy`, `pbcopy`, or `clip.exe`, in
+that order. When one is found, it offers to copy the same summary straight to the
+clipboard, no flag required and regardless of whether `--to` or `--output` were
+given. Answering yes puts the exact text you would paste into a deck directly on
+your system clipboard: no file, no chat round-trip. The ids choice is shared with
+chat and file delivery: if you already answered it there, you are not asked again.
+When no clipboard tool is detected, this offer is skipped silently, the same way
+chat delivery is skipped when no chat tool is detected.
+
 ## Configuration
 
 Reads `.claude/tracker-policy.json` for `state_categories` (how vendor state names map

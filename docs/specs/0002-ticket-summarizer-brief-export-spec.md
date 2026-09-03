@@ -146,12 +146,12 @@ sequenceDiagram
 
 **Acceptance criteria**
 
-- [ ] **5.3.1** A read-only capability probe checks for a first available clipboard tool (`xclip`, `xsel`, `wl-copy`, `pbcopy`, `clip.exe`, checked in that order; first found wins), run once per session, mirroring the plugin family's existing `marp-cli` probe pattern (source 4).
-- [ ] **5.3.2** When a tool is detected and the resolved item set is non-empty, the agent asks "Copy this summary to the clipboard?" (Yes/No) immediately after Phase 3 prints, regardless of whether `--to` or `--output` were also given.
-- [ ] **5.3.3** On "Yes", if `include_ids` is not already set (from chat or file delivery earlier in the same run), ask the same with-ids/without-ids question those phases already ask; reuse the answer when it is already set.
-- [ ] **5.3.4** The clipboard payload is the same body Phase 4/5 already build (brief-line list, truncation note, unresolved-refs notes), rendered per the resolved `include_ids` choice, piped to the detected tool.
-- [ ] **5.3.5** On success, confirm `Copied to the clipboard.` On failure (the shell-out errors), report `Could not copy to the clipboard: <reason>. The printed summary above is still the full output.` and do not retry (invariant 4.2).
-- [ ] **5.3.6** When no clipboard tool is detected, the offer is skipped entirely, with no message to the user, exactly as the chat offer is already skipped silently when `chat == none`.
+- [x] **5.3.1** A read-only capability probe checks for a first available clipboard tool (`xclip`, `xsel`, `wl-copy`, `pbcopy`, `clip.exe`, checked in that order; first found wins), run once per session, mirroring the plugin family's existing `marp-cli` probe pattern (source 4).
+- [x] **5.3.2** When a tool is detected and the resolved item set is non-empty, the agent asks "Copy this summary to the clipboard?" (Yes/No) immediately after Phase 3 prints, regardless of whether `--to` or `--output` were also given.
+- [x] **5.3.3** On "Yes", if `include_ids` is not already set (from chat or file delivery earlier in the same run), ask the same with-ids/without-ids question those phases already ask; reuse the answer when it is already set.
+- [x] **5.3.4** The clipboard payload is the same body Phase 4/5 already build (brief-line list, truncation note, unresolved-refs notes), rendered per the resolved `include_ids` choice, piped to the detected tool.
+- [x] **5.3.5** On success, confirm `Copied to the clipboard.` On failure (the shell-out errors), report `Could not copy to the clipboard: <reason>. The printed summary above is still the full output.` and do not retry (invariant 4.2).
+- [x] **5.3.6** When no clipboard tool is detected, the offer is skipped entirely, with no message to the user, exactly as the chat offer is already skipped silently when `chat == none`.
 
 **Verification (slice complete when these pass):**
 

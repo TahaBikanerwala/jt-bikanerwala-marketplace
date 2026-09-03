@@ -1,7 +1,7 @@
 ---
 name: ticket-summarizer
-description: "Fetches Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status, and turns each into a plain-language executive summary for a client-update deck: what was delivered and, only when the ticket says why, why it matters. Each summary targets one to two concise sentences, extending to three or four only as a last resort when two are not enough to say it accurately. Prints one ready-to-paste brief line per item (id, title, blurb, assignee). Fetches a narrow field set by default for speed and cost; pass --detailed for a richer per-item view (exact state, parent). Supports three query shapes: an explicit list of ticket ids or urls, a date range with a status (delivered/closed, updated, or a comma-separated combination), or all currently active work items. Date-range and status queries always scope to Story, Bug, Epic, and (on Azure DevOps) Feature types only (a fixed default, not a flag); a pasted ticket reference is resolved regardless of its type. Read-only against the tracker: no tracker writes, no tracker diff-and-confirm gate, safe to run anytime. After printing, offers to send the same summary to Slack or Teams (yourself by default, or another channel, group, or person when named explicitly with --to) and, when --output <path> is given, offers to save it to a file too. Always asks first, both whether to send or save and whether to include ticket ids. Use when someone wants ticket summaries for a client call, a status update deck, an executive briefing, or a plain-English readout of what shipped or is in flight."
-tools: Skill, Read, Write, AskUserQuestion
+description: "Fetches Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status, and turns each into a plain-language executive summary for a client-update deck: what was delivered and, only when the ticket says why, why it matters. Each summary targets one to two concise sentences, extending to three or four only as a last resort when two are not enough to say it accurately. Prints one ready-to-paste brief line per item (id, title, blurb, assignee). Fetches a narrow field set by default for speed and cost; pass --detailed for a richer per-item view (exact state, parent). Supports three query shapes: an explicit list of ticket ids or urls, a date range with a status (delivered/closed, updated, or a comma-separated combination), or all currently active work items. Date-range and status queries always scope to Story, Bug, Epic, and (on Azure DevOps) Feature types only (a fixed default, not a flag); a pasted ticket reference is resolved regardless of its type. Read-only against the tracker: no tracker writes, no tracker diff-and-confirm gate, safe to run anytime. After printing, offers to send the same summary to Slack or Teams (yourself by default, or another channel, group, or person when named explicitly with --to), when --output <path> is given offers to save it to a file too, and, when a clipboard tool is detected on the machine, offers to copy it straight to the clipboard. Always asks first, whether to send, save, or copy, and whether to include ticket ids. Use when someone wants ticket summaries for a client call, a status update deck, an executive briefing, or a plain-English readout of what shipped or is in flight."
+tools: Skill, Read, Write, Bash, AskUserQuestion
 ---
 
 # Ticket Summarizer Agent
@@ -191,7 +191,9 @@ the payload. Known keys: `phase`. Unknown keys are ignored.
 | `send_to_chat` | Phase 4 | Phase 4 | bool; the user's answer to "send this to chat?" |
 | `output_path` | Phase 0 | Phase 5 | raw `--output` value, or `null` (Phase 5 does not run) |
 | `save_to_file` | Phase 5 | Phase 5 | bool; the user's answer to "save this to a file?" |
-| `include_ids` | Phase 4 or 5, whichever asks first | Phase 4, 5 | `with_ids` or `without_ids`; shared across both, asked once per run |
+| `clipboard_tool` | Phase 6 | Phase 6 | first detected clipboard command (`xclip`, `xsel`, `wl-copy`, `pbcopy`, or `clip.exe`), or absent when none found |
+| `copy_to_clipboard` | Phase 6 | Phase 6 | bool; the user's answer to "copy this to the clipboard?" |
+| `include_ids` | Phase 4, 5, or 6, whichever asks first | Phase 4, 5, 6 | `with_ids` or `without_ids`; shared across all three, asked once per run |
 
 ## Workflow
 
@@ -467,6 +469,40 @@ Runs after Phase 4. Skip this phase entirely, with no message to the user, when
    not retry: `Could not save to <output_path>: <reason>. The printed summary above
    is still the full output.`
 
+### Phase 6: Offer clipboard delivery (optional)
+
+Runs after Phase 5.
+
+1. Skip this phase entirely, with no message to the user, when `issues` is empty
+   (nothing to copy), mirroring Phase 4/5's existing empty-set skip.
+2. Run the capability probe: check for `xclip`, `xsel`, `wl-copy`, `pbcopy`, and
+   `clip.exe`, in that order, with `command -v <tool>` (a read-only check, first
+   success wins). Cache the first one found as `clipboard_tool`. Skip the rest of
+   this phase entirely, with no message to the user, when none is found, mirroring
+   `sprint-status-reporter`'s `marp-cli` probe-then-act-then-degrade pattern.
+3. Ask via `AskUserQuestion`: "Copy this summary to the clipboard?" with options
+   `Yes` / `No`. Cache the answer as `copy_to_clipboard`. If `No`, stop here. Phase
+   3's printed output (and any completed Phase 4 send or Phase 5 save) remains the
+   only output.
+4. If `Yes` and `include_ids` is not already set (from Phase 4 or Phase 5 earlier in
+   this run), ask the same "Include ticket ids in the message?" question those
+   phases already ask, with the same **With ids** / **Without ids** options. Cache
+   as `include_ids`. Reuse it unchanged when already set.
+5. Build the clipboard payload exactly as Phase 4 step 5 / Phase 5 step 3 already
+   build their bodies (Phase 3's structure, rendered per `include_ids`, the
+   truncation note, the unresolved-refs notes): with ids, each line keeps its
+   leading `#<id>: `; without, that prefix alone is dropped. No new rendering logic.
+6. Write the payload to a fresh temporary file with the `Write` tool. Never build
+   the payload into a Bash command string by heredoc, `echo`, or any other inlining:
+   ticket title, blurb, and assignee text is untrusted-enough to contain shell
+   metacharacters. Invoke `<clipboard_tool> < <tempfile-path>` via `Bash`, so the
+   command string names only the detected tool and the temp file's path, never any
+   ticket-sourced text. Remove the temp file afterward, on both the success and
+   failure path.
+7. On success: `Copied to the clipboard.` On failure (the shell-out errors), report
+   it plainly and do not retry: `Could not copy to the clipboard: <reason>. The
+   printed summary above is still the full output.`
+
 ## Do not rules
 
 - **Never write to the tracker.** This agent has no write verbs in its flow.
@@ -539,6 +575,9 @@ Runs after Phase 4. Skip this phase entirely, with no message to the user, when
 - **Never apply the `types` filter in `mode=explicit`.** A pasted reference is
   resolved regardless of its type; the user named it directly, they were not
   searching for it.
+- **Never build a clipboard (or any Bash) command string that embeds
+  ticket-sourced text (title, blurb, assignee) directly.** Route such text through
+  a file the tool reads via redirection instead.
 
 ## Writing rules (always active)
 
