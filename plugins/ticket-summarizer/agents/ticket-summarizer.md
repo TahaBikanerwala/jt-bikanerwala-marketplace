@@ -57,6 +57,10 @@ mistaken for a tracker reference or folded into `keywords`):
 - Otherwise set `mode=query` and parse flags:
   - `--from <date>` / `--till <date>`: any unambiguous date string; normalize to
     `YYYY-MM-DD`.
+  - `--range <preset>`: one of `this-week`, `last-week`, `this-month`,
+    `last-month`; resolves to a concrete `from`/`till` pair before Phase 1 runs
+    (see Phase 0), computed against the cached `today`. Mutually exclusive with
+    `--from`/`--till`; see Validation.
   - `--status active|delivered|closed|updated`: `delivered` and `closed` are
     synonyms. Default `updated` when a date range is given and `--status` is absent.
   - `--project <name>`: passed straight through to the search.
@@ -78,9 +82,16 @@ mistaken for a tracker reference or folded into `keywords`):
 **Validation:**
 
 - `--status active` needs no date range: the query is bounded by state only.
-- `--status delivered|closed|updated` with neither `--from` nor `--till`: ask once via
-  `AskUserQuestion` for a date range (offer a default of "last 30 days," computed
-  against today's date) rather than fetching an unbounded history.
+- `--range` combined with either `--from` or `--till`: stop and tell the user
+  `--range` cannot be combined with `--from`/`--till`; pick one. This check runs
+  before any fetch, never a silent override of one by the other.
+- An unrecognized `--range` value: stop and tell the user the four accepted
+  presets (`this-week`, `last-week`, `this-month`, `last-month`). Never fall back
+  to a default window.
+- `--status delivered|closed|updated` with neither `--from`, `--till`, nor
+  `--range`: ask once via `AskUserQuestion` for a date range (offer a default of
+  "last 30 days," computed against today's date) rather than fetching an
+  unbounded history.
 - `mode=explicit` ignores every mode=query flag above; it only reads the
   references. `--to` and `--output` were already extracted separately above and
   still apply.
@@ -154,6 +165,8 @@ the payload. Known keys: `phase`. Unknown keys are ignored.
 | `types` | Phase 0 | Phase 1 | `[story_work_item_type[tracker], bug_work_item_type[tracker], "Epic"]`, plus `feature_work_item_type[tracker]` appended when that key resolves to a value (Azure DevOps by default); always set in `mode=query`, never read in `mode=explicit` |
 | `status_label` | Phase 0 | Phase 3 | `"Active"`, `"Delivered"`, or `null` (no heading; flat list) |
 | `date_field` | Phase 0 | Phase 1 | `updated`, `resolved`, or `null` (no date filter) |
+| `from` | Phase 0 | Phase 1 | resolved start date (`YYYY-MM-DD`), from `--range` or explicit `--from`, or `null` (no lower bound) |
+| `till` | Phase 0 | Phase 1 | resolved end date (`YYYY-MM-DD`), from `--range` or explicit `--till`, or `null` (no upper bound) |
 | `tag_filters` | Phase 0 | Phase 1 | tag/label substrings from `--tags`, or `null` (no tag filter) |
 | `detailed` | Phase 0 | Phase 1, 3 | bool from `--detailed`; picks the fetched `fields` list and whether Phase 3 prints the extra metadata line |
 | `issues` | Phase 1 | Phase 2, 3 | `Issue[]`, the resolved item set; Phase 3 reads it too when `detailed` |
@@ -174,8 +187,24 @@ the payload. Known keys: `phase`. Unknown keys are ignored.
 ### Phase 0: Parse
 
 Record today's date (ISO `YYYY-MM-DD`) as `today` first; the "last 30 days" default in
-Validation needs it. Parse `mode` and, in query mode, the flags above, applying
-Validation. Run the bootstrap and configuration steps in Prerequisites. Resolve
+Validation needs it, and it is the only clock read this phase makes — every
+`--range` computation below reads this cached value, never a second clock read.
+Parse `mode` and, in query mode, the flags above, applying Validation.
+
+Resolve `from` and `till` next. When `--range` is absent, `from`/`till` are
+whatever `--from`/`--till` resolved to during flag parsing, or absent when
+neither was given. When `--range` is present (Validation already confirmed it is
+not combined with `--from`/`--till`, and is one of the four accepted presets),
+resolve `from`/`till` from the cached `today`:
+
+| `--range` value | `from` | `till` |
+|---|---|---|
+| `this-week` | Monday of the current ISO week | `today` |
+| `last-week` | Monday of the immediately preceding ISO week | Sunday of the immediately preceding ISO week |
+| `this-month` | 1st of the current calendar month | `today` |
+| `last-month` | 1st of the immediately preceding calendar month | Last day of the immediately preceding calendar month |
+
+Run the bootstrap and configuration steps in Prerequisites. Resolve
 `states`, `status_label`, and `date_field` from `--status`:
 
 | `--status` | `states` | `status_label` | `date_field` |

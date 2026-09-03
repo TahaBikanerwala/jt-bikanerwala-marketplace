@@ -1,6 +1,6 @@
 ---
 description: Fetch Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status, and print a concise executive summary per item (one to two sentences, three or four only as a last resort) for a client-update deck. Read-only; safe to run anytime.
-argument-hint: "<ticket ids/urls...> | --from <date> --till <date> [--status active|delivered|closed|updated] [--project <name>] [--scope <area-path-or-component>] [--tags <name>[,<name>...]] [--to <target>] [--output <path>] [--detailed] [keywords...]"
+argument-hint: "<ticket ids/urls...> | --range this-week|last-week|this-month|last-month | --from <date> --till <date> [--status active|delivered|closed|updated] [--project <name>] [--scope <area-path-or-component>] [--tags <name>[,<name>...]] [--to <target>] [--output <path>] [--detailed] [keywords...]"
 allowed-tools: Skill
 ---
 
@@ -14,6 +14,7 @@ client-update deck.
 ```
 /ticket-summarizer:run AB#1234 AB#1235 https://dev.azure.com/myorg/myproj/_workitems/edit/1240
 /ticket-summarizer:run --from 2026-07-01 --till 2026-07-31 --status delivered
+/ticket-summarizer:run --range this-month --status closed
 /ticket-summarizer:run --status active
 /ticket-summarizer:run --from 2026-07-01 --till 2026-07-31 --project "Mobile App"
 /ticket-summarizer:run --from 2026-08-11 --till 2026-08-12 --status closed --tags ecw
@@ -65,6 +66,11 @@ requires `--output` before it is even offered, since there is no default path.
   `--from`/`--till`.
 - **Updated in range:** `--from`/`--till` with no `--status`, or `--status updated`
   explicitly.
+- **Date range via a preset:** `--range this-week|last-week|this-month|last-month`
+  instead of computing `--from`/`--till` by hand. `this-week`/`this-month` run
+  through today (a trailing partial period, since future dates carry no tickets
+  yet); `last-week`/`last-month` are the complete prior period. Mutually
+  exclusive with `--from`/`--till`.
 
 Every query shape above is scoped to Story, Bug, Epic, and (on Azure DevOps)
 Feature types only, always. This is not configurable per run: it keeps a
