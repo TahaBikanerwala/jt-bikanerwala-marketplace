@@ -1,7 +1,7 @@
 {
   "name": "sprint-status-reporter",
-  "version": "2.0.0",
-  "description": "Reports on the current sprint from any supported tracker (Azure DevOps, Jira) two ways. /run tallies work items by state (Done / In Progress / To Do), computes percent complete and remaining count, flags blocked and stale items, and emits a Marp deck. /progress-delta compares the sprint now against an earlier snapshot (or reconstructed history) and reports what shipped, what newly started, scope added or dropped, new risk, and how progress moved. Every run writes a snapshot so deltas accumulate. Read-only and safe to run anytime; no tracker writes, no confirmation gate. Tracker-agnostic via issuekit. Bundles sprint-analyzer, deck-composer, delta-analyzer, and delta-narrator skills.",
+  "version": "2.1.0",
+  "description": "Reports on the current sprint from any supported tracker (Azure DevOps, Jira) three ways. /run tallies work items by state (Done / In Progress / To Do), computes percent complete and remaining count, flags blocked and stale items, and emits a Marp deck. /progress-delta compares the sprint now against an earlier snapshot (or reconstructed history) and reports what shipped, what newly started, scope added or dropped, new risk, and how progress moved. /pulse publishes the same metrics and delta into a private, always-current Claude Artifact dashboard (Delivered, In Progress, Risks & Blockers, plus a paste-ready Copy for deck view) and refreshes that same dashboard on every later run, so status is available between report days. Every run writes a snapshot so deltas accumulate. Read-only and safe to run anytime; no tracker writes, no confirmation gate. Tracker-agnostic via issuekit. Bundles sprint-analyzer, deck-composer, delta-analyzer, delta-narrator, and dashboard-composer skills.",
   "author": {
     "name": "Taha Bikanerwala",
     "url": "https://github.com/TahaBikanerwala"
@@ -9,7 +9,7 @@
   "homepage": "https://github.com/TahaBikanerwala/jt-bikanerwala-marketplace",
   "repository": "https://github.com/TahaBikanerwala/jt-bikanerwala-marketplace",
   "license": "MIT",
-  "keywords": ["sprint", "status-report", "sprint-report", "progress-delta", "delta", "burndown", "what-shipped", "marp", "slides", "delivery", "azure-devops", "jira", "tracker-agnostic", "sprint-status-report"],
+  "keywords": ["sprint", "status-report", "sprint-report", "progress-delta", "delta", "burndown", "what-shipped", "marp", "slides", "delivery", "azure-devops", "jira", "tracker-agnostic", "sprint-status-report", "pulse", "dashboard", "artifact", "live-status"],
   "dependencies": [
     { "name": "issuekit", "version": "^0.2.1" }
   ]
