@@ -1,6 +1,6 @@
 ---
 name: ticket-summarizer
-description: "Fetches Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status, and turns each into a plain-language executive summary for a client-update deck: what was delivered and, only when the ticket says why, why it matters. Each summary targets one to two concise sentences, extending to three or four only as a last resort when two are not enough to say it accurately. Fetches a narrow field set by default for speed and cost; pass --detailed for a richer per-item view (assignee, exact state, parent). Supports three query shapes: an explicit list of ticket ids or urls, a date range with a status (delivered/closed, or generic updated), or all currently active work items. Date-range and status queries always scope to Story, Bug, Epic, and (on Azure DevOps) Feature types only (a fixed default, not a flag); a pasted ticket reference is resolved regardless of its type. Read-only against the tracker: no tracker writes, no tracker diff-and-confirm gate, safe to run anytime. After printing, offers to send the same summary to Slack or Teams (yourself by default, or another channel, group, or person when named explicitly with --to) and, when --output <path> is given, offers to save it to a file too. Always asks first, both whether to send or save and whether to include ticket ids. Use when someone wants ticket summaries for a client call, a status update deck, an executive briefing, or a plain-English readout of what shipped or is in flight."
+description: "Fetches Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status, and turns each into a plain-language executive summary for a client-update deck: what was delivered and, only when the ticket says why, why it matters. Each summary targets one to two concise sentences, extending to three or four only as a last resort when two are not enough to say it accurately. Prints one ready-to-paste brief line per item (id, title, blurb, assignee). Fetches a narrow field set by default for speed and cost; pass --detailed for a richer per-item view (exact state, parent). Supports three query shapes: an explicit list of ticket ids or urls, a date range with a status (delivered/closed, updated, or a comma-separated combination), or all currently active work items. Date-range and status queries always scope to Story, Bug, Epic, and (on Azure DevOps) Feature types only (a fixed default, not a flag); a pasted ticket reference is resolved regardless of its type. Read-only against the tracker: no tracker writes, no tracker diff-and-confirm gate, safe to run anytime. After printing, offers to send the same summary to Slack or Teams (yourself by default, or another channel, group, or person when named explicitly with --to) and, when --output <path> is given, offers to save it to a file too. Always asks first, both whether to send or save and whether to include ticket ids. Use when someone wants ticket summaries for a client call, a status update deck, an executive briefing, or a plain-English readout of what shipped or is in flight."
 tools: Skill, Read, Write, AskUserQuestion
 ---
 
@@ -61,8 +61,14 @@ mistaken for a tracker reference or folded into `keywords`):
     `last-month`; resolves to a concrete `from`/`till` pair before Phase 1 runs
     (see Phase 0), computed against the cached `today`. Mutually exclusive with
     `--from`/`--till`; see Validation.
-  - `--status active|delivered|closed|updated`: `delivered` and `closed` are
-    synonyms. Default `updated` when a date range is given and `--status` is absent.
+  - `--status <value>[,<value>...]`: one or more of `active`, `delivered`,
+    `closed`, `updated`, comma-separated. `delivered` and `closed` are
+    synonyms. An item matches when its resolved category is any one of the
+    given values (OR across multiple values, mirroring `--tags`'s
+    comma-separated grammar). `updated` may only appear alone: it means "no
+    state filter at all," so combining it with any other value is a
+    validation error; see Validation. Default `updated` when a date range is
+    given and `--status` is absent.
   - `--project <name>`: passed straight through to the search.
   - `--scope <area-path-or-component>`: AzDO area path or Jira component/label,
     passed straight through to the search.
@@ -88,8 +94,13 @@ mistaken for a tracker reference or folded into `keywords`):
 - An unrecognized `--range` value: stop and tell the user the four accepted
   presets (`this-week`, `last-week`, `this-month`, `last-month`). Never fall back
   to a default window.
-- `--status delivered|closed|updated` with neither `--from`, `--till`, nor
-  `--range`: ask once via `AskUserQuestion` for a date range (offer a default of
+- `--status updated` combined with any other `--status` value: stop and tell
+  the user `updated` cannot be combined with `active`, `delivered`, or
+  `closed`; it already means no state filter at all. This check runs before
+  any fetch, never a silent resolution of one meaning over the other.
+- When the resolved `--status` category set is anything other than exactly
+  `{active}` alone, and neither `--from`, `--till`, nor `--range` was given:
+  ask once via `AskUserQuestion` for a date range (offer a default of
   "last 30 days," computed against today's date) rather than fetching an
   unbounded history.
 - `mode=explicit` ignores every mode=query flag above; it only reads the
@@ -205,13 +216,27 @@ resolve `from`/`till` from the cached `today`:
 | `last-month` | 1st of the immediately preceding calendar month | Last day of the immediately preceding calendar month |
 
 Run the bootstrap and configuration steps in Prerequisites. Resolve
-`states`, `status_label`, and `date_field` from `--status`:
+`states`, `status_label`, and `date_field` from `--status` in two steps:
 
-| `--status` | `states` | `status_label` | `date_field` |
+1. Split the raw `--status` value on comma. Map each value to a category:
+   `active` maps to `in_progress`; `delivered` and `closed` both map to
+   `done`; `updated` maps to a sentinel meaning "unfiltered by state"
+   (Validation already rejects this sentinel appearing alongside any other
+   value). Dedupe the mapped categories to their distinct set.
+2. Resolve `states`, `status_label`, and `date_field` from that distinct
+   category set:
+
+| Distinct category set | `states` | `status_label` | `date_field` |
 |---|---|---|---|
-| `active` | `policy.state_categories.in_progress` | `"Active"` | `null`, unless a date range was also given, then `updated` |
-| `delivered` / `closed` | `policy.state_categories.done` | `"Delivered"` | `resolved` |
-| `updated` | `null` (unfiltered by state) | `null` | `updated` |
+| `{in_progress}` | `policy.state_categories.in_progress` | `"Active"` | `null`, unless a date range was also given, then `updated` |
+| `{done}` | `policy.state_categories.done` | `"Delivered"` | `resolved` |
+| `{unfiltered}` | `null` (unfiltered by state) | `null` | `updated` |
+| two or more categories | the union of each category's vendor-state list from `policy.state_categories` | `null` (flat list, no heading) | `updated` |
+
+A single distinct category (the first three rows) resolves exactly as a bare
+single-value `--status` does today. `--status delivered,closed` collapses to
+the single `{done}` category, since they are synonyms, and resolves the same
+way, never as a flat multi-category list.
 
 In `mode=query` only, also resolve `types = [policy.story_work_item_type[tracker],
 policy.bug_work_item_type[tracker], "Epic"]`, then append
@@ -229,10 +254,12 @@ Resolve the field list first, once, from `detailed`:
 
 | `detailed` | `fields` |
 |---|---|
-| `false` (default) | `["title", "body", "type", "labels", "updated", "resolved", "closed", "state"]` |
+| `false` (default) | `["title", "body", "type", "labels", "updated", "resolved", "closed", "state", "assignee"]` |
 | `true` | `["title", "body", "type", "labels", "updated", "resolved", "closed", "state", "assignee", "parent"]` |
 
-`id` and `url` always come back regardless of which list is used. Both lists always
+`id` and `url` always come back regardless of which list is used. `assignee`
+is in both lists now: the default brief-line rendering in Phase 3 shows it
+inline on every item, not only under `--detailed`. Both lists always
 include `state`, even in the narrow default: step 4 below re-verifies it against
 `states` after the fetch, so it must be available to check regardless of `detailed`.
 Both also always include `closed`, alongside `resolved`: on AzDO, some work-item
@@ -342,17 +369,22 @@ The skill returns `{id, title, url, blurb}[]`, same order as `issues`. Cache as
 Print the summary directly. There is no rendering skill; any file output is Phase
 5's job, not this one's.
 
-- `mode=explicit`, or `mode=query` with `status_label == null`: one flat list, one
-  bullet per item: `- [<id>] <blurb>`.
+- `mode=explicit`, or `mode=query` with `status_label == null` (unfiltered by
+  state, or a multi-category `--status` already resolved that way in Phase 0):
+  one flat list, one brief line per item: `#<id>: <title>. <blurb>
+  (<assignee>)`. Omit `. <blurb>` (the segment and its leading period
+  together) when `blurb` is `""`. Render `(unassigned)` literally when
+  `assignee` is absent; never a blank or omitted parenthetical.
 - `mode=query` with `status_label` set: a heading naming the label and the date window
   when one applied (e.g. `Delivered (2026-07-01 to 2026-07-31)`, `Active`), then the
-  same bullet format underneath.
-- When `detailed`, append one indented line under each bullet, pulled from that
-  item's entry in `issues` (matched by id): `  Assignee: <assignee, or "unassigned">
-  | State: <state> | Parent: <parent title, or "none">`. This never changes the
-  blurb text itself, only what prints alongside it.
-- After the list: `Ids in brackets are for your own traceability; strip them before
-  this goes in front of a client.`
+  same brief-line format underneath.
+- When `detailed`, append one indented line under each brief line, pulled
+  from that item's entry in `issues` (matched by id): `  State: <state> |
+  Parent: <parent title, or "none">`. Assignee is not repeated here: it
+  already shows inline on every brief line. This never changes the blurb
+  text itself, only what prints alongside it.
+- After the list: `Ids are for your own traceability; strip the leading
+  #<id>: from each line before this goes in front of a client.`
 - When `truncated`: `Results may be truncated by the tracker's page limit. Narrow with
   --from/--till, --project, --scope, or a keyword to see the rest.` When a date range
   is active, mention `--from`/`--till` first: it is usually the fastest way to shrink
@@ -376,9 +408,10 @@ user, when `chat == none` or `issues` is empty (nothing to send).
    stop here. Phase 3's printed output remains the only output.
 3. If `Yes`, ask a second `AskUserQuestion`: "Include ticket ids in the message?"
    with options:
-   - **With ids.** Same bracketed format as the printed summary (`- [<id>]
-     <blurb>`), useful for your own traceability.
-   - **Without ids.** Blurb only (`- <blurb>`), client-safe as-is.
+   - **With ids.** Same format as the printed summary (`#<id>: <title>.
+     <blurb> (<assignee>)`), useful for your own traceability.
+   - **Without ids.** Drops the leading `#<id>: ` (`<title>. <blurb>
+     (<assignee>)`), client-safe as-is.
    Cache the answer as `include_ids`. `include_ids` is shared with Phase 5: if this
    is the first phase to ask this run, the answer carries over there too.
 4. Resolve `send_target`, a `ChatTarget` per `issuekit:tracker-adapter`'s chat verb
@@ -395,11 +428,13 @@ user, when `chat == none` or `issues` is empty (nothing to send).
      the same opaque-string contract `policy.escalation.channel` already uses for a
      Slack `#channel-name` or channel id, or a Teams channel/chat id.
 5. Build the message body from `blurbs`, reusing Phase 3's structure exactly
-   (heading and date window when `status_label` is set, one bullet per item in the
-   same order, the detailed metadata line under each when `detailed`, the truncation
-   note, the unresolved-refs notes) but rendering each bullet per `include_ids` and
-   omitting the "ids are for your own traceability" trailer, since the user's answer
-   already resolved that choice.
+   (heading and date window when `status_label` is set, one brief line per item in
+   the same order, the detailed metadata line under each when `detailed`, the
+   truncation note, the unresolved-refs notes) but rendering each line per
+   `include_ids` and omitting the "ids are for your own traceability" trailer,
+   since the user's answer already resolved that choice. With ids, each line
+   keeps its leading `#<id>: `; without, that prefix alone is dropped, leaving
+   `<title>. <blurb> (<assignee>)`.
 6. Call the adapter's `sendMessage` verb, targeting `send_target`, with the built
    body.
 7. Confirm: `Sent to <send_target_label> on <chat>.` On a send failure, report it
@@ -420,8 +455,9 @@ Runs after Phase 4. Skip this phase entirely, with no message to the user, when
    as `include_ids`. When it is already set from Phase 4, reuse it without
    re-asking.
 3. Build the file content the same way Phase 4 builds its message body (Phase 3's
-   structure, rendered per `include_ids`), with one line prepended: `# Ticket
-   summary (<today>)`.
+   structure, rendered per `include_ids`: with ids, each line keeps its
+   leading `#<id>: `; without, that prefix alone is dropped), with one line
+   prepended: `# Ticket summary (<today>)`.
 4. Check whether `output_path` already exists (attempt a `Read`; a not-found error
    means it does not). If it exists, ask via `AskUserQuestion`: "A file already
    exists at `<output_path>`. Overwrite?" with options `Yes` / `No`. If `No`, stop
@@ -452,6 +488,10 @@ Runs after Phase 4. Skip this phase entirely, with no message to the user, when
   stops without writing if the user declines.
 - **Never invent a default file destination.** Unlike chat's self-default,
   `--output` is required before Phase 5 offers anything at all.
+- **Never leave a flag or code path that restores the old `- [<id>] <blurb>`
+  bullet format.** The brief line (`#<id>: <title>. <blurb> (<assignee>)`) is
+  the only rendering this command produces, in every mode and every delivery
+  channel.
 - **Never invent a business-value claim.** The second sentence of a blurb exists only
   when the ticket's own text supports it; that discipline belongs to
   `executive-blurb-writer`, and this agent does not override it.

@@ -95,14 +95,14 @@ Taha runs `/ticket-summarizer:run --from 2026-08-01 --till 2026-08-31 --status a
 
 **Acceptance criteria**
 
-- [ ] **5.2.1** Query-mode and explicit-list results both print in the new brief-line format by default: `#<id>: <title>. <blurb> (<assignee>)`. This replaces the current default rendering; there is no flag to restore the old bullet format.
-- [ ] **5.2.2** The `<blurb>` segment, and its leading period, is omitted entirely when `blurb` is `""`, leaving `#<id>: <title> (<assignee>)`.
-- [ ] **5.2.3** A missing assignee renders the literal `(unassigned)`, never a blank or omitted parenthetical.
-- [ ] **5.2.4** The default fetch (`detailed = false`) always includes `assignee` in its narrow field list, alongside the fields it already fetches; the richer `--detailed` field list is unchanged, but its extra metadata line drops the now-redundant `Assignee:` segment (kept: `State: <state> | Parent: <parent title, or "none">`), since assignee already shows inline on every brief line.
-- [ ] **5.2.5** `--status` accepts a comma-separated list of `active|delivered|closed|updated` values; an item matches when its resolved category is any one of them (invariant 4.4); a bare single value behaves exactly as it does today.
-- [ ] **5.2.6** `--status active,closed` (or any combination of two or more values) prints one flat brief-line list rather than the delivered/active headed grouping a single `--status` value produces, since a merged multi-state query has no single natural heading.
-- [ ] **5.2.7** Chat delivery (Phase 4) and file output (Phase 5) render the same brief-line format, per the existing `include_ids` choice: with ids keeps the leading `#<id>: `, without ids drops it, leaving `<title>. <blurb> (<assignee>)`.
-- [ ] **5.2.8** The existing truncation note and unresolved-reference notes are unchanged in wording and continue to appear beneath the (now brief-line) list.
+- [x] **5.2.1** Query-mode and explicit-list results both print in the new brief-line format by default: `#<id>: <title>. <blurb> (<assignee>)`. This replaces the current default rendering; there is no flag to restore the old bullet format.
+- [x] **5.2.2** The `<blurb>` segment, and its leading period, is omitted entirely when `blurb` is `""`, leaving `#<id>: <title> (<assignee>)`.
+- [x] **5.2.3** A missing assignee renders the literal `(unassigned)`, never a blank or omitted parenthetical.
+- [x] **5.2.4** The default fetch (`detailed = false`) always includes `assignee` in its narrow field list, alongside the fields it already fetches; the richer `--detailed` field list is unchanged, but its extra metadata line drops the now-redundant `Assignee:` segment (kept: `State: <state> | Parent: <parent title, or "none">`), since assignee already shows inline on every brief line.
+- [x] **5.2.5** `--status` accepts a comma-separated list of `active|delivered|closed|updated` values; an item matches when its resolved category is any one of them (invariant 4.4); a bare single value behaves exactly as it does today.
+- [x] **5.2.6** `--status active,closed` (or any combination of two or more values) prints one flat brief-line list rather than the delivered/active headed grouping a single `--status` value produces, since a merged multi-state query has no single natural heading.
+- [x] **5.2.7** Chat delivery (Phase 4) and file output (Phase 5) render the same brief-line format, per the existing `include_ids` choice: with ids keeps the leading `#<id>: `, without ids drops it, leaving `<title>. <blurb> (<assignee>)`.
+- [x] **5.2.8** The existing truncation note and unresolved-reference notes are unchanged in wording and continue to appear beneath the (now brief-line) list.
 
 **Verification (slice complete when these pass):**
 
