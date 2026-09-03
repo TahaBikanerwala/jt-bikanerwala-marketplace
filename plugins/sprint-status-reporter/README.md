@@ -126,6 +126,23 @@ timestamp never advances past the data it describes.
 The page is private to you. It reads its data from its own document store rather than calling
 your tracker, so nothing about your tracker credentials leaves your machine.
 
+## Recommended schedule
+
+To keep the dashboard fresh without manual intervention, schedule a daily run of
+`/sprint-status-reporter:pulse` via Claude Code's scheduled cron (`/schedule`).
+
+```
+/schedule /sprint-status-reporter:pulse --team "Rolai" -r daily -t 09:00
+```
+
+(Adjust the time and team name to your preference. See `/schedule --help` for the full cron
+syntax.)
+
+A scheduled run follows the same process as a manual run: it refreshes the existing dashboard
+in place. If a scheduled run fails (the tracker is unreachable, for example), the dashboard
+keeps showing its last successful data with its last successful timestamp. Nothing is blanked,
+and the timestamp never advances past the data it describes.
+
 ## Workflow
 
 Read-only phases, shared until the mode branch:
