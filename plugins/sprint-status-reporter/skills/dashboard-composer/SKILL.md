@@ -32,7 +32,6 @@ The caller passes a JSON payload:
   "sprint":  { "id", "name", "start", "end" },
   "metrics": <sprint-analyzer metrics model>,
   "delta":   <delta-analyzer delta model> | null,
-  "policy":  { "state_categories", "blocked_indicators", "stale_after_days" },
   "today":   "YYYY-MM-DD"
 }
 ```
@@ -48,9 +47,9 @@ empty delta.
 `today` is supplied by the caller because this skill cannot read the clock. It is the only
 source for the payload's timestamp.
 
-`policy` carries the classification rules the analyst already applied. It is present so the
-payload can name the policy that produced the buckets; the bucketing itself is the analyst's,
-already done.
+The tracker policy is not passed in. Its classification rules were already applied upstream by
+`sprint-analyzer` and `delta-analyzer`, so every bucket arrives pre-classified and this skill
+has nothing left to decide with it.
 
 ## Output
 
@@ -182,7 +181,8 @@ randomness, never read the clock, and never depend on the order the input lists 
 - Do not reshape `metrics` or `delta`. Select from their lists; never rename, merge, round, or
   recompute a field.
 - Do not re-derive Delivered or at-risk status from an item's raw `state`. Delivered is the
-  analyst's `completed` list, which the analyst built from `stateCategory` under `policy`.
+  analyst's `completed` list, which the analyst built from `stateCategory` under the tracker
+  policy.
 - Do not hardcode a project's state names. No vendor state string belongs in this skill.
 - Do not fabricate an item, a count, a blurb, a reason, or a timestamp. Missing data stays missing.
 - Do not emit an empty delta when `delta` is `null`. Set `delta_available: false` and say so in

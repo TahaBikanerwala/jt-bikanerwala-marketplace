@@ -321,7 +321,7 @@ Calling context: phase=P2.
 
 Compose the dashboard payload.
 
-{ "sprint": <sprint>, "metrics": <metrics>, "delta": <delta or null>, "policy": <relevant policy keys>, "today": "<today>" }
+{ "sprint": <sprint>, "metrics": <metrics>, "delta": <delta or null>, "today": "<today>" }
 ```
 
 Pass `metrics` and `delta` exactly as Phases 3 and D2 produced them. Do not reshape either

@@ -199,7 +199,9 @@ plugin uses:
 - `points_field_name` — Jira-only override for the story-points field. Default: auto-detect.
 - `output_directory` — where decks are written. Defaults to `./sprint-reports/` for this
   plugin. Snapshots go under `<output_directory>/.snapshots/` and the Pulse dashboard's URL at
-  `<output_directory>/.dashboard.json`; there are no separate keys for either.
+  `<output_directory>/.dashboard.json`. The first `/pulse` run also drops the dashboard page it
+  publishes at `<output_directory>/.dashboard-page.html`. There are no separate keys for any of
+  them.
 
 When the file is absent, defaults are used and the agent lazy-prompts (and offers to
 persist) any key it actually needs. Defaults are documented in

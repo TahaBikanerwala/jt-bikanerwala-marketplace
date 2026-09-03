@@ -283,9 +283,9 @@
     return parts.join(", ");
   }
 
-  function itemRow(item) {
+  function itemRow(bucket, item) {
     var row = element("li", "item");
-    row.dataset.testid = "pulse-dashboard-item";
+    row.dataset.testid = "pulse-dashboard-" + bucket.slug + "-item-" + item.id;
 
     var heading = element("p", "item-line");
     heading.appendChild(textNode("span", "item-id", String(item.id)));
@@ -300,9 +300,9 @@
     return row;
   }
 
-  function itemList(items) {
+  function itemList(bucket, items) {
     var list = element("ul", "items");
-    items.forEach(function (item) { list.appendChild(itemRow(item)); });
+    items.forEach(function (item) { list.appendChild(itemRow(bucket, item)); });
     return list;
   }
 
@@ -335,7 +335,7 @@
       return section;
     }
 
-    section.appendChild(items.length ? itemList(items) : textNode("p", "note", "None."));
+    section.appendChild(items.length ? itemList(bucket, items) : textNode("p", "note", "None."));
     return section;
   }
 
