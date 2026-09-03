@@ -29,7 +29,7 @@
     {
       "name": "sprint-status-reporter",
       "source": "./plugins/sprint-status-reporter",
-      "description": "Reports on the current sprint on any supported tracker (Azure DevOps, Jira) two ways: /run emits a Marp status deck (work by state, progress, blocked/stale items), and /progress-delta emits a what-changed deck (what shipped, newly started, scope added/dropped, new risk, progress movement) by comparing against an earlier snapshot or reconstructed history. Read-only and safe to run anytime. Auto-installs issuekit; bring your own MCPs."
+      "description": "Reports on the current sprint on any supported tracker (Azure DevOps, Jira) three ways: /run emits a Marp status deck (work by state, progress, blocked/stale items), /progress-delta emits a what-changed deck (what shipped, newly started, scope added/dropped, new risk, progress movement) by comparing against an earlier snapshot or reconstructed history, and /pulse publishes the same numbers to a private, always-current Claude Artifact dashboard (Delivered, In Progress, Risks & Blockers, plus a paste-ready Copy for deck view) that every later run refreshes in place. Read-only and safe to run anytime. Auto-installs issuekit; bring your own MCPs."
     },
     {
       "name": "story-drafter",

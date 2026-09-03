@@ -1,12 +1,14 @@
 # sprint-status-reporter
 
-Turn the current sprint into a report with one command, on any supported tracker. Two views:
+Turn the current sprint into a report with one command, on any supported tracker. Three views:
 
 - **`/run`** — a point-in-time status deck: tally work by state, flag what's blocked or
   stalling, write a [Marp](https://marp.app/) deck you can export to PPTX or PDF.
 - **`/progress-delta`** — a what-changed deck: compare the sprint now against an earlier
   snapshot (or reconstructed history) and report what shipped, what newly started, scope
   added or dropped, new risk, and how progress moved.
+- **`/pulse`** — a live dashboard: publish the same numbers to a private Claude Artifact you
+  can open any day, and refresh that same page on every later run.
 
 Powered by [`issuekit`](../issuekit/), so the same commands work against Azure DevOps and
 Jira. Read-only by design: reports never touch the tracker, so there's no confirmation gate
@@ -45,6 +47,7 @@ or the slash commands:
 ```
 /sprint-status-reporter:run [sprint name or ID] [--team <name>] [--export pptx|pdf]
 /sprint-status-reporter:progress-delta [sprint name or ID] [--team <name>] [--since <YYYY-MM-DD>] [--baseline <path>] [--export pptx|pdf]
+/sprint-status-reporter:pulse [sprint name or ID] [--team <name>]
 ```
 
 Examples:
@@ -58,11 +61,14 @@ Examples:
 /sprint-status-reporter:progress-delta
 /sprint-status-reporter:progress-delta --since 2026-07-07
 /sprint-status-reporter:progress-delta "Sprint 42" --since 2026-07-01 --export pptx
+
+/sprint-status-reporter:pulse
+/sprint-status-reporter:pulse --team "Payments"
 ```
 
 All arguments are optional. With none, `/run` reports the current sprint for your default
 team and writes a status deck; `/progress-delta` compares it against the most recent stored
-snapshot.
+snapshot; `/pulse` does the same comparison and puts the result on your dashboard.
 
 ## progress-delta
 
@@ -84,6 +90,59 @@ The delta deck lists what shipped (moved to Done), what newly started, scope add
 removed, and new risk (newly blocked, newly stale, regressed), with the sprint's
 before → after headline movement on the summary slide.
 
+## pulse
+
+`/pulse` answers "where are we right now?" on a day that isn't a report day. It runs the same
+pipeline as `/progress-delta`, then publishes the result to a private
+[Claude Artifact](https://claude.ai/code/artifacts) instead of a deck. Open the page any time;
+re-run the command to refresh it.
+
+The dashboard has two views:
+
+- **Live status** — four sections, each item with its id, title, owner, and one-line detail:
+  - **Delivered** — items whose `stateCategory` is Done under your `state_categories` policy.
+  - **In Progress** — items still in flight and not currently at risk.
+  - **Currently at risk** — every blocked or stale item, with its reason (`blocked: <indicator>`
+    or `stale: <n>d`).
+  - **Newly at risk** — the ones that became blocked or stale since the baseline.
+- **Copy for deck** — the same three sections (Delivered, In Progress, Risks & Blockers) as
+  plain paste-ready text, with a copy button.
+
+A visible "last updated" line always shows when the data was last refreshed successfully.
+
+**One dashboard per project.** The first `/pulse` run creates the Artifact and remembers its URL
+at `<output_directory>/.dashboard.json`, a sibling of `.snapshots/`. Every later run writes into
+that same page rather than publishing a second one. Delete that file if you want a fresh
+dashboard.
+
+**First run, no baseline.** With nothing to compare against, the dashboard still publishes the
+point-in-time view and says plainly that no delta is available yet. It never shows an invented
+"no changes" delta.
+
+**A failed run is safe.** If the tracker is unreachable or the publish fails, the dashboard keeps
+showing its last successful data and its last successful timestamp. Nothing is blanked, and the
+timestamp never advances past the data it describes.
+
+The page is private to you. It reads its data from its own document store rather than calling
+your tracker, so nothing about your tracker credentials leaves your machine.
+
+## Recommended schedule
+
+To keep the dashboard fresh without manual intervention, schedule a daily run of
+`/sprint-status-reporter:pulse` via Claude Code's scheduled cron (`/schedule`).
+
+```
+/schedule /sprint-status-reporter:pulse --team "Rolai" -r daily -t 09:00
+```
+
+(Adjust the time and team name to your preference. See `/schedule --help` for the full cron
+syntax.)
+
+A scheduled run follows the same process as a manual run: it refreshes the existing dashboard
+in place. If a scheduled run fails (the tracker is unreachable, for example), the dashboard
+keeps showing its last successful data with its last successful timestamp. Nothing is blanked,
+and the timestamp never advances past the data it describes.
+
 ## Workflow
 
 Read-only phases, shared until the mode branch:
@@ -97,7 +156,8 @@ Read-only phases, shared until the mode branch:
 | **S. Snapshot** | Write a snapshot JSON under `.snapshots/` so later deltas have a baseline. |
 | **4. Render** (status) | Write a Marp status deck; optionally export with `marp-cli` (`deck-composer`). |
 | **D1–D3** (delta) | Resolve a baseline, diff it against the current state (`delta-analyzer`), and render a Marp delta deck (`delta-narrator`). |
-| **5. Summary** | Recap the numbers, the deck path, the snapshot path, and any warnings. |
+| **D1–D2, P1–P3** (pulse) | Resolve a baseline and diff it, compose the dashboard payload (`dashboard-composer`), then publish or refresh the dashboard Artifact. |
+| **5. Summary** | Recap the numbers, the deck path or dashboard URL, the snapshot path, and any warnings. |
 
 ## The deck
 
@@ -138,7 +198,10 @@ plugin uses:
 - `stale_after_days` — an in-progress item older than this is flagged at-risk. Default `3`.
 - `points_field_name` — Jira-only override for the story-points field. Default: auto-detect.
 - `output_directory` — where decks are written. Defaults to `./sprint-reports/` for this
-  plugin. Snapshots go under `<output_directory>/.snapshots/`; there is no separate key.
+  plugin. Snapshots go under `<output_directory>/.snapshots/` and the Pulse dashboard's URL at
+  `<output_directory>/.dashboard.json`. The first `/pulse` run also drops the dashboard page it
+  publishes at `<output_directory>/.dashboard-page.html`. There are no separate keys for any of
+  them.
 
 When the file is absent, defaults are used and the agent lazy-prompts (and offers to
 persist) any key it actually needs. Defaults are documented in
@@ -152,6 +215,7 @@ persist) any key it actually needs. Defaults are documented in
 | `deck-composer` | Pure rendering: metrics model → Marp status deck written to `output_directory`. |
 | `delta-analyzer` | Pure computation: a baseline snapshot + the current state → a delta model (shipped, started, added/removed, new risk, headline movement). |
 | `delta-narrator` | Pure rendering: delta model → Marp "what changed" deck written to `output_directory`. |
+| `dashboard-composer` | Pure computation: metrics model + delta model → the Pulse dashboard's view payload (four buckets plus paste-ready deck text). Returns the payload; the agent publishes it. |
 
 The agent also invokes `issuekit:tracker-adapter` for every tracker read.
 
