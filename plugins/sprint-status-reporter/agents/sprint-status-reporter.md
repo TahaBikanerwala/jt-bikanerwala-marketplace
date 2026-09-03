@@ -299,9 +299,13 @@ Read `<output_directory>/.dashboard.json`.
 - Present and it parses with a `url` → cache that as `dashboard_url`. This project already has
   a dashboard; Phase P3 will refresh it.
 - Absent → leave `dashboard_url` unset. Phase P3 will create the dashboard.
-- Present but unreadable or unparseable → leave `dashboard_url` unset, and add the warning
-  `<output_directory>/.dashboard.json could not be read; publishing a new dashboard.` Do not
-  fail the run and do not delete the file.
+- Present but unreadable or unparseable → stop the run. Do not touch the file, do not publish,
+  and do not fall through to the absent case: a corrupt file is not proof that no dashboard
+  exists, and publishing here risks a second Artifact for this project, which invariant "one
+  dashboard per project" forbids. Tell the user:
+  `<output_directory>/.dashboard.json exists but could not be parsed. If this project already
+  has a live Pulse dashboard, publishing now would create a duplicate. Inspect the file; if it
+  is corrupt with no real dashboard behind it, delete it and re-run pulse to publish fresh.`
 
 Its shape:
 

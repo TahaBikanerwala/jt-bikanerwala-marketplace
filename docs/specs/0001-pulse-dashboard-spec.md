@@ -101,8 +101,8 @@ graph LR
 
 **Acceptance criteria**
 
-- [x] **5.1.1** Running `/sprint-status-reporter:pulse` with no arguments against a project with no prior `.dashboard.json` creates a new private Artifact, prints its URL, and persists the URL at `<output_directory>/.dashboard.json`.
-- [x] **5.1.2** Running the command again against the same project reads the persisted URL and updates that same Artifact's `db` document rather than creating a second one.
+- [ ] **5.1.1** Running `/sprint-status-reporter:pulse` with no arguments against a project with no prior `.dashboard.json` creates a new private Artifact, prints its URL, and persists the URL at `<output_directory>/.dashboard.json`.
+- [ ] **5.1.2** Running the command again against the same project reads the persisted URL and updates that same Artifact's `db` document rather than creating a second one.
 - [x] **5.1.3** The dashboard's Delivered section lists exactly the items whose current `stateCategory` is `done` per the project's policy, each with its one-line blurb, id, and title.
 - [x] **5.1.4** The dashboard's In Progress section lists items whose current `stateCategory` is `in_progress` and that are not in the current `at_risk` list.
 - [x] **5.1.5** The dashboard's Risks & Blockers section shows two parts: every item currently in `at_risk` (with its reason: `blocked: <indicator>` or `stale: <n>d`), and a separate "new since last check" callout listing only the items also present in `delta.newly_blocked` or `delta.newly_stale`.
@@ -118,7 +118,7 @@ graph LR
 > contract confirmed against the live tool schema and two observed real publish/update calls,
 > but were **not** executed against a live tracker: no tracker MCP was reachable from the build
 > session, so [§9.1](#9-open-questions) is still open and the first real run is still the probe
-> for it.
+> for it. Left unchecked above until that first real run confirms them live.
 
 **Verification (slice complete when these pass):**
 
@@ -139,7 +139,7 @@ Beyond manual on-demand runs, a Claude Code scheduled cron invokes `/sprint-stat
 
 **Acceptance criteria**
 
-- [x] **5.2.1** A scheduled cron job exists that invokes `/sprint-status-reporter:pulse` against the Rolai project once daily.
+- [ ] **5.2.1** A scheduled cron job exists that invokes `/sprint-status-reporter:pulse` against the Rolai project once daily. Platform configuration, not a repo file; this PR documents the recommended setup in the README but does not itself register the job. Left unchecked until Taha registers the cron and confirms it fires.
 - [x] **5.2.2** A scheduled run updates the existing Pulse Artifact in place, per [invariant 4.1](#4-invariants) — identical behavior to a manual re-run.
 - [x] **5.2.3** A failed scheduled run (e.g. the tracker MCP is unreachable that morning) does not blank or corrupt the previously published dashboard. The dashboard keeps showing its last successful data, and the "last updated" timestamp from [AC 5.1.7](#51-publish-or-update-the-pulse-dashboard-from-a-sprints-current-delta) stays honest about staleness rather than silently advancing.
 
@@ -192,7 +192,7 @@ See the diagram and Reachability under [slice 5.1](#51-publish-or-update-the-pul
 |---|---|---|
 | `commands/pulse.md` (new) | Thin CLI entry; dispatches to the agent with `mode=pulse` | agent |
 | `agents/sprint-status-reporter.md` (extended) | Orchestrates phases; the only module with `Artifact`/`Read`/`Write`/`Bash` | `issuekit:tracker-adapter`, `sprint-analyzer`, `delta-analyzer`, `dashboard-composer` |
-| `skills/dashboard-composer/` (new) | Pure: metrics model + delta model + policy → dashboard view payload (live-view rows + copy-for-deck text) | `sprint-analyzer`'s and `delta-analyzer`'s output shapes |
+| `skills/dashboard-composer/` (new) | Pure: metrics model + delta model → dashboard view payload (live-view rows + copy-for-deck text) | `sprint-analyzer`'s and `delta-analyzer`'s output shapes |
 | `skills/sprint-analyzer/`, `skills/delta-analyzer/` (existing, unmodified) | Point-in-time metrics; delta diff | `issuekit`'s `SprintItem` shape |
 | `issuekit:tracker-adapter` (existing, unmodified) | Tracker detection + abstract verb surface | vendor MCP |
 
