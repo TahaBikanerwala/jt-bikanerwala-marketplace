@@ -22,6 +22,8 @@ MCP). See the [root README](../../README.md#configure-your-mcps).
 ```
 /ticket-summarizer:run AB#1234 AB#1235
 /ticket-summarizer:run --from 2026-07-01 --till 2026-07-31 --status delivered
+/ticket-summarizer:run --range this-month --status closed
+/ticket-summarizer:run --range this-week --status active,closed
 /ticket-summarizer:run --status active
 ```
 
@@ -31,6 +33,8 @@ MCP). See the [root README](../../README.md#configure-your-mcps).
 | `--status active` | Everything in the tracker's "in progress" bucket. No date range needed. |
 | `--status delivered` (or `closed`) + `--from`/`--till` | Everything whose resolved/closed date falls in the window. |
 | `--from`/`--till`, no `--status` | Everything whose *updated* date falls in the window, any state. |
+| `--range this-week\|last-week\|this-month\|last-month` | A weekly/monthly preset instead of computing `--from`/`--till` by hand. Mutually exclusive with them. |
+| `--status <value>[,<value>...]` | A comma-separated combination of `active`/`delivered`/`closed`/`updated`; matches an item whose resolved status is any one of them. `updated` may only appear alone. |
 
 Every query-mode shape above is scoped to Story, Bug, Epic, and (on Azure DevOps)
 Feature types only, always; this keeps a client-facing summary to the units
@@ -47,7 +51,8 @@ and `"ECW Bug"` alike, never an exact-match comparison; always filtered client-s
 after the fetch on both trackers: Azure DevOps' WIQL `CONTAINS` on tags matches
 whole tokens, not substrings within a multi-word tag, so it can't be pushed into
 the search without silently missing real matches). `--detailed` fetches a richer
-field set per item (assignee, exact state, parent) instead of the fast default.
+field set per item (exact state, parent; the narrow default already includes
+assignee for the brief line) instead of the fast default.
 
 ## What it does
 
@@ -64,12 +69,17 @@ field set per item (assignee, exact state, parent) instead of the fast default.
    second sentence only when the ticket's own text supports a why-it-matters claim,
    and (last resort only) a third or fourth sentence when two genuinely are not
    enough to say it accurately.
-4. Prints the summaries as bullets, grouped by status for query-mode runs.
+4. Prints one ready-to-paste brief line per item (`#<id>: <title>. <blurb>
+   (<assignee>)`), grouped by status when a query resolves to a single status
+   category; a multi-value `--status` prints one flat list instead.
 5. Offers to send the same summary to Slack or Teams: yourself by default, or the
    target named with `--to` (a person's email, or a channel/group id or name).
    Always asks first whether to send, and whether to include ticket ids.
 6. When `--output <path>` is given, offers to save the same summary to that file
    too, asking before overwriting if the path already exists.
+7. When a clipboard tool (`xclip`, `xsel`, `wl-copy`, `pbcopy`, or `clip.exe`) is
+   detected on the machine, offers to copy the same summary straight to the
+   clipboard, no flag required. Skipped silently when none is found.
 
 ## What it deliberately does not do
 
@@ -78,7 +88,10 @@ field set per item (assignee, exact state, parent) instead of the fast default.
   `--to` names the target explicitly.
 - No file save without asking first, and never without `--output` naming a path;
   there is no default file destination.
-- No generated slide deck or PPTX file. Output is plain markdown bullets; see
+- No clipboard copy without asking first, and never without a clipboard tool
+  actually detected on the machine; there is no real file "download" from this
+  command, just print, chat, file, and clipboard.
+- No generated slide deck or PPTX file. Output is plain-text brief lines; see
   [`sprint-status-reporter`](../sprint-status-reporter/) for an actual Marp/PPTX deck
   instead.
 - No invented business value. A ticket that states no rationale gets a one-sentence
@@ -88,10 +101,8 @@ field set per item (assignee, exact state, parent) instead of the fast default.
 
 ```
 Delivered (2026-07-01 to 2026-07-31)
-- [AB#1234] Fixed the checkout page timing out when a coupon is applied twice.
-- [AB#1240] Added CSV export for account statements, so account managers can pull client data without a manual request.
-
-Ids in brackets are for your own traceability; strip them before this goes in front of a client.
+#1234: Checkout page times out on double coupon. Fixed the checkout page timing out when a coupon is applied twice. (Jane Smith)
+#1240: Account statement CSV export. Added CSV export for account statements, so account managers can pull client data without a manual request. (unassigned)
 ```
 
 ## Configuration

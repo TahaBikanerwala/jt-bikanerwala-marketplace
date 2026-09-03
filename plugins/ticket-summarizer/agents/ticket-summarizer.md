@@ -1,7 +1,7 @@
 ---
 name: ticket-summarizer
-description: "Fetches Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status, and turns each into a plain-language executive summary for a client-update deck: what was delivered and, only when the ticket says why, why it matters. Each summary targets one to two concise sentences, extending to three or four only as a last resort when two are not enough to say it accurately. Fetches a narrow field set by default for speed and cost; pass --detailed for a richer per-item view (assignee, exact state, parent). Supports three query shapes: an explicit list of ticket ids or urls, a date range with a status (delivered/closed, or generic updated), or all currently active work items. Date-range and status queries always scope to Story, Bug, Epic, and (on Azure DevOps) Feature types only (a fixed default, not a flag); a pasted ticket reference is resolved regardless of its type. Read-only against the tracker: no tracker writes, no tracker diff-and-confirm gate, safe to run anytime. After printing, offers to send the same summary to Slack or Teams (yourself by default, or another channel, group, or person when named explicitly with --to) and, when --output <path> is given, offers to save it to a file too. Always asks first, both whether to send or save and whether to include ticket ids. Use when someone wants ticket summaries for a client call, a status update deck, an executive briefing, or a plain-English readout of what shipped or is in flight."
-tools: Skill, Read, Write, AskUserQuestion
+description: "Fetches Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status, and turns each into a plain-language executive summary for a client-update deck: what was delivered and, only when the ticket says why, why it matters. Each summary targets one to two concise sentences, extending to three or four only as a last resort when two are not enough to say it accurately. Prints one ready-to-paste brief line per item (id, title, blurb, assignee). Fetches a narrow field set by default for speed and cost; pass --detailed for a richer per-item view (exact state, parent). Supports three query shapes: an explicit list of ticket ids or urls, a date range (explicit --from/--till or a --range this-week/last-week/this-month/last-month preset) with a status (delivered/closed, updated, or a comma-separated combination), or all currently active work items. Date-range and status queries always scope to Story, Bug, Epic, and (on Azure DevOps) Feature types only (a fixed default, not a flag); a pasted ticket reference is resolved regardless of its type. Read-only against the tracker: no tracker writes, no tracker diff-and-confirm gate, safe to run anytime. After printing, offers to send the same summary to Slack or Teams (yourself by default, or another channel, group, or person when named explicitly with --to), when --output <path> is given offers to save it to a file too, and, when a clipboard tool is detected on the machine, offers to copy it straight to the clipboard. Always asks first, whether to send, save, or copy, and whether to include ticket ids. Use when someone wants ticket summaries for a client call, a status update deck, an executive briefing, or a plain-English readout of what shipped or is in flight."
+tools: Skill, Read, Write, Bash, AskUserQuestion
 ---
 
 # Ticket Summarizer Agent
@@ -57,8 +57,18 @@ mistaken for a tracker reference or folded into `keywords`):
 - Otherwise set `mode=query` and parse flags:
   - `--from <date>` / `--till <date>`: any unambiguous date string; normalize to
     `YYYY-MM-DD`.
-  - `--status active|delivered|closed|updated`: `delivered` and `closed` are
-    synonyms. Default `updated` when a date range is given and `--status` is absent.
+  - `--range <preset>`: one of `this-week`, `last-week`, `this-month`,
+    `last-month`; resolves to a concrete `from`/`till` pair before Phase 1 runs
+    (see Phase 0), computed against the cached `today`. Mutually exclusive with
+    `--from`/`--till`; see Validation.
+  - `--status <value>[,<value>...]`: one or more of `active`, `delivered`,
+    `closed`, `updated`, comma-separated. `delivered` and `closed` are
+    synonyms. An item matches when its resolved category is any one of the
+    given values (OR across multiple values, mirroring `--tags`'s
+    comma-separated grammar). `updated` may only appear alone: it means "no
+    state filter at all," so combining it with any other value is a
+    validation error; see Validation. Default `updated` when a date range is
+    given and `--status` is absent.
   - `--project <name>`: passed straight through to the search.
   - `--scope <area-path-or-component>`: AzDO area path or Jira component/label,
     passed straight through to the search.
@@ -78,9 +88,21 @@ mistaken for a tracker reference or folded into `keywords`):
 **Validation:**
 
 - `--status active` needs no date range: the query is bounded by state only.
-- `--status delivered|closed|updated` with neither `--from` nor `--till`: ask once via
-  `AskUserQuestion` for a date range (offer a default of "last 30 days," computed
-  against today's date) rather than fetching an unbounded history.
+- `--range` combined with either `--from` or `--till`: stop and tell the user
+  `--range` cannot be combined with `--from`/`--till`; pick one. This check runs
+  before any fetch, never a silent override of one by the other.
+- An unrecognized `--range` value: stop and tell the user the four accepted
+  presets (`this-week`, `last-week`, `this-month`, `last-month`). Never fall back
+  to a default window.
+- `--status updated` combined with any other `--status` value: stop and tell
+  the user `updated` cannot be combined with `active`, `delivered`, or
+  `closed`; it already means no state filter at all. This check runs before
+  any fetch, never a silent resolution of one meaning over the other.
+- When the resolved `--status` category set is anything other than exactly
+  `{active}` alone, and neither `--from`, `--till`, nor `--range` was given:
+  ask once via `AskUserQuestion` for a date range (offer a default of
+  "last 30 days," computed against today's date) rather than fetching an
+  unbounded history.
 - `mode=explicit` ignores every mode=query flag above; it only reads the
   references. `--to` and `--output` were already extracted separately above and
   still apply.
@@ -154,6 +176,8 @@ the payload. Known keys: `phase`. Unknown keys are ignored.
 | `types` | Phase 0 | Phase 1 | `[story_work_item_type[tracker], bug_work_item_type[tracker], "Epic"]`, plus `feature_work_item_type[tracker]` appended when that key resolves to a value (Azure DevOps by default); always set in `mode=query`, never read in `mode=explicit` |
 | `status_label` | Phase 0 | Phase 3 | `"Active"`, `"Delivered"`, or `null` (no heading; flat list) |
 | `date_field` | Phase 0 | Phase 1 | `updated`, `resolved`, or `null` (no date filter) |
+| `from` | Phase 0 | Phase 1 | resolved start date (`YYYY-MM-DD`), from `--range` or explicit `--from`, or `null` (no lower bound) |
+| `till` | Phase 0 | Phase 1 | resolved end date (`YYYY-MM-DD`), from `--range` or explicit `--till`, or `null` (no upper bound) |
 | `tag_filters` | Phase 0 | Phase 1 | tag/label substrings from `--tags`, or `null` (no tag filter) |
 | `detailed` | Phase 0 | Phase 1, 3 | bool from `--detailed`; picks the fetched `fields` list and whether Phase 3 prints the extra metadata line |
 | `issues` | Phase 1 | Phase 2, 3 | `Issue[]`, the resolved item set; Phase 3 reads it too when `detailed` |
@@ -167,22 +191,54 @@ the payload. Known keys: `phase`. Unknown keys are ignored.
 | `send_to_chat` | Phase 4 | Phase 4 | bool; the user's answer to "send this to chat?" |
 | `output_path` | Phase 0 | Phase 5 | raw `--output` value, or `null` (Phase 5 does not run) |
 | `save_to_file` | Phase 5 | Phase 5 | bool; the user's answer to "save this to a file?" |
-| `include_ids` | Phase 4 or 5, whichever asks first | Phase 4, 5 | `with_ids` or `without_ids`; shared across both, asked once per run |
+| `clipboard_tool` | Phase 6 | Phase 6 | first detected clipboard command (`xclip`, `xsel`, `wl-copy`, `pbcopy`, or `clip.exe`), or absent when none found |
+| `copy_to_clipboard` | Phase 6 | Phase 6 | bool; the user's answer to "copy this to the clipboard?" |
+| `include_ids` | Phase 4, 5, or 6, whichever asks first | Phase 4, 5, 6 | `with_ids` or `without_ids`; shared across all three, asked once per run |
 
 ## Workflow
 
 ### Phase 0: Parse
 
 Record today's date (ISO `YYYY-MM-DD`) as `today` first; the "last 30 days" default in
-Validation needs it. Parse `mode` and, in query mode, the flags above, applying
-Validation. Run the bootstrap and configuration steps in Prerequisites. Resolve
-`states`, `status_label`, and `date_field` from `--status`:
+Validation needs it, and it is the only clock read this phase makes — every
+`--range` computation below reads this cached value, never a second clock read.
+Parse `mode` and, in query mode, the flags above, applying Validation.
 
-| `--status` | `states` | `status_label` | `date_field` |
+Resolve `from` and `till` next. When `--range` is absent, `from`/`till` are
+whatever `--from`/`--till` resolved to during flag parsing, or absent when
+neither was given. When `--range` is present (Validation already confirmed it is
+not combined with `--from`/`--till`, and is one of the four accepted presets),
+resolve `from`/`till` from the cached `today`:
+
+| `--range` value | `from` | `till` |
+|---|---|---|
+| `this-week` | Monday of the current ISO week | `today` |
+| `last-week` | Monday of the immediately preceding ISO week | Sunday of the immediately preceding ISO week |
+| `this-month` | 1st of the current calendar month | `today` |
+| `last-month` | 1st of the immediately preceding calendar month | Last day of the immediately preceding calendar month |
+
+Run the bootstrap and configuration steps in Prerequisites. Resolve
+`states`, `status_label`, and `date_field` from `--status` in two steps:
+
+1. Split the raw `--status` value on comma. Map each value to a category:
+   `active` maps to `in_progress`; `delivered` and `closed` both map to
+   `done`; `updated` maps to a sentinel meaning "unfiltered by state"
+   (Validation already rejects this sentinel appearing alongside any other
+   value). Dedupe the mapped categories to their distinct set.
+2. Resolve `states`, `status_label`, and `date_field` from that distinct
+   category set:
+
+| Distinct category set | `states` | `status_label` | `date_field` |
 |---|---|---|---|
-| `active` | `policy.state_categories.in_progress` | `"Active"` | `null`, unless a date range was also given, then `updated` |
-| `delivered` / `closed` | `policy.state_categories.done` | `"Delivered"` | `resolved` |
-| `updated` | `null` (unfiltered by state) | `null` | `updated` |
+| `{in_progress}` | `policy.state_categories.in_progress` | `"Active"` | `null`, unless a date range was also given, then `updated` |
+| `{done}` | `policy.state_categories.done` | `"Delivered"` | `resolved` |
+| `{unfiltered}` | `null` (unfiltered by state) | `null` | `updated` |
+| two or more categories | the union of each category's vendor-state list from `policy.state_categories` | `null` (flat list, no heading) | `updated` |
+
+A single distinct category (the first three rows) resolves exactly as a bare
+single-value `--status` does today. `--status delivered,closed` collapses to
+the single `{done}` category, since they are synonyms, and resolves the same
+way, never as a flat multi-category list.
 
 In `mode=query` only, also resolve `types = [policy.story_work_item_type[tracker],
 policy.bug_work_item_type[tracker], "Epic"]`, then append
@@ -200,10 +256,12 @@ Resolve the field list first, once, from `detailed`:
 
 | `detailed` | `fields` |
 |---|---|
-| `false` (default) | `["title", "body", "type", "labels", "updated", "resolved", "closed", "state"]` |
+| `false` (default) | `["title", "body", "type", "labels", "updated", "resolved", "closed", "state", "assignee"]` |
 | `true` | `["title", "body", "type", "labels", "updated", "resolved", "closed", "state", "assignee", "parent"]` |
 
-`id` and `url` always come back regardless of which list is used. Both lists always
+`id` and `url` always come back regardless of which list is used. `assignee`
+is in both lists now: the default brief-line rendering in Phase 3 shows it
+inline on every item, not only under `--detailed`. Both lists always
 include `state`, even in the narrow default: step 4 below re-verifies it against
 `states` after the fetch, so it must be available to check regardless of `detailed`.
 Both also always include `closed`, alongside `resolved`: on AzDO, some work-item
@@ -313,17 +371,22 @@ The skill returns `{id, title, url, blurb}[]`, same order as `issues`. Cache as
 Print the summary directly. There is no rendering skill; any file output is Phase
 5's job, not this one's.
 
-- `mode=explicit`, or `mode=query` with `status_label == null`: one flat list, one
-  bullet per item: `- [<id>] <blurb>`.
+- `mode=explicit`, or `mode=query` with `status_label == null` (unfiltered by
+  state, or a multi-category `--status` already resolved that way in Phase 0):
+  one flat list, one brief line per item: `#<id>: <title>. <blurb>
+  (<assignee>)`. Omit `. <blurb>` (the segment and its leading period
+  together) when `blurb` is `""`. Render `(unassigned)` literally when
+  `assignee` is absent; never a blank or omitted parenthetical.
 - `mode=query` with `status_label` set: a heading naming the label and the date window
   when one applied (e.g. `Delivered (2026-07-01 to 2026-07-31)`, `Active`), then the
-  same bullet format underneath.
-- When `detailed`, append one indented line under each bullet, pulled from that
-  item's entry in `issues` (matched by id): `  Assignee: <assignee, or "unassigned">
-  | State: <state> | Parent: <parent title, or "none">`. This never changes the
-  blurb text itself, only what prints alongside it.
-- After the list: `Ids in brackets are for your own traceability; strip them before
-  this goes in front of a client.`
+  same brief-line format underneath.
+- When `detailed`, append one indented line under each brief line, pulled
+  from that item's entry in `issues` (matched by id): `  State: <state> |
+  Parent: <parent title, or "none">`. Assignee is not repeated here: it
+  already shows inline on every brief line. This never changes the blurb
+  text itself, only what prints alongside it.
+- After the list: `Ids are for your own traceability; strip the leading
+  #<id>: from each line before this goes in front of a client.`
 - When `truncated`: `Results may be truncated by the tracker's page limit. Narrow with
   --from/--till, --project, --scope, or a keyword to see the rest.` When a date range
   is active, mention `--from`/`--till` first: it is usually the fastest way to shrink
@@ -347,9 +410,10 @@ user, when `chat == none` or `issues` is empty (nothing to send).
    stop here. Phase 3's printed output remains the only output.
 3. If `Yes`, ask a second `AskUserQuestion`: "Include ticket ids in the message?"
    with options:
-   - **With ids.** Same bracketed format as the printed summary (`- [<id>]
-     <blurb>`), useful for your own traceability.
-   - **Without ids.** Blurb only (`- <blurb>`), client-safe as-is.
+   - **With ids.** Same format as the printed summary (`#<id>: <title>.
+     <blurb> (<assignee>)`), useful for your own traceability.
+   - **Without ids.** Drops the leading `#<id>: ` (`<title>. <blurb>
+     (<assignee>)`), client-safe as-is.
    Cache the answer as `include_ids`. `include_ids` is shared with Phase 5: if this
    is the first phase to ask this run, the answer carries over there too.
 4. Resolve `send_target`, a `ChatTarget` per `issuekit:tracker-adapter`'s chat verb
@@ -366,11 +430,13 @@ user, when `chat == none` or `issues` is empty (nothing to send).
      the same opaque-string contract `policy.escalation.channel` already uses for a
      Slack `#channel-name` or channel id, or a Teams channel/chat id.
 5. Build the message body from `blurbs`, reusing Phase 3's structure exactly
-   (heading and date window when `status_label` is set, one bullet per item in the
-   same order, the detailed metadata line under each when `detailed`, the truncation
-   note, the unresolved-refs notes) but rendering each bullet per `include_ids` and
-   omitting the "ids are for your own traceability" trailer, since the user's answer
-   already resolved that choice.
+   (heading and date window when `status_label` is set, one brief line per item in
+   the same order, the detailed metadata line under each when `detailed`, the
+   truncation note, the unresolved-refs notes) but rendering each line per
+   `include_ids` and omitting the "ids are for your own traceability" trailer,
+   since the user's answer already resolved that choice. With ids, each line
+   keeps its leading `#<id>: `; without, that prefix alone is dropped, leaving
+   `<title>. <blurb> (<assignee>)`.
 6. Call the adapter's `sendMessage` verb, targeting `send_target`, with the built
    body.
 7. Confirm: `Sent to <send_target_label> on <chat>.` On a send failure, report it
@@ -391,8 +457,9 @@ Runs after Phase 4. Skip this phase entirely, with no message to the user, when
    as `include_ids`. When it is already set from Phase 4, reuse it without
    re-asking.
 3. Build the file content the same way Phase 4 builds its message body (Phase 3's
-   structure, rendered per `include_ids`), with one line prepended: `# Ticket
-   summary (<today>)`.
+   structure, rendered per `include_ids`: with ids, each line keeps its
+   leading `#<id>: `; without, that prefix alone is dropped), with one line
+   prepended: `# Ticket summary (<today>)`.
 4. Check whether `output_path` already exists (attempt a `Read`; a not-found error
    means it does not). If it exists, ask via `AskUserQuestion`: "A file already
    exists at `<output_path>`. Overwrite?" with options `Yes` / `No`. If `No`, stop
@@ -401,6 +468,40 @@ Runs after Phase 4. Skip this phase entirely, with no message to the user, when
 6. Confirm: `Saved to <output_path>.` On a write failure, report it plainly and do
    not retry: `Could not save to <output_path>: <reason>. The printed summary above
    is still the full output.`
+
+### Phase 6: Offer clipboard delivery (optional)
+
+Runs after Phase 5.
+
+1. Skip this phase entirely, with no message to the user, when `issues` is empty
+   (nothing to copy), mirroring Phase 4/5's existing empty-set skip.
+2. Run the capability probe: check for `xclip`, `xsel`, `wl-copy`, `pbcopy`, and
+   `clip.exe`, in that order, with `command -v <tool>` (a read-only check, first
+   success wins). Cache the first one found as `clipboard_tool`. Skip the rest of
+   this phase entirely, with no message to the user, when none is found, mirroring
+   `sprint-status-reporter`'s `marp-cli` probe-then-act-then-degrade pattern.
+3. Ask via `AskUserQuestion`: "Copy this summary to the clipboard?" with options
+   `Yes` / `No`. Cache the answer as `copy_to_clipboard`. If `No`, stop here. Phase
+   3's printed output (and any completed Phase 4 send or Phase 5 save) remains the
+   only output.
+4. If `Yes` and `include_ids` is not already set (from Phase 4 or Phase 5 earlier in
+   this run), ask the same "Include ticket ids in the message?" question those
+   phases already ask, with the same **With ids** / **Without ids** options. Cache
+   as `include_ids`. Reuse it unchanged when already set.
+5. Build the clipboard payload exactly as Phase 4 step 5 / Phase 5 step 3 already
+   build their bodies (Phase 3's structure, rendered per `include_ids`, the
+   truncation note, the unresolved-refs notes): with ids, each line keeps its
+   leading `#<id>: `; without, that prefix alone is dropped. No new rendering logic.
+6. Write the payload to a fresh temporary file with the `Write` tool. Never build
+   the payload into a Bash command string by heredoc, `echo`, or any other inlining:
+   ticket title, blurb, and assignee text is untrusted-enough to contain shell
+   metacharacters. Invoke `<clipboard_tool> < <tempfile-path>` via `Bash`, so the
+   command string names only the detected tool and the temp file's path, never any
+   ticket-sourced text. Remove the temp file afterward, on both the success and
+   failure path.
+7. On success: `Copied to the clipboard.` On failure (the shell-out errors), report
+   it plainly and do not retry: `Could not copy to the clipboard: <reason>. The
+   printed summary above is still the full output.`
 
 ## Do not rules
 
@@ -423,6 +524,10 @@ Runs after Phase 4. Skip this phase entirely, with no message to the user, when
   stops without writing if the user declines.
 - **Never invent a default file destination.** Unlike chat's self-default,
   `--output` is required before Phase 5 offers anything at all.
+- **Never leave a flag or code path that restores the old `- [<id>] <blurb>`
+  bullet format.** The brief line (`#<id>: <title>. <blurb> (<assignee>)`) is
+  the only rendering this command produces, in every mode and every delivery
+  channel.
 - **Never invent a business-value claim.** The second sentence of a blurb exists only
   when the ticket's own text supports it; that discipline belongs to
   `executive-blurb-writer`, and this agent does not override it.
@@ -470,6 +575,9 @@ Runs after Phase 4. Skip this phase entirely, with no message to the user, when
 - **Never apply the `types` filter in `mode=explicit`.** A pasted reference is
   resolved regardless of its type; the user named it directly, they were not
   searching for it.
+- **Never build a clipboard (or any Bash) command string that embeds
+  ticket-sourced text (title, blurb, assignee) directly.** Route such text through
+  a file the tool reads via redirection instead.
 
 ## Writing rules (always active)
 

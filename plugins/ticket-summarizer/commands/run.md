@@ -1,6 +1,6 @@
 ---
 description: Fetch Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status, and print a concise executive summary per item (one to two sentences, three or four only as a last resort) for a client-update deck. Read-only; safe to run anytime.
-argument-hint: "<ticket ids/urls...> | --from <date> --till <date> [--status active|delivered|closed|updated] [--project <name>] [--scope <area-path-or-component>] [--tags <name>[,<name>...]] [--to <target>] [--output <path>] [--detailed] [keywords...]"
+argument-hint: "<ticket ids/urls...> | --range this-week|last-week|this-month|last-month | --from <date> --till <date> [--status active|delivered|closed|updated[,...]] [--project <name>] [--scope <area-path-or-component>] [--tags <name>[,<name>...]] [--to <target>] [--output <path>] [--detailed] [keywords...]"
 allowed-tools: Skill
 ---
 
@@ -14,9 +14,11 @@ client-update deck.
 ```
 /ticket-summarizer:run AB#1234 AB#1235 https://dev.azure.com/myorg/myproj/_workitems/edit/1240
 /ticket-summarizer:run --from 2026-07-01 --till 2026-07-31 --status delivered
+/ticket-summarizer:run --range this-month --status closed
 /ticket-summarizer:run --status active
 /ticket-summarizer:run --from 2026-07-01 --till 2026-07-31 --project "Mobile App"
 /ticket-summarizer:run --from 2026-08-11 --till 2026-08-12 --status closed --tags ecw
+/ticket-summarizer:run --range this-week --status active,closed
 /ticket-summarizer:run --status active --to #client-updates
 /ticket-summarizer:run --status delivered --from 2026-07-01 --till 2026-07-31 --output ./client-update.md
 /ticket-summarizer:run --status active --tags ecw --detailed
@@ -44,7 +46,10 @@ This command is a thin shell. It dispatches to the `ticket-summarizer` agent, wh
    plain-language summary: what was delivered, and why it matters only when the ticket
    itself says so. Targets one to two sentences; extends to three or four only as a
    last resort when two are not enough to say it accurately.
-5. Prints the summaries as bullets, grouped by status when a query was run.
+5. Prints one ready-to-paste brief line per item (`#<id>: <title>. <blurb>
+   (<assignee>)`), grouped by status when a query resolves to a single status
+   category; a multi-value `--status` prints one flat list instead, since a
+   merged multi-state query has no single natural heading.
 6. Offers to send the same summary to Slack or Teams: yourself by default, or the
    target named with `--to`. Asks first whether to send, and whether to include
    ticket ids in the message.
@@ -65,6 +70,20 @@ requires `--output` before it is even offered, since there is no default path.
   `--from`/`--till`.
 - **Updated in range:** `--from`/`--till` with no `--status`, or `--status updated`
   explicitly.
+- **Date range via a preset:** `--range this-week|last-week|this-month|last-month`
+  instead of computing `--from`/`--till` by hand. `this-week`/`this-month` run
+  through today (a trailing partial period, since future dates carry no tickets
+  yet); `last-week`/`last-month` are the complete prior period. Mutually
+  exclusive with `--from`/`--till`.
+- **Multiple statuses in one run:** `--status <value>[,<value>...]` accepts a
+  comma-separated combination of `active`, `delivered`, `closed`, `updated`.
+  An item matches when its resolved status is any one of them. A single value
+  behaves exactly as above; two or more distinct statuses (e.g.
+  `active,closed`) print one flat list with no heading, since a merged
+  multi-state query has no single natural heading; `delivered,closed`
+  collapses to one status since they are synonyms. `updated` may only appear
+  alone: it already means no state filter at all, so combining it with any
+  other value is a validation error.
 
 Every query shape above is scoped to Story, Bug, Epic, and (on Azure DevOps)
 Feature types only, always. This is not configurable per run: it keeps a
@@ -84,10 +103,15 @@ like `"ECW Bug"` would not match a search for `"ECW"`, and Jira's JQL has no
 substring operator for labels either. Pushing the filter into the search would
 silently miss real matches on both, so it never is.
 
-Add `--detailed` to fetch a richer field set per item (assignee, exact state,
-parent) and print one extra line under each bullet. Omit it (the default) for the
-narrow, fast fetch; this is the tradeoff to reach for when you need more context on
-a specific run, not something to leave on by default.
+Every printed line, in both modes, follows the same default format: `#<id>:
+<title>. <blurb> (<assignee>)`, with the blurb segment dropped entirely when
+there is none and `(unassigned)` shown when there is no assignee. Add
+`--detailed` to fetch a richer field set per item (exact state, parent; the
+narrow default already includes assignee for the brief line) and print one
+extra indented line under each item: `State: <state> | Parent: <parent
+title, or "none">`. Omit `--detailed` (the default) for the narrow, fast
+fetch; this is the tradeoff to reach for when you need more context on a
+specific run, not something to leave on by default.
 
 ## Chat delivery
 
@@ -110,6 +134,18 @@ destination: without `--output`, this step does not run at all. When the path
 already exists, the agent asks before overwriting it. The ids choice is shared with
 chat delivery: if you already answered it there, you are not asked twice.
 
+## Clipboard delivery
+
+After printing (and after any chat send or file save above), the agent checks the
+machine for a clipboard tool: `xclip`, `xsel`, `wl-copy`, `pbcopy`, or `clip.exe`, in
+that order. When one is found, it offers to copy the same summary straight to the
+clipboard, no flag required and regardless of whether `--to` or `--output` were
+given. Answering yes puts the exact text you would paste into a deck directly on
+your system clipboard: no file, no chat round-trip. The ids choice is shared with
+chat and file delivery: if you already answered it there, you are not asked again.
+When no clipboard tool is detected, this offer is skipped silently, the same way
+chat delivery is skipped when no chat tool is detected.
+
 ## Configuration
 
 Reads `.claude/tracker-policy.json` for `state_categories` (how vendor state names map
@@ -122,7 +158,7 @@ AzDO states and the default Jira workflow.
 ## See also
 
 - `/sprint-status-reporter:run`: a full sprint status deck (Marp/PPTX) instead of
-  plain-text bullets, scoped to the current iteration rather than an arbitrary date
-  range.
+  plain-text brief lines, scoped to the current iteration rather than an arbitrary
+  date range.
 - `/issue-triager:run`: investigates and fixes a single issue; this command only
   reads and summarizes.
