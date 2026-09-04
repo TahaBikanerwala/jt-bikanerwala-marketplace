@@ -23,7 +23,8 @@ The caller passes a JSON payload:
   "capacity": Capacity | null,
   "policy":  { "state_categories", "blocked_indicators", "stale_after_days" },
   "today":   "YYYY-MM-DD",
-  "tracker": "azure-devops" | "jira"
+  "tracker": "azure-devops" | "jira",
+  "up_next_cap": <int> | null
 }
 ```
 
@@ -35,6 +36,10 @@ The caller passes a JSON payload:
 `today`. Use `today` as the reference date: an item is stale when `today − item.updated ≥
 stale_after_days`. If `today` is missing, fall back to the most recent `updated` across all
 items (a clock-free proxy for "now"). Never use `sprint.end` for staleness.
+
+**Up-next cap.** `up_next_cap` is optional. Absent → the up-next cap defaults to 8, today's
+existing behavior. Explicit `null` → no cap; every `todo`-bucket item is included. An
+explicit positive int → cap at that value. See "Up next" under Computation rules.
 
 ## Output
 
@@ -59,10 +64,10 @@ Return a single JSON object (the metrics model). Do not write files. Do not add 
     "remaining_points": <number|null>,
     "basis": "points" | "count"
   },
-  "completed":   [ { "id", "title", "blurb", "points", "assignee" }, ... ],
-  "in_progress": [ { "id", "title", "blurb", "points", "assignee", "days_since_update" }, ... ],
-  "at_risk":     [ { "id", "title", "blurb", "assignee", "reason": "blocked: <indicator>" | "stale: <n>d" }, ... ],
-  "up_next":     [ { "id", "title", "blurb", "points", "assignee" }, ... ],
+  "completed":   [ { "id", "title", "blurb", "points", "assignee", "labels", "state" }, ... ],
+  "in_progress": [ { "id", "title", "blurb", "points", "assignee", "days_since_update", "labels", "state" }, ... ],
+  "at_risk":     [ { "id", "title", "blurb", "assignee", "reason": "blocked: <indicator>" | "stale: <n>d", "labels", "state" }, ... ],
+  "up_next":     [ { "id", "title", "blurb", "points", "assignee", "labels", "state" }, ... ],
   "capacity_summary": { "total", "committed", "per_member": [ { "user", "capacity" } ], "note" } | null,
   "warnings": [ "<string>", ... ]
 }
@@ -125,11 +130,19 @@ language.
   says everything and there's no description, set `blurb` to `""` and let the deck show the
   title alone rather than padding.
 
+### Labels and state
+Every entry in `completed`, `in_progress`, `at_risk`, and `up_next` also carries `labels`
+and `state`, copied verbatim from the source `SprintItem`. No transformation, no fallback,
+no deduplication of `labels`. `state` is the raw vendor state string, for display only —
+never use it to recompute a bucket; `stateCategory` alone drives bucketing.
+
 ### Up next
 `up_next` = `todo`-bucket items in the order they arrived (the adapter sorts by backlog
-rank / creation order). Cap at 8 so it fits one slide; if more remain, the last entry note
-is left to the deck composer (pass the full count via a warning:
-`<n> more items in To Do beyond the top 8.` only when truncating).
+rank / creation order). Resolve `effective_cap` from `up_next_cap`: absent → `8` (today's
+default); explicit `null` → no cap, every `todo`-bucket item is included and no warning is
+added; an explicit positive int → cap at that value. When capped and more items remain
+beyond `effective_cap`, truncate to `effective_cap` entries and add a warning:
+`<n> more items in To Do beyond the top <effective_cap>.`
 
 ### Capacity summary
 - `capacity == null` → `capacity_summary = null` always. Add the warning `Team capacity
