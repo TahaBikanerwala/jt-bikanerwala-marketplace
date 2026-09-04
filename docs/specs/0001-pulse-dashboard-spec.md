@@ -20,6 +20,8 @@ Taha builds a stakeholder-facing PPT every Monday and Thursday summarizing Rolai
 | 5 | Org Memory (`search_memories`: "ticket-summarizer", "Azure DevOps", "Pulse dashboard") | Fabric | 2026-09-03 | Prior use of `ticket-summarizer` for recurring updates; `sprint-status-reporter` previously run against Rolai (evidenced by `sprint-reports/.snapshots/` dated 2026-07-21, now empty) |
 | 6 | Claude Artifact runtime capabilities (`db`, `artifact`) | Anthropic platform docs | 2026-09-03 | `db` capability shape (realtime JSON doc store, private by default), CSP restrictions on raw fetch from a published page, `mcp` capability requiring a claude.ai-level connector (Azure DevOps is not one; it's a project-local MCP) |
 | 7 | `jt-bikanerwala-marketplace/docs/ARCHITECTURE.md` | n/a | 2026-09-03 | Standalone architecture reference extracted from this spec's §7, covering the whole marketplace's pipe-and-filter convention |
+| 8 | Codebase: `jt-bikanerwala-marketplace/plugins/ticket-summarizer/agents/ticket-summarizer.md`, `commands/run.md` | n/a | 2026-09-04 | Exact `--range` preset table, `--status` split/map/dedupe resolution and validation, and `--tags` substring-match convention that [slice 5.3](#53-filter-pulse-by-date-range-and-status-and-regroup-its-dashboard-by-tag) mirrors for its own `--from`/`--till`/`--range`/`--status` flags |
+| 9 | Live clarifying conversation with Taha, 2026-09-04 | Taha | 2026-09-04 | Date range must never hide active tickets, only bound which closed/new tickets show; the "new since last refresh" count; the choice to replace (not append to) the section-based layout with tag tiles |
 
 ## 3. Type ontology
 
@@ -34,6 +36,8 @@ Taha builds a stakeholder-facing PPT every Monday and Thursday summarizing Rolai
 - **Delta model** — `delta-analyzer`'s diff of a baseline metrics model against the current one: `shipped`, `started`, `added`, `removed`, `newly_blocked`, `newly_stale`, `regressed`, `reassigned`, headline movement. [2]
 - **Snapshot** — a JSON file capturing a point-in-time `SprintItem[]` + metrics model, written under `<output_directory>/.snapshots/`. Existing mechanism, unmodified by this spec. [2]
 - **Dashboard document** — the Pulse Artifact's persisted view data: the current metrics model, the current delta model, and a `generatedAt` timestamp, stored in the Artifact's `db` capability. [1, 6]
+- **Tag tile** — a per-`SprintItem.labels`-entry aggregation on the dashboard (or the reserved `Untagged` sentinel for items with no labels): an active count, a closed count, and the two underlying ticket lists. Introduced by [slice 5.3](#53-filter-pulse-by-date-range-and-status-and-regroup-its-dashboard-by-tag). [9]
+- **New-since callout** — `delta.added`, re-surfaced on the dashboard as a headline count plus its ticket list, labeled by the resolved baseline date. Introduced by [slice 5.3](#53-filter-pulse-by-date-range-and-status-and-regroup-its-dashboard-by-tag). [9]
 
 ### 3.3 Kinds of events
 
@@ -58,6 +62,10 @@ Taha builds a stakeholder-facing PPT every Monday and Thursday summarizing Rolai
 **4.3 Read-only against the tracker** — pulse mode never writes to Azure DevOps or Jira. Its only side effects are the existing snapshot file and the Artifact's own store. Inherited unmodified from the plugin's existing invariant across status and delta modes. Sources: [2].
 
 **4.4 No fabricated numbers or claims** — every count, blurb, and timestamp on the dashboard traces to a real fetched `SprintItem` field or a real computed model field. Missing data (points, description, history) is shown as missing, never invented. Mirrors `sprint-analyzer`/`delta-analyzer`'s existing anti-pattern rules. Sources: [2].
+
+**4.5 A date window narrows only closed tickets, never active ones** — when a `--from`/`--till`/`--range` window is applied ([slice 5.3](#53-filter-pulse-by-date-range-and-status-and-regroup-its-dashboard-by-tag)), every currently non-done (`stateCategory != done`) ticket still appears in full, in its tag's active count and list, on every run. The window narrows only which done-category tickets count as "closed" (those that shipped within it) and which tickets count as "new" (added within it); it never hides an active ticket. Sources: [9].
+
+**4.6 Multi-tag fan-out, never silent loss** — a ticket carrying two or more `labels` entries appears once under each of its tags' tiles and lists, never deduplicated away. A ticket carrying no labels appears once under a single reserved `Untagged` tile. No ticket is ever dropped from every tile. Sources: [9].
 
 ## 5. Slices
 
@@ -103,12 +111,12 @@ graph LR
 
 - [ ] **5.1.1** Running `/sprint-status-reporter:pulse` with no arguments against a project with no prior `.dashboard.json` creates a new private Artifact, prints its URL, and persists the URL at `<output_directory>/.dashboard.json`.
 - [ ] **5.1.2** Running the command again against the same project reads the persisted URL and updates that same Artifact's `db` document rather than creating a second one.
-- [x] **5.1.3** The dashboard's Delivered section lists exactly the items whose current `stateCategory` is `done` per the project's policy, each with its one-line blurb, id, and title.
-- [x] **5.1.4** The dashboard's In Progress section lists items whose current `stateCategory` is `in_progress` and that are not in the current `at_risk` list.
-- [x] **5.1.5** The dashboard's Risks & Blockers section shows two parts: every item currently in `at_risk` (with its reason: `blocked: <indicator>` or `stale: <n>d`), and a separate "new since last check" callout listing only the items also present in `delta.newly_blocked` or `delta.newly_stale`.
-- [x] **5.1.6** A "Copy for deck" view renders the same three sections (Delivered / In Progress / Risks & Blockers) as plain paste-ready text, with a one-click copy control.
+- [x] ~~**5.1.3** The dashboard's Delivered section lists exactly the items whose current `stateCategory` is `done` per the project's policy, each with its one-line blurb, id, and title.~~ **Superseded by [5.3.9](#53-filter-pulse-by-date-range-and-status-and-regroup-its-dashboard-by-tag)** — a top-level Delivered section no longer exists; done-category tickets appear as each tag tile's closed list instead.
+- [x] ~~**5.1.4** The dashboard's In Progress section lists items whose current `stateCategory` is `in_progress` and that are not in the current `at_risk` list.~~ **Superseded by [5.3.9](#53-filter-pulse-by-date-range-and-status-and-regroup-its-dashboard-by-tag)** — a top-level In Progress section no longer exists; non-done tickets appear as each tag tile's active list instead.
+- [x] ~~**5.1.5** The dashboard's Risks & Blockers section shows two parts: every item currently in `at_risk` (with its reason: `blocked: <indicator>` or `stale: <n>d`), and a separate "new since last check" callout listing only the items also present in `delta.newly_blocked` or `delta.newly_stale`.~~ **Superseded by [5.3.10](#53-filter-pulse-by-date-range-and-status-and-regroup-its-dashboard-by-tag)** — a top-level Risks & Blockers section no longer exists; at-risk tickets carry their reason as a per-ticket badge within their tag's active list instead.
+- [x] ~~**5.1.6** A "Copy for deck" view renders the same three sections (Delivered / In Progress / Risks & Blockers) as plain paste-ready text, with a one-click copy control.~~ **Superseded by [5.3.12](#53-filter-pulse-by-date-range-and-status-and-regroup-its-dashboard-by-tag)** — the copy control is unchanged, but the text it copies now mirrors the tag-tile layout, not the three old sections.
 - [x] **5.1.7** The dashboard always shows a visible "last updated" timestamp reflecting when its data was last successfully refreshed.
-- [x] **5.1.8** When no prior snapshot exists and no baseline can be resolved (the plugin's existing "baseline established, nothing to compare yet" case), the dashboard still publishes a point-in-time view (Delivered / In Progress / Risks from the current metrics alone) and states plainly that no delta is available yet — it never fabricates a "no changes" delta.
+- [x] **5.1.8** When no prior snapshot exists and no baseline can be resolved (the plugin's existing "baseline established, nothing to compare yet" case), the dashboard still publishes a point-in-time view (tag tiles built from the current metrics alone, per [5.3](#53-filter-pulse-by-date-range-and-status-and-regroup-its-dashboard-by-tag)) and states plainly that no delta is available yet — it never fabricates a "no changes" delta.
 - [x] **5.1.9** Every number and item blurb on the dashboard traces to a real fetched `SprintItem` or a real computed model field; nothing is invented when points, description, or history are missing ([invariant 4.4](#4-invariants)).
 
 > **Verification status at build time (2026-09-03).** The dashboard page was driven end to end
@@ -149,6 +157,79 @@ Beyond manual on-demand runs, a Claude Code scheduled cron invokes `/sprint-stat
 2. **Migrations.** Not applicable.
 3. **User-facing flow.** Trigger the scheduled job once (or wait for its next scheduled fire) and confirm the dashboard's "last updated" timestamp advances and its data matches a manual run taken at the same time.
 4. **Accessibility.** Not applicable — this slice introduces no new UI surface; [5.1](#51-publish-or-update-the-pulse-dashboard-from-a-sprints-current-delta) already covers the dashboard's accessibility.
+
+### 5.3 Filter Pulse by date range and status, and regroup its dashboard by tag
+
+Taha's stakeholder deck needs two things the section-based dashboard from [5.1](#51-publish-or-update-the-pulse-dashboard-from-a-sprints-current-delta) cannot give him: a way to bound which *closed* tickets show up by when they closed, and a per-area (per-tag) breakdown he can read off directly instead of mentally regrouping a flat Delivered/In Progress list by component. `/sprint-status-reporter:pulse` gains `--from`/`--till`/`--range` and `--status`, mirroring `/ticket-summarizer:run`'s exact flag vocabulary and validation ([source 8](#2-sources)) — but their *meaning* here is Pulse's own, not a duplicate of ticket-summarizer's query pipeline ([invariant 4.5](#4-invariants); see the rejected alternative in the accompanying plan's Decisions). A resolved window becomes the `since_arg` Phase D1 already understands (delta mode has taken `--since` since spec inception), so this slice extends an existing internal mechanism rather than adding a new one. The dashboard's content model also changes from four fixed sections to one tile per `labels` entry, each carrying an active count and a closed count, followed by that tag's exact ticket list.
+
+- **Touches types:** SprintItem, Metrics model, Delta model, Dashboard document, Pulse run, Dashboard update, plus the new Tag tile and New-since callout ([§3.2](#32-kinds-of-data)).
+- **Preserves invariants:** [4.2](#4-invariants), [4.3](#4-invariants), [4.4](#4-invariants); introduces and preserves [4.5](#4-invariants), [4.6](#4-invariants).
+- **Affected modules:** `plugins/sprint-status-reporter/commands/pulse.md` (rewrite: new flags, examples, behavior), `plugins/sprint-status-reporter/agents/sprint-status-reporter.md` (Arguments, Working state, Phase 0, Phase D1, Phase P2, Phase 5), `plugins/sprint-status-reporter/skills/sprint-analyzer/SKILL.md` (extend: `labels` passthrough, optional uncapped `up_next`), `plugins/sprint-status-reporter/skills/dashboard-composer/SKILL.md` (rewrite: tag-tile computation replaces the four-bucket table), `plugins/sprint-status-reporter/skills/dashboard-composer/references/dashboard-page.html` (rewrite: dynamic tile rendering), `plugins/sprint-status-reporter/.claude-plugin/plugin.json` (version bump; description update).
+- **Active packs:** none (spec §6, unchanged from 5.1/5.2).
+- **Reachability:** `root → /sprint-status-reporter:pulse [sprint] [--team <name>] [--from <date> --till <date> | --range <preset>] [--status <value>[,...]]`.
+
+```mermaid
+graph LR
+  subgraph "sprint-status-reporter agent, mode=pulse"
+    Cmd["/sprint-status-reporter:pulse<br/>--from/--till/--range --status"]
+    P0["Phase 0<br/>parse + validate filters"]
+    D1["Phase D1<br/>baseline via since_arg"]
+  end
+  subgraph "pure computation, extended"
+    Analyzer["sprint-analyzer<br/>+labels, uncapped up_next"]
+    Delta["delta-analyzer<br/>unchanged"]
+    Composer["dashboard-composer<br/>tag-tile computation"]
+  end
+  subgraph "external"
+    Art[["Pulse Artifact"]]
+  end
+
+  Cmd --> P0 --> D1
+  D1 --> Analyzer
+  Analyzer --> Delta
+  Delta --> Composer
+  P0 -.filters context.-> Composer
+  Composer -.tile payload.-> Art
+```
+
+**Acceptance criteria**
+
+- [ ] **5.3.1** `/sprint-status-reporter:pulse` accepts `--from <date>`/`--till <date>` or `--range this-week|last-week|this-month|last-month`, resolved identically to `/ticket-summarizer:run`'s table (Monday-through-today for `this-week`, complete prior period for `last-week`, same for the monthly presets), mutually exclusive with `--from`/`--till`, validated before any fetch.
+- [ ] **5.3.2** `/sprint-status-reporter:pulse` accepts `--status <value>[,...]` from `active|delivered|closed|updated`, with `delivered`/`closed` as synonyms and `updated` valid only alone, validated with the same stop-and-name-the-accepted-set behavior as `/ticket-summarizer:run`.
+- [ ] **5.3.3** When a `from` date resolves (explicit or via `--range`), Phase D1 resolves its baseline using that date as `since_arg`, exactly as delta mode's existing `--since` mechanism already does, instead of the default "newest snapshot before today."
+- [x] **5.3.4** When `--till` resolves, it bounds the closed and new-since ticket lists to entries whose `updated` date is on or before it; it never re-derives a second point-in-time reconstruction.
+- [x] **5.3.5** Every currently non-done ticket appears in full in its tag's active count and list on every run, regardless of any date window applied ([invariant 4.5](#4-invariants)).
+- [x] **5.3.6** When a baseline resolves, a tag's closed count and list are exactly `delta.shipped` filtered to that tag (tickets that transitioned to done within the resolved window) — not every historically-done ticket in the sprint.
+- [ ] **5.3.7** When no baseline has resolved yet (first run for a project), closed counts and lists fall back to every currently-done ticket per tag, and the dashboard states plainly this is a point-in-time view, per the existing no-baseline handling ([5.1.8](#51-publish-or-update-the-pulse-dashboard-from-a-sprints-current-delta)).
+- [ ] **5.3.8** `--status active` shows only active tiles/lists (closed omitted entirely); `--status closed` (or `delivered`) shows only closed tiles/lists, scoped per 5.3.6/5.3.7; omitting `--status` shows both.
+- [x] **5.3.9** The dashboard groups every ticket by its `labels` entries into one tile per tag, each tile showing an active count and a closed count.
+- [ ] **5.3.10** A ticket with two or more labels appears under each of its tags' tiles and lists; a ticket with no labels appears once under a reserved `Untagged` tile, always rendered last ([invariant 4.6](#4-invariants)). At-risk tickets carry their `blocked:`/`stale:` reason as a badge on their row within their tag's active list.
+- [ ] **5.3.11** Below the tiles, each tag's exact ticket list (active tickets, then closed tickets) shows id, title, state, assignee, points, and blurb when available.
+- [ ] **5.3.12** The "Copy for deck" plain-text view mirrors the tile layout (tag headings, active/closed counts, one line per ticket, id-ascending order, `None.` for an empty list) with the same one-click copy control as before.
+- [x] **5.3.13** No tile or ticket list is ever capped or truncated (carries forward `dashboard-composer`'s existing "no display caps" rule).
+- [ ] **5.3.14** The dashboard shows a "New since `<resolved baseline date>`" count and the underlying ticket list, sourced from `delta.added` and scoped to the same resolved window, shown whenever a delta is available and unaffected by `--status`.
+- [x] **5.3.15** Every number and ticket-list entry traces to a real fetched `SprintItem` or a real computed model field; nothing is invented when points, description, or history are missing ([invariant 4.4](#4-invariants)).
+
+> **Verification status at build time (2026-09-04, slice 3 of the accompanying plan).**
+> `dashboard-composer`'s rewritten tag-tile rules were driven against a hand-built
+> `metrics`/`delta` fixture pair covering a multi-tag ticket, an untagged ticket, a blocked
+> ticket that is also newly blocked, a shipped entry falling outside a test `till`, a `till`
+> boundary timestamp, a `delta: null` first run, and both `--status` gatings (51 assertions,
+> all green). Each assertion is backed by a mutation that turns it red; the mutation that
+> narrows the active pool by `till` turns 13 red, including both window-blindness assertions,
+> which is [invariant 4.5](#4-invariants)'s guard. 5.3.4, 5.3.5, 5.3.6, 5.3.9, 5.3.13 and
+> 5.3.15 are decided entirely inside that skill and are checked above on this evidence.
+> 5.3.1-5.3.3 await a live tracker run (flag parsing and baseline resolution); 5.3.7, 5.3.8,
+> 5.3.10, 5.3.11, 5.3.12 and 5.3.14 carry a rendering half that needs the `dashboard-page.html`
+> rewrite (slice 4) before it can be observed end to end. No tracker MCP was reachable from
+> this build session, so [§9.1](#9-open-questions) stays open.
+
+**Verification (slice complete when these pass):**
+
+1. **Tests.** No automated test suite in this plugin family (markdown skill/agent definitions). Verify behaviorally: invoke `/sprint-status-reporter:pulse` with each new flag combination against a real or sandboxed tracker project and confirm the published payload matches `sprint-analyzer`'s, `delta-analyzer`'s, and the revised `dashboard-composer`'s documented output schemas exactly.
+2. **Migrations.** Not applicable.
+3. **User-facing flow.** Drive the published Pulse Artifact URL through a `chrome-devtools-mcp` browser session: confirm tag tiles render with correct active/closed counts, a multi-tag ticket appears under every one of its tags, an untagged ticket appears under `Untagged`, the New-since callout shows when a delta is available, and the "Copy for deck" view's copy control places the tile-shaped text on the clipboard.
+4. **Accessibility.** Same browser session: tab order reaches every tile and interactive control, focus is visible, and text meets baseline contrast at default zoom, preserving the 44×44 touch targets and ARIA tablist semantics [5.1](#51-publish-or-update-the-pulse-dashboard-from-a-sprints-current-delta) already established.
 
 ## 6. NFRs & regulatory compliance
 
@@ -211,6 +292,12 @@ Low-sensitivity, single-user surface: the dashboard carries sprint metadata (tic
 | `plugins/sprint-status-reporter/.claude-plugin/plugin.json` | 5.1 | Version bump; description update |
 | Rolai repo `.claude/tracker-policy.json` | 5.1 | Created via the existing lazy-prompt flow on first Rolai run (Rolai's custom states get classified interactively) — not hand-authored as part of this spec's code |
 | Claude Code scheduled-job configuration | 5.2 | New cron registration; platform-level, not a repo file |
+| `plugins/sprint-status-reporter/commands/pulse.md` | 5.3 | Rewrite: new `--from`/`--till`/`--range`/`--status` flags, examples, behavior description |
+| `plugins/sprint-status-reporter/agents/sprint-status-reporter.md` | 5.3 | Extend: Arguments, Working state, Phase 0 filter parsing, Phase D1 `since_arg` reuse, Phase P2 payload widened with `filters`, Phase 5 summary |
+| `plugins/sprint-status-reporter/skills/sprint-analyzer/SKILL.md` | 5.3 | Extend: `labels` on every per-item output object, optional uncapped `up_next` |
+| `plugins/sprint-status-reporter/skills/dashboard-composer/SKILL.md` | 5.3 | Rewrite: tag-tile computation replaces the four-bucket table; deck-text rules rewritten |
+| `plugins/sprint-status-reporter/skills/dashboard-composer/references/dashboard-page.html` | 5.3 | Rewrite: dynamic tag-tile rendering replaces the hardcoded 4-bucket `BUCKETS` array |
+| `plugins/sprint-status-reporter/.claude-plugin/plugin.json` | 5.3 | Version bump; description update |
 
 ## 9. Open questions
 
@@ -223,3 +310,4 @@ Low-sensitivity, single-user surface: the dashboard carries sprint metadata (tic
 ## Changelog
 
 - 2026-09-03 — Taha Bikanerwala (via Anthara spec-writer) — Initial spec, synthesized from a brainstorming session that discovered and pivoted onto the existing `sprint-status-reporter` plugin rather than building a duplicate delta-computation system [1].
+- 2026-09-04 — Taha Bikanerwala (via Anthara planner) — Added [slice 5.3](#53-filter-pulse-by-date-range-and-status-and-regroup-its-dashboard-by-tag): date-range/status filtering via Phase D1's existing baseline mechanism, and a tag-tile dashboard layout replacing the four-bucket section layout. Superseded ACs 5.1.3-5.1.6 accordingly; added invariants 4.5-4.6 and the Tag tile / New-since callout types. See `docs/plans/0001-pulse-dashboard-plan.md` for the build-level decisions, including why this does not duplicate `ticket-summarizer`'s query pipeline (`ARCHITECTURE.md` §7).

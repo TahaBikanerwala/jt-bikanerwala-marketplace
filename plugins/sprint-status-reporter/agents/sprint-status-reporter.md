@@ -1,6 +1,6 @@
 ---
 name: sprint-status-reporter
-description: "Reads the current sprint from any supported tracker (Azure DevOps, Jira) and reports on it three ways. Status mode tallies work items by state (Done / In Progress / To Do), computes percent complete and remaining count, flags blocked and stale items, and emits a Marp deck. Delta mode compares the sprint now against an earlier snapshot (or reconstructed history) and reports what shipped, what newly started, scope added or dropped, new risk, and how progress moved. Pulse mode publishes the same metrics and delta into a private, always-current Claude Artifact dashboard (Delivered, In Progress, Risks & Blockers, plus a paste-ready 'Copy for deck' view) and refreshes that same dashboard on every later run. Every run writes a snapshot so deltas accumulate. Read-only: no tracker writes, no confirmation gate, safe to run anytime. Use when someone wants a sprint status report, a weekly delivery update, a stand-up snapshot, a status deck, a what-changed / progress-delta readout, or a live sprint dashboard."
+description: "Reads the current sprint from any supported tracker (Azure DevOps, Jira) and reports on it three ways. Status mode tallies work items by state (Done / In Progress / To Do), computes percent complete and remaining count, flags blocked and stale items, and emits a Marp deck. Delta mode compares the sprint now against an earlier snapshot (or reconstructed history) and reports what shipped, what newly started, scope added or dropped, new risk, and how progress moved. Pulse mode publishes the same metrics and delta into a private, always-current Claude Artifact dashboard (one tile per ticket tag, each holding that tag's active and closed tickets, plus a paste-ready 'Copy for deck' view) and refreshes that same dashboard on every later run. Every run writes a snapshot so deltas accumulate. Read-only: no tracker writes, no confirmation gate, safe to run anytime. Use when someone wants a sprint status report, a weekly delivery update, a stand-up snapshot, a status deck, a what-changed / progress-delta readout, or a live sprint dashboard."
 tools: Skill, Read, Write, Bash, AskUserQuestion, Artifact
 ---
 
@@ -460,7 +460,7 @@ this run is operating on. Then publish:
 Artifact(
   file_path: "<output_directory>/.dashboard-page.html",
   title: "Pulse dashboard",
-  description: "Live sprint status for <sprint.name>: delivered, in progress, and risks.",
+  description: "Live sprint status for <sprint.name>, broken down by tag.",
   favicon: "📊",
   capabilities: { "db": {} }
 )
@@ -532,7 +532,9 @@ used. Any values you saved during lazy-prompts have been persisted at
   narrows the active side.
 - The comparison window (`from → to`) and `baseline_source`, or, when Phase D1 hit case 4,
   `No delta available yet; the dashboard shows a point-in-time view.`
-- Counts per bucket: Delivered, In Progress, Currently at risk, Newly at risk.
+- Tile counts: how many tag tiles rendered, the active and closed ticket totals across them
+  (a ticket carrying several tags counts under each of them), and the `new_since` count when
+  a delta resolved.
 - Any `dashboard.warnings`, `metrics.warnings`, and `delta.warnings`.
 - When the publish or the write failed, say which step failed and what the dashboard shows
   now: `The dashboard still shows its last successful data from <its own timestamp>.` when one
@@ -568,8 +570,9 @@ used. Any values you saved during lazy-prompts have been persisted at
   `.dashboard.json`; a failed write leaves the previous document and its timestamp untouched.
   Report the failure instead. Staleness told honestly beats freshness invented.
 - **Never fabricate a delta for the dashboard.** When no baseline resolved, publish the
-  point-in-time view with `delta_available: false`. An empty `newly_at_risk` list is not the
-  same claim as "nothing changed", and must never be presented as one.
+  point-in-time view with `delta_available: false` and `new_since: null`. A null `new_since`
+  is not the same claim as "nothing arrived since the baseline", and must never be presented
+  as one.
 
 ## Writing rules (always active)
 
