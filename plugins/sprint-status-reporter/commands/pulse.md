@@ -1,5 +1,5 @@
 ---
-description: Publish or refresh the Pulse dashboard for a sprint. A private, always-current Claude Artifact showing what's delivered, what's in progress, and what's at risk, plus a paste-ready "Copy for deck" view. Bound which closed and new tickets it counts with a date window (explicit --from/--till or a --range preset) and pick which side to show with --status; active tickets always show in full regardless. Read-only; safe to run anytime.
+description: Publish or refresh the Pulse dashboard for a sprint. A private, always-current Claude Artifact showing one tile per ticket tag, each holding that tag's active and closed tickets, plus a paste-ready "Copy for deck" view. Bound which closed and new tickets it counts with a date window (explicit --from/--till or a --range preset) and pick which side to show with --status; active tickets always show in full regardless. Read-only; safe to run anytime.
 argument-hint: "[sprint name or ID] [--team <name>] [--from <date> --till <date> | --range this-week|last-week|this-month|last-month] [--status active|delivered|closed|updated[,...]]"
 allowed-tools: Skill
 ---
