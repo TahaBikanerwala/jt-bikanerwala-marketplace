@@ -84,14 +84,11 @@
     margin: 0 0 16px;
   }
 
-  .bucket--delivered { --accent: var(--delivered); }
-  .bucket--in-progress { --accent: var(--in-progress); }
-  .bucket--currently-at-risk { --accent: var(--currently-at-risk); }
-  .bucket--newly-at-risk { --accent: var(--newly-at-risk); }
+  .bucket--tag { --accent: var(--in-progress); }
+  .bucket--new-since { --accent: var(--newly-at-risk); }
 
   .bucket-head { display: flex; align-items: baseline; gap: 10px; }
   .bucket-head h2 { color: var(--accent); }
-  .mark { color: var(--accent); font-size: 1.1rem; line-height: 1; }
   .count {
     margin-left: auto;
     color: var(--surface);
@@ -101,6 +98,18 @@
     font-size: 0.85rem;
     font-weight: 700;
   }
+
+  .count--active { --accent: var(--in-progress); }
+  .count--closed { --accent: var(--delivered); }
+
+  .tile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+    margin: 0 0 20px;
+  }
+
+  .tile { margin: 0; }
 
   ul.items { list-style: none; margin: 12px 0 0; padding: 0; }
 
@@ -123,10 +132,22 @@
     padding: 2px 8px;
     font-size: 0.85rem;
     font-weight: 600;
-    color: var(--accent);
+    color: var(--currently-at-risk);
     background: var(--surface);
-    border: 2px solid var(--accent);
+    border: 2px solid var(--currently-at-risk);
     border-radius: 4px;
+  }
+
+  .new-marker {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--surface);
+    background: var(--newly-at-risk);
+    border-radius: 4px;
+    vertical-align: middle;
   }
 
   .note { color: var(--muted); margin: 12px 0 0; }
@@ -199,7 +220,7 @@
     <p class="note" id="loading-state" role="status" data-testid="pulse-dashboard-loading-state">Loading the latest sprint data.</p>
     <p class="note" id="empty-state" data-testid="pulse-dashboard-empty-state" hidden>No sprint data has been published to this dashboard yet. Run the pulse command to fill it in.</p>
     <p class="banner" id="error-state" role="alert" data-testid="pulse-dashboard-error-state" hidden></p>
-    <div id="buckets" hidden></div>
+    <div id="live-content" hidden></div>
     <ul class="warnings" id="warnings" data-testid="pulse-dashboard-warnings" hidden></ul>
   </section>
 
@@ -219,13 +240,6 @@
 
   var DOC_PATH = "dashboard/current";
 
-  var BUCKETS = [
-    { key: "delivered", label: "Delivered", mark: "✓", slug: "delivered", needsDelta: false },
-    { key: "in_progress", label: "In Progress", mark: "▶", slug: "in-progress", needsDelta: false },
-    { key: "currently_at_risk", label: "Currently at risk", mark: "▲", slug: "currently-at-risk", needsDelta: false },
-    { key: "newly_at_risk", label: "Newly at risk", mark: "★", slug: "newly-at-risk", needsDelta: true }
-  ];
-
   var TABS = [
     { tab: "tab-live", panel: "panel-live" },
     { tab: "tab-deck", panel: "panel-deck" }
@@ -236,7 +250,7 @@
   var loadingState = document.getElementById("loading-state");
   var emptyState = document.getElementById("empty-state");
   var errorState = document.getElementById("error-state");
-  var bucketsRoot = document.getElementById("buckets");
+  var liveContent = document.getElementById("live-content");
   var warningsList = document.getElementById("warnings");
   var deckText = document.getElementById("deck-text");
   var copyButton = document.getElementById("copy-button");
@@ -275,6 +289,8 @@
 
   function metaLine(item) {
     var parts = [];
+    var state = item.to_state || item.state;
+    if (state) { parts.push(String(state)); }
     if (item.assignee) { parts.push(String(item.assignee)); }
     if (item.points !== null && item.points !== undefined) { parts.push(item.points + " pts"); }
     if (item.days_since_update !== null && item.days_since_update !== undefined) {
@@ -283,13 +299,14 @@
     return parts.join(", ");
   }
 
-  function itemRow(bucket, item) {
+  function itemRow(testidPrefix, item) {
     var row = element("li", "item");
-    row.dataset.testid = "pulse-dashboard-" + bucket.slug + "-item-" + item.id;
+    row.dataset.testid = "pulse-dashboard-" + testidPrefix + "-item-" + item.id;
 
     var heading = element("p", "item-line");
     heading.appendChild(textNode("span", "item-id", String(item.id)));
     heading.appendChild(textNode("span", "item-title", item.title ? String(item.title) : ""));
+    if (item.newly_at_risk) { heading.appendChild(textNode("span", "new-marker", "NEW")); }
     row.appendChild(heading);
 
     var meta = metaLine(item);
@@ -300,43 +317,101 @@
     return row;
   }
 
-  function itemList(bucket, items) {
+  function itemList(testidPrefix, items) {
     var list = element("ul", "items");
-    items.forEach(function (item) { list.appendChild(itemRow(bucket, item)); });
+    items.forEach(function (item) { list.appendChild(itemRow(testidPrefix, item)); });
     return list;
   }
 
-  function bucketHead(bucket, count) {
+  function tagSlug(label) {
+    return String(label)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  }
+
+  function resolveTagSlugs(tags) {
+    var seen = Object.create(null);
+    return tags.map(function (tagEntry) {
+      var base = tagSlug(tagEntry.tag);
+      var occurrence = seen[base] || 0;
+      seen[base] = occurrence + 1;
+      return occurrence === 0 ? base : base + "-" + (occurrence + 1);
+    });
+  }
+
+  function tile(tagEntry, slug) {
+    var card = element("div", "item tile");
+    card.dataset.testid = "pulse-dashboard-tag-" + slug + "-tile";
+
     var head = element("div", "bucket-head");
-    var mark = textNode("span", "mark", bucket.mark);
-    mark.setAttribute("aria-hidden", "true");
-    head.appendChild(mark);
-    head.appendChild(textNode("h2", null, bucket.label));
-    var badge = textNode("span", "count", String(count));
-    badge.dataset.testid = "pulse-dashboard-" + bucket.slug + "-count";
-    head.appendChild(badge);
+    head.appendChild(textNode("p", "item-title", String(tagEntry.tag)));
+
+    var activeCount = textNode("span", "count count--active", String(tagEntry.active_count));
+    activeCount.dataset.testid = "pulse-dashboard-tag-" + slug + "-active-count";
+    head.appendChild(activeCount);
+
+    var closedCount = textNode("span", "count count--closed", String(tagEntry.closed_count));
+    closedCount.dataset.testid = "pulse-dashboard-tag-" + slug + "-closed-count";
+    head.appendChild(closedCount);
+
+    card.appendChild(head);
+    return card;
+  }
+
+  function tileGrid(tags, slugs) {
+    var grid = element("div", "tile-grid");
+    tags.forEach(function (tagEntry, index) {
+      grid.appendChild(tile(tagEntry, slugs[index]));
+    });
+    return grid;
+  }
+
+  function tagSectionHead(tagEntry) {
+    var head = element("div", "bucket-head");
+    head.appendChild(textNode("h2", null, String(tagEntry.tag)));
     return head;
+  }
+
+  function tagSubList(headingText, testidPrefix, items) {
+    var wrap = element("div", null);
+    wrap.appendChild(textNode("h3", null, headingText));
+    var body = items.length ? itemList(testidPrefix, items) : textNode("p", "note", "None.");
+    body.dataset.testid = "pulse-dashboard-" + testidPrefix + "-list";
+    wrap.appendChild(body);
+    return wrap;
+  }
+
+  function tagSection(tagEntry, slug) {
+    var section = element("section", "bucket bucket--tag");
+    section.dataset.testid = "pulse-dashboard-tag-" + slug + "-section";
+    section.appendChild(tagSectionHead(tagEntry));
+    section.appendChild(tagSubList("Active", "tag-" + slug + "-active", tagEntry.active_items));
+    section.appendChild(tagSubList("Closed", "tag-" + slug + "-closed", tagEntry.closed_items));
+    return section;
+  }
+
+  function newSinceSection(newSince) {
+    var section = element("section", "bucket bucket--new-since");
+    section.dataset.testid = "pulse-dashboard-new-since-section";
+
+    var head = element("div", "bucket-head");
+    head.appendChild(textNode("h2", null, "New since " + newSince.window_from));
+    var badge = textNode("span", "count", String(newSince.count));
+    badge.dataset.testid = "pulse-dashboard-new-since-count";
+    head.appendChild(badge);
+    section.appendChild(head);
+
+    var items = Array.isArray(newSince.items) ? newSince.items : [];
+    section.appendChild(items.length ? itemList("new-since", items) : textNode("p", "note", "None."));
+
+    return section;
   }
 
   function noDeltaNote() {
     var note = textNode("p", "note", "No delta available yet, so nothing can be marked new since the last check. This is a point-in-time view.");
     note.dataset.testid = "pulse-dashboard-no-delta-state";
     return note;
-  }
-
-  function bucketSection(bucket, view) {
-    var items = Array.isArray(view[bucket.key]) ? view[bucket.key] : [];
-    var section = element("section", "bucket bucket--" + bucket.slug);
-    section.dataset.testid = "pulse-dashboard-" + bucket.slug + "-section";
-    section.appendChild(bucketHead(bucket, items.length));
-
-    if (bucket.needsDelta && view.delta_available === false) {
-      section.appendChild(noDeltaNote());
-      return section;
-    }
-
-    section.appendChild(items.length ? itemList(bucket, items) : textNode("p", "note", "None."));
-    return section;
   }
 
   function renderSprint(sprint) {
@@ -374,9 +449,15 @@
     updatedAt.textContent = view.generated_at ? String(view.generated_at) : "not yet";
     if (view.generated_at) { updatedAt.setAttribute("datetime", String(view.generated_at)); }
 
-    bucketsRoot.replaceChildren();
-    BUCKETS.forEach(function (bucket) {
-      bucketsRoot.appendChild(bucketSection(bucket, view));
+    var tags = Array.isArray(view.tags) ? view.tags : [];
+    var slugs = resolveTagSlugs(tags);
+
+    liveContent.replaceChildren();
+    if (view.delta_available === false) { liveContent.appendChild(noDeltaNote()); }
+    if (view.new_since) { liveContent.appendChild(newSinceSection(view.new_since)); }
+    liveContent.appendChild(tileGrid(tags, slugs));
+    tags.forEach(function (tagEntry, index) {
+      liveContent.appendChild(tagSection(tagEntry, slugs[index]));
     });
 
     renderWarnings(document_.warnings);
@@ -385,13 +466,13 @@
     hide(loadingState);
     hide(emptyState);
     hide(errorState);
-    show(bucketsRoot);
+    show(liveContent);
   }
 
   function showEmpty() {
     hide(loadingState);
     hide(errorState);
-    hide(bucketsRoot);
+    hide(liveContent);
     renderDeckText("");
     show(emptyState);
   }
@@ -399,7 +480,7 @@
   function showError(message) {
     hide(loadingState);
     hide(emptyState);
-    hide(bucketsRoot);
+    hide(liveContent);
     renderDeckText("");
     errorState.textContent = message;
     show(errorState);

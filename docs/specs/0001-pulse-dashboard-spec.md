@@ -200,14 +200,14 @@ graph LR
 - [x] **5.3.4** When `--till` resolves, it bounds the closed and new-since ticket lists to entries whose `updated` date is on or before it; it never re-derives a second point-in-time reconstruction.
 - [x] **5.3.5** Every currently non-done ticket appears in full in its tag's active count and list on every run, regardless of any date window applied ([invariant 4.5](#4-invariants)).
 - [x] **5.3.6** When a baseline resolves, a tag's closed count and list are exactly `delta.shipped` filtered to that tag (tickets that transitioned to done within the resolved window) — not every historically-done ticket in the sprint.
-- [ ] **5.3.7** When no baseline has resolved yet (first run for a project), closed counts and lists fall back to every currently-done ticket per tag, and the dashboard states plainly this is a point-in-time view, per the existing no-baseline handling ([5.1.8](#51-publish-or-update-the-pulse-dashboard-from-a-sprints-current-delta)).
-- [ ] **5.3.8** `--status active` shows only active tiles/lists (closed omitted entirely); `--status closed` (or `delivered`) shows only closed tiles/lists, scoped per 5.3.6/5.3.7; omitting `--status` shows both.
+- [x] **5.3.7** When no baseline has resolved yet (first run for a project), closed counts and lists fall back to every currently-done ticket per tag, and the dashboard states plainly this is a point-in-time view, per the existing no-baseline handling ([5.1.8](#51-publish-or-update-the-pulse-dashboard-from-a-sprints-current-delta)).
+- [x] **5.3.8** `--status active` shows only active tiles/lists (closed omitted entirely); `--status closed` (or `delivered`) shows only closed tiles/lists, scoped per 5.3.6/5.3.7; omitting `--status` shows both.
 - [x] **5.3.9** The dashboard groups every ticket by its `labels` entries into one tile per tag, each tile showing an active count and a closed count.
-- [ ] **5.3.10** A ticket with two or more labels appears under each of its tags' tiles and lists; a ticket with no labels appears once under a reserved `Untagged` tile, always rendered last ([invariant 4.6](#4-invariants)). At-risk tickets carry their `blocked:`/`stale:` reason as a badge on their row within their tag's active list.
-- [ ] **5.3.11** Below the tiles, each tag's exact ticket list (active tickets, then closed tickets) shows id, title, state, assignee, points, and blurb when available.
-- [ ] **5.3.12** The "Copy for deck" plain-text view mirrors the tile layout (tag headings, active/closed counts, one line per ticket, id-ascending order, `None.` for an empty list) with the same one-click copy control as before.
+- [x] **5.3.10** A ticket with two or more labels appears under each of its tags' tiles and lists; a ticket with no labels appears once under a reserved `Untagged` tile, always rendered last ([invariant 4.6](#4-invariants)). At-risk tickets carry their `blocked:`/`stale:` reason as a badge on their row within their tag's active list.
+- [x] **5.3.11** Below the tiles, each tag's exact ticket list (active tickets, then closed tickets) shows id, title, state, assignee, points, and blurb when available.
+- [x] **5.3.12** The "Copy for deck" plain-text view mirrors the tile layout (tag headings, active/closed counts, one line per ticket, id-ascending order, `None.` for an empty list) with the same one-click copy control as before.
 - [x] **5.3.13** No tile or ticket list is ever capped or truncated (carries forward `dashboard-composer`'s existing "no display caps" rule).
-- [ ] **5.3.14** The dashboard shows a "New since `<resolved baseline date>`" count and the underlying ticket list, sourced from `delta.added` and scoped to the same resolved window, shown whenever a delta is available and unaffected by `--status`.
+- [x] **5.3.14** The dashboard shows a "New since `<resolved baseline date>`" count and the underlying ticket list, sourced from `delta.added` and scoped to the same resolved window, shown whenever a delta is available and unaffected by `--status`.
 - [x] **5.3.15** Every number and ticket-list entry traces to a real fetched `SprintItem` or a real computed model field; nothing is invented when points, description, or history are missing ([invariant 4.4](#4-invariants)).
 
 > **Verification status at build time (2026-09-04, slice 3 of the accompanying plan).**
@@ -223,6 +223,43 @@ graph LR
 > 5.3.10, 5.3.11, 5.3.12 and 5.3.14 carry a rendering half that needs the `dashboard-page.html`
 > rewrite (slice 4) before it can be observed end to end. No tracker MCP was reachable from
 > this build session, so [§9.1](#9-open-questions) stays open.
+
+> **Verification status at build time (2026-09-04, slice 4 of the accompanying plan).**
+> `dashboard-page.html`'s rewritten render logic was driven, outside a real browser, against
+> two hand-built Artifact `db` documents matching slice 3's exact output schema: one with a
+> resolved delta (a multi-tag ticket, a ticket newly marked at risk, a real label spelled
+> `untagged` colliding with the reserved `Untagged` tile, a `delta.shipped`-shaped closed row,
+> a non-empty new-since callout, and a `--status`-gated tag with an empty closed side) and one
+> with `delta: null` (a `metrics.completed`-shaped closed row, no new-since callout, the
+> point-in-time note). The script was executed for real (Node's `vm` module, a minimal DOM
+> shim satisfying every DOM call the script makes) rather than only read, and the resulting
+> element tree was walked to assert on it, not just eyeballed. This confirmed: the multi-tag
+> ticket renders as two DOM rows under two distinct testids
+> (`pulse-dashboard-tag-ecw-active-item-101`, `pulse-dashboard-tag-qa-active-item-101`); the
+> `untagged`/`Untagged` slug collision resolves to `pulse-dashboard-tag-untagged-tile` and
+> `pulse-dashboard-tag-untagged-2-tile`, two distinct testids, per the Automation Testing
+> Conventions pack's uniqueness rule; a row's state resolves to `to_state` when present and
+> falls back to `state` otherwise, correctly reading both of `dashboard-composer`'s two
+> `closed_items` shapes; a gated, empty side renders its count pill as `0` and its list as
+> `None.` rather than being dropped from the DOM; the `newly_at_risk` marker and the `reason`
+> badge both render; the repurposed `pulse-dashboard-no-delta-state` note is present exactly
+> when `delta_available` is `false` and absent otherwise; and the `new_since` section is
+> present exactly when `live_view.new_since` is non-null. This checks 5.3.7, 5.3.8, 5.3.10,
+> 5.3.11 and 5.3.14's rendering half directly; 5.3.12 rests on the copy/textarea mechanism
+> being unchanged from [5.1](#51-publish-or-update-the-pulse-dashboard-from-a-sprints-current-delta)'s
+> already-verified copy flow, since this slice made no logic change to it, confirmed by
+> re-tracing that `renderDeckText` still enables the copy button whenever `deck_text` is
+> non-empty. Every pre-existing testid (`pulse-dashboard`, `-sprint`, `-updated-at`,
+> `-view-toggle`, `-live-tab`, `-deck-tab`, `-live-view`, `-loading-state`, `-empty-state`,
+> `-error-state`, `-warnings`, `-deck-view`, `-copy-button`, `-copy-status`, `-deck-text`) is
+> unchanged; every old bucket-specific testid (`-delivered-*`, `-in-progress-*`,
+> `-currently-at-risk-*`, `-newly-at-risk-*`) is gone, confirmed by grep against the rewritten
+> file. Not exercised by this session, still pending a live run: `Artifact` publish/update
+> itself, real tab-order/focus/contrast measurement in an actual browser, and a real clipboard
+> write. No tracker MCP or `chrome-devtools-mcp` session was reachable from this build session,
+> so [§9.1](#9-open-questions) stays open and this slice's own browser-session verification step
+> is deferred to the first real run, matching [5.1](#51-publish-or-update-the-pulse-dashboard-from-a-sprints-current-delta)'s
+> own precedent.
 
 **Verification (slice complete when these pass):**
 
