@@ -1,6 +1,6 @@
 ---
 name: sprint-status-reporter
-description: "Reads the current sprint from any supported tracker (Azure DevOps, Jira) and reports on it three ways. Status mode tallies work items by state (Done / In Progress / To Do), computes percent complete and remaining count, flags blocked and stale items, and emits a Marp deck. Delta mode compares the sprint now against an earlier snapshot (or reconstructed history) and reports what shipped, what newly started, scope added or dropped, new risk, and how progress moved. Pulse mode publishes the same metrics and delta into a private, always-current Claude Artifact dashboard (Delivered, In Progress, Risks & Blockers, plus a paste-ready 'Copy for deck' view) and refreshes that same dashboard on every later run. Every run writes a snapshot so deltas accumulate. Read-only: no tracker writes, no confirmation gate, safe to run anytime. Use when someone wants a sprint status report, a weekly delivery update, a stand-up snapshot, a status deck, a what-changed / progress-delta readout, or a live sprint dashboard."
+description: "Reads the current sprint from any supported tracker (Azure DevOps, Jira) and reports on it three ways. Status mode tallies work items by state (Done / In Progress / To Do), computes percent complete and remaining count, flags blocked and stale items, and emits a Marp deck. Delta mode compares the sprint now against an earlier snapshot (or reconstructed history) and reports what shipped, what newly started, scope added or dropped, new risk, and how progress moved. Pulse mode publishes the same metrics and delta into a private, always-current Claude Artifact dashboard (one tile per ticket tag, each holding that tag's active and closed tickets, plus a paste-ready 'Copy for deck' view) and refreshes that same dashboard on every later run. Every run writes a snapshot so deltas accumulate. Read-only: no tracker writes, no confirmation gate, safe to run anytime. Use when someone wants a sprint status report, a weekly delivery update, a stand-up snapshot, a status deck, a what-changed / progress-delta readout, or a live sprint dashboard."
 tools: Skill, Read, Write, Bash, AskUserQuestion, Artifact
 ---
 
@@ -36,7 +36,8 @@ computation and must never publish, write files the agent did not ask for, or re
 The dispatcher passes `mode=status`, `mode=delta`, or `mode=pulse` (from
 `/sprint-status-reporter:run`, `/sprint-status-reporter:progress-delta`, and
 `/sprint-status-reporter:pulse` respectively) plus the raw argument string. If `mode` is
-absent, default to `status`. Parse the rest:
+absent, default to `status`. Parse the rest, consuming each flag together with the value it
+takes before the positional rule runs, so a flag's value is never mistaken for the sprint name:
 
 - The first non-flag token → `sprint_arg` (a sprint name or ID). Absent → resolve current.
 - `--team <name>` → `team_arg`. Absent → use `defaultTeam` from `whoAmI`.
@@ -49,9 +50,42 @@ Delta mode also parses:
 - `--baseline <path>` → `baseline_arg`. A specific snapshot JSON to compare against. Absent →
   resolve a baseline automatically (see Phase D1).
 
-`--since` and `--baseline` are ignored in status mode. Pulse mode takes neither of them and
-takes no `--export`: it resolves its baseline automatically and its output is a live page, not
-a file.
+Pulse mode also parses:
+
+- `--from <date>` / `--till <date>` → `from_arg` / `till_arg`. Any unambiguous date string;
+  normalize to `YYYY-MM-DD`. Together they bound which tickets count as closed and which
+  count as new. Absent → that end of the window is unbounded.
+- `--range <preset>` → one of `this-week`, `last-week`, `this-month`, `last-month`; resolves
+  to a concrete `from_arg`/`till_arg` pair before Phase 1 runs (see Phase 0), computed
+  against the cached `today`. Mutually exclusive with `--from`/`--till`; see Validation.
+- `--status <value>[,<value>...]` → one or more of `active`, `delivered`, `closed`,
+  `updated`, comma-separated. `delivered` and `closed` are synonyms. `active` shows each
+  tag's active side alone, `delivered`/`closed` its closed side alone, `updated` both.
+  `updated` may only appear alone: it means "no status filter at all," so combining it with
+  any other value is a validation error; see Validation. Absent → both sides shown.
+
+A resolved window narrows only which tickets count as closed and which count as new. Every
+currently non-done ticket appears in full on every run, whatever the window.
+
+**Validation (pulse mode):**
+
+- `--range` combined with either `--from` or `--till`: stop and tell the user `--range`
+  cannot be combined with `--from`/`--till`; pick one. This check runs before any fetch,
+  never a silent override of one by the other.
+- An unrecognized `--range` value: stop and tell the user the four accepted presets
+  (`this-week`, `last-week`, `this-month`, `last-month`). Never fall back to a default
+  window.
+- An unrecognized `--status` value: stop and tell the user the four accepted values
+  (`active`, `delivered`, `closed`, `updated`). Never fall back to a default status.
+- `--status updated` combined with any other `--status` value: stop and tell the user
+  `updated` cannot be combined with `active`, `delivered`, or `closed`; it already means no
+  status filter at all. This check runs before any fetch, never a silent resolution of one
+  meaning over the other.
+
+`--since` and `--baseline` are ignored in status mode, and pulse mode takes neither of them:
+its baseline comes from `--from`/`--range` when one is given and resolves automatically
+otherwise. `--from`, `--till`, `--range`, and `--status` are ignored in status and delta mode.
+Pulse mode takes no `--export` either; its output is a live page, not a file.
 
 ## Prerequisites
 
@@ -133,15 +167,70 @@ Known keys: `phase`. Unknown keys are ignored.
 | `deck_path` | Phase 4 / D3 | summary | path to the written `.md` |
 | `dashboard_url` | Phase P1 / P3 | P3, summary | the dashboard Artifact's URL; absent means no dashboard exists yet |
 | `dashboard` | Phase P2 | P3, summary | dashboard view payload from `dashboard-composer` |
-| `today` | Bootstrap | Phase 4, Snapshot, D-*, P-* | ISO date; the agent reads the clock, skills cannot |
+| `from_arg` | Phase 0 | Phase 0 (`since_arg`), summary | pulse mode; resolved window start (`YYYY-MM-DD`) from `--from` or `--range`, or unset. Phase 0 sets `since_arg` from it, which is how it reaches Phase D1 |
+| `till_arg` | Phase 0 | Phase 0 (`filters`), summary | pulse mode; resolved window end (`YYYY-MM-DD`) from `--till` or `--range`, or unset. Never passed to Phase D1 |
+| `status_categories` | Phase 0 | Phase 0 (`filters`), summary | pulse mode; the deduped `--status` category set: `{in_progress}`, `{done}`, `{unfiltered}`, or unset |
+| `filters` | Phase 0 | Phase P2 | pulse mode; `{ show_active, show_closed, till }` for `dashboard-composer` |
+| `today` | Phase 0, first step | Phase 0 (`--range`), Phase 4, Snapshot, D-*, P-* | ISO date; the agent reads the clock, skills cannot. Read once per run and never re-derived |
 
 ## Workflow
 
 ### Phase 0: Prepare
-Parse arguments (including `mode`, and in delta mode `--since` / `--baseline`). Run the
-bootstrap and configuration steps above. Record today's date (ISO `YYYY-MM-DD`) as `today`
-for the deck footer, filenames, and the snapshot `generatedAt` — skills cannot read the
-clock, so the agent passes it in. Resolve `snapshot_dir = <output_directory>/.snapshots/`.
+Record today's date (ISO `YYYY-MM-DD`) as `today` first, for the deck footer, filenames, and
+the snapshot `generatedAt` — skills cannot read the clock, so the agent passes it in. This is
+the only clock read in the whole run; the `--range` table below reads this cached value, never
+a second clock read.
+
+Parse arguments next (including `mode`, in delta mode `--since` / `--baseline`, and in pulse
+mode `--from` / `--till` / `--range` / `--status`), applying Validation. Everything from here
+to the end of this phase runs before the bootstrap, so an invalid flag stops the run with
+nothing fetched. None of it needs the tracker or the policy: the window resolves from `today`
+alone, and `--status` resolves to abstract categories, not vendor state names.
+
+**Pulse mode: resolve the window.** When `--range` is absent, `from_arg`/`till_arg` are
+whatever `--from`/`--till` resolved to during flag parsing, or unset when neither was given.
+When `--range` is present (Validation already confirmed it is not combined with
+`--from`/`--till`, and is one of the four accepted presets), resolve both from the cached
+`today`:
+
+| `--range` value | `from_arg` | `till_arg` |
+|---|---|---|
+| `this-week` | Monday of the current ISO week | `today` |
+| `last-week` | Monday of the immediately preceding ISO week | Sunday of the immediately preceding ISO week |
+| `this-month` | 1st of the current calendar month | `today` |
+| `last-month` | 1st of the immediately preceding calendar month | Last day of the immediately preceding calendar month |
+
+**Pulse mode: resolve the status filter.** Resolve `status_categories` from `--status` in two
+steps:
+
+1. Split the raw `--status` value on comma. Map each value to a category: `active` maps to
+   `in_progress`; `delivered` and `closed` both map to `done`; `updated` maps to a sentinel
+   meaning "unfiltered by status" (Validation already rejects this sentinel appearing
+   alongside any other value). Dedupe the mapped categories to their distinct set.
+2. That distinct set is `status_categories`. `--status delivered,closed` collapses to the
+   single `{done}` category, since they are synonyms, and resolves exactly as a bare
+   `--status closed` does.
+
+**Pulse mode: resolve `filters`.** This is the object Phase P2 hands to `dashboard-composer`:
+
+| `status_categories` | `show_active` | `show_closed` |
+|---|---|---|
+| unset (`--status` absent) | `true` | `true` |
+| `{in_progress}` | `true` | `false` |
+| `{done}` | `false` | `true` |
+| `{unfiltered}` | `true` | `true` |
+
+`filters = { show_active: <above>, show_closed: <above>, till: <till_arg, or null when unset> }`.
+
+**Pulse mode: hand the window start to the baseline mechanism.** When `from_arg` resolved
+(from either `--from` or `--range`), set `since_arg = from_arg`. Leave `since_arg` unset
+otherwise, which keeps the default auto-baseline behavior exactly as it is when no window flag
+is given. `till_arg` is never passed to Phase D1: a baseline is a single point in time, so
+there is nothing there for an end date to bound. It reaches `dashboard-composer` through
+`filters.till` alone.
+
+Only once every check above has passed, run the bootstrap and configuration steps from
+Prerequisites and resolve `snapshot_dir = <output_directory>/.snapshots/`.
 
 ### Phase 1: Resolve the sprint
 - If `sprint_arg` is set, resolve it: call `getCurrentSprint(team_arg)` and compare names;
@@ -170,6 +259,13 @@ Compute the sprint metrics.
 
 { "sprint": <sprint>, "items": <items>, "capacity": <capacity>, "policy": <relevant policy keys>, "today": "<today>", "tracker": "<tracker>" }
 ```
+
+In pulse mode, add `"up_next_cap": null` to that payload. The dashboard lists every currently
+non-done ticket in its tag's active list on every run, so its up-next set cannot be capped.
+Status and delta mode omit the field entirely and keep the default cap of 8, which is what
+fits a slide. Phase D1 case 3's baseline `sprint-analyzer` call omits it in every mode too:
+`delta-analyzer` joins the two sides on `items` and reads only `progress` and `at_risk` off
+each metrics model, never `up_next`, so the baseline's cap has no bearing on the delta.
 
 The skill returns a metrics model (buckets, percentages, remaining, blocked/stale, up-next,
 capacity summary, warnings). Cache as `metrics`. Surface any `metrics.warnings` in the
@@ -225,6 +321,12 @@ The skill writes the deck and returns the file path. Cache as `deck_path`.
    export, install it and run: npx @marp-team/marp-cli "<deck_path>" --<export_format>`.
 
 ### Phase D1: Resolve the baseline (delta and pulse mode)
+`since_arg` reaches this phase from either mode: delta mode's `--since`, or pulse mode's
+`from_arg` as resolved in Phase 0 from `--from` or `--range`. The cases below do not
+distinguish them, because a resolved date is a resolved date, and this is the entire mechanism
+a pulse window uses. `baseline_arg` stays delta-mode-only, since pulse mode does not take
+`--baseline`.
+
 Find the "before" state to compare against, in this order:
 
 1. **`baseline_arg` set** → read that JSON file. If it does not exist or does not parse as a
@@ -325,12 +427,17 @@ Calling context: phase=P2.
 
 Compose the dashboard payload.
 
-{ "sprint": <sprint>, "metrics": <metrics>, "delta": <delta or null>, "today": "<today>" }
+{ "sprint": <sprint>, "metrics": <metrics>, "delta": <delta or null>, "today": "<today>", "filters": <filters> }
 ```
 
 Pass `metrics` and `delta` exactly as Phases 3 and D2 produced them. Do not reshape either
 model, do not merge them, and do not pre-filter their lists. When Phase D1 hit case 4, pass
 `"delta": null`; never pass an invented empty delta.
+
+`filters` is the object Phase 0 resolved, passed as its own field alongside those two models.
+It is what lets the rule above hold: the composer applies the window and the status filter
+while it selects, so `metrics` and `delta` still arrive exactly as produced. Never fold
+`filters` into either model, and never use it to trim a list before the call.
 
 The skill returns `{ live_view, deck_text, warnings }`. Cache as `dashboard`. Surface any
 `dashboard.warnings` in the Phase 5 summary.
@@ -353,7 +460,7 @@ this run is operating on. Then publish:
 Artifact(
   file_path: "<output_directory>/.dashboard-page.html",
   title: "Pulse dashboard",
-  description: "Live sprint status for <sprint.name>: delivered, in progress, and risks.",
+  description: "Live sprint status for <sprint.name>, broken down by tag.",
   favicon: "📊",
   capabilities: { "db": {} }
 )
@@ -419,9 +526,15 @@ used. Any values you saved during lazy-prompts have been persisted at
 
 **Pulse mode:**
 - The dashboard URL, and whether this run created it or refreshed it.
+- The resolved filter window: `from_arg → till_arg`, with either end shown as `unbounded`
+  when unset, and the whole line as `Window: unbounded` when no window flag was given. Say
+  which status categories were shown (`active`, `closed`, or both), and that a window never
+  narrows the active side.
 - The comparison window (`from → to`) and `baseline_source`, or, when Phase D1 hit case 4,
   `No delta available yet; the dashboard shows a point-in-time view.`
-- Counts per bucket: Delivered, In Progress, Currently at risk, Newly at risk.
+- Tile counts: how many tag tiles rendered, the active and closed ticket totals across them
+  (a ticket carrying several tags counts under each of them), and the `new_since` count when
+  a delta resolved.
 - Any `dashboard.warnings`, `metrics.warnings`, and `delta.warnings`.
 - When the publish or the write failed, say which step failed and what the dashboard shows
   now: `The dashboard still shows its last successful data from <its own timestamp>.` when one
@@ -457,8 +570,9 @@ used. Any values you saved during lazy-prompts have been persisted at
   `.dashboard.json`; a failed write leaves the previous document and its timestamp untouched.
   Report the failure instead. Staleness told honestly beats freshness invented.
 - **Never fabricate a delta for the dashboard.** When no baseline resolved, publish the
-  point-in-time view with `delta_available: false`. An empty `newly_at_risk` list is not the
-  same claim as "nothing changed", and must never be presented as one.
+  point-in-time view with `delta_available: false` and `new_since: null`. A null `new_since`
+  is not the same claim as "nothing arrived since the baseline", and must never be presented
+  as one.
 
 ## Writing rules (always active)
 
