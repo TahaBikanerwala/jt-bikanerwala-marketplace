@@ -2,8 +2,8 @@
 
 Pulls Azure DevOps or Jira work items and turns each into a concise, plain-language
 summary suited for a client-update deck: what was delivered and, only when the ticket
-itself says why, why it matters. Each summary targets one to two sentences, extending
-to three or four only as a last resort when two are not enough to say it accurately.
+itself says why, why it matters. Each summary targets one short sentence; a second is
+rare, and there is never a third.
 
 Auto-installs [`issuekit`](../issuekit/); bring your own MCPs.
 
@@ -65,10 +65,9 @@ assignee for the brief line) instead of the fast default.
    created date, so this plugin fetches full items and checks the requested date
    field itself); `--tags` always filters client-side after the fetch, on both
    trackers.
-3. Runs every item through `executive-blurb-writer`: one sentence on what changed, a
-   second sentence only when the ticket's own text supports a why-it-matters claim,
-   and (last resort only) a third or fourth sentence when two genuinely are not
-   enough to say it accurately.
+3. Runs every item through `executive-blurb-writer`: one short sentence on what
+   changed, and a second only when the ticket's own text supports a why-it-matters
+   claim that cannot be folded into the first. Never a third.
 4. Prints one ready-to-paste brief line per item (`#<id>: <title>. <blurb>
    (<assignee>)`), grouped by status when a query resolves to a single status
    category; a multi-value `--status` prints one flat list instead.
@@ -122,8 +121,8 @@ for the full shape. Works with zero configuration.
 
 ## Bundled skills
 
-- `executive-blurb-writer`: turns a fetched work item into a concise, one-to-two
-  sentence client-facing blurb (three or four only as a last resort). Bundled here.
+- `executive-blurb-writer`: turns a fetched work item into a concise, one-sentence
+  (rarely two) client-facing blurb. Bundled here.
 - `issuekit:tracker-adapter`: tracker detection, identity, and the abstract verb
   surface. Reused from `issuekit`.
 
