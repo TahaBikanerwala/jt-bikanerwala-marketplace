@@ -1,5 +1,5 @@
 ---
-description: Fetch Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status, and print a concise executive summary per item (one to two sentences, three or four only as a last resort) for a client-update deck. Read-only; safe to run anytime.
+description: Fetch Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status, and print a concise executive summary per item (one short sentence, rarely a second) for a client-update deck. Read-only; safe to run anytime.
 argument-hint: "<ticket ids/urls...> | --range this-week|last-week|this-month|last-month | --from <date> --till <date> [--status active|delivered|closed|updated[,...]] [--project <name>] [--scope <area-path-or-component>] [--tags <name>[,<name>...]] [--to <target>] [--output <path>] [--detailed] [keywords...]"
 allowed-tools: Skill
 ---
@@ -44,8 +44,8 @@ This command is a thin shell. It dispatches to the `ticket-summarizer` agent, wh
    of its type.
 4. Runs each item through `executive-blurb-writer` to produce a concise,
    plain-language summary: what was delivered, and why it matters only when the ticket
-   itself says so. Targets one to two sentences; extends to three or four only as a
-   last resort when two are not enough to say it accurately.
+   itself says so and it cannot be folded into the same sentence. Targets one short
+   sentence; a second is rare, and there is never a third.
 5. Prints one ready-to-paste brief line per item (`#<id>: <title>. <blurb>
    (<assignee>)`), grouped by status when a query resolves to a single status
    category; a multi-value `--status` prints one flat list instead, since a
