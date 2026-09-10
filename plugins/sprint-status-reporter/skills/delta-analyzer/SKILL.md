@@ -66,9 +66,9 @@ Return a single JSON object (the delta model). Do not write files. Do not add pr
     "remaining_points": { "from": <number>, "to": <number>, "delta": <number> } | null,
     "scope": { "added": <int>, "removed": <int>, "net_points": <number|null> }
   },
-  "shipped":       [ { "id", "title", "blurb", "points", "assignee", "from_state", "to_state" }, ... ],
+  "shipped":       [ { "id", "title", "blurb", "points", "assignee", "from_state", "to_state", "labels", "updated" }, ... ],
   "started":       [ { "id", "title", "blurb", "points", "assignee", "from_state", "to_state" }, ... ],
-  "added":         [ { "id", "title", "blurb", "points", "assignee", "state" }, ... ],
+  "added":         [ { "id", "title", "blurb", "points", "assignee", "state", "labels", "updated" }, ... ],
   "removed":       [ { "id", "title", "points", "assignee", "last_state" }, ... ],
   "newly_blocked": [ { "id", "title", "reason": "blocked: <indicator>" }, ... ],
   "unblocked":     [ { "id", "title" }, ... ],
@@ -82,7 +82,10 @@ Return a single JSON object (the delta model). Do not write files. Do not add pr
 
 `from_state` / `to_state` / `last_state` / `state` carry the raw vendor `state` string (not
 the bucket) so the deck can show what actually happened. `blurb` follows the same rule as
-`sprint-analyzer` (a short plain-text line; `""` when the title says everything).
+`sprint-analyzer` (a short plain-text line; `""` when the title says everything). `shipped`
+and `added` entries also carry `labels` and `updated`, copied verbatim from the
+current-side `SprintItem` that produced the entry. No other output list carries these two
+fields.
 
 ## Computation rules
 
