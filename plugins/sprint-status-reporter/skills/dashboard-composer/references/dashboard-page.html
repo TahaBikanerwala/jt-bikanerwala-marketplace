@@ -341,7 +341,7 @@
     });
   }
 
-  function tile(tagEntry, slug) {
+  function tile(tagEntry, slug, filters) {
     var card = element("div", "item tile");
     card.dataset.testid = "pulse-dashboard-tag-" + slug + "-tile";
 
@@ -350,23 +350,27 @@
 
     var counts = element("div", "count-group");
 
-    var activeCount = textNode("span", "count count--active", String(tagEntry.active_count));
-    activeCount.dataset.testid = "pulse-dashboard-tag-" + slug + "-active-count";
-    counts.appendChild(activeCount);
+    if (filters.show_active) {
+      var activeCount = textNode("span", "count count--active", String(tagEntry.active_count));
+      activeCount.dataset.testid = "pulse-dashboard-tag-" + slug + "-active-count";
+      counts.appendChild(activeCount);
+    }
 
-    var closedCount = textNode("span", "count count--closed", String(tagEntry.closed_count));
-    closedCount.dataset.testid = "pulse-dashboard-tag-" + slug + "-closed-count";
-    counts.appendChild(closedCount);
+    if (filters.show_closed) {
+      var closedCount = textNode("span", "count count--closed", String(tagEntry.closed_count));
+      closedCount.dataset.testid = "pulse-dashboard-tag-" + slug + "-closed-count";
+      counts.appendChild(closedCount);
+    }
 
     head.appendChild(counts);
     card.appendChild(head);
     return card;
   }
 
-  function tileGrid(tags, slugs) {
+  function tileGrid(tags, slugs, filters) {
     var grid = element("div", "tile-grid");
     tags.forEach(function (tagEntry, index) {
-      grid.appendChild(tile(tagEntry, slugs[index]));
+      grid.appendChild(tile(tagEntry, slugs[index], filters));
     });
     return grid;
   }
@@ -386,12 +390,16 @@
     return wrap;
   }
 
-  function tagSection(tagEntry, slug) {
+  function tagSection(tagEntry, slug, filters) {
     var section = element("section", "bucket bucket--tag");
     section.dataset.testid = "pulse-dashboard-tag-" + slug + "-section";
     section.appendChild(tagSectionHead(tagEntry));
-    section.appendChild(tagSubList("Active", "tag-" + slug + "-active", tagEntry.active_items));
-    section.appendChild(tagSubList("Closed", "tag-" + slug + "-closed", tagEntry.closed_items));
+    if (filters.show_active) {
+      section.appendChild(tagSubList("Active", "tag-" + slug + "-active", tagEntry.active_items));
+    }
+    if (filters.show_closed) {
+      section.appendChild(tagSubList("Closed", "tag-" + slug + "-closed", tagEntry.closed_items));
+    }
     return section;
   }
 
@@ -459,13 +467,14 @@
 
     var tags = Array.isArray(view.tags) ? view.tags : [];
     var slugs = resolveTagSlugs(tags);
+    var filters = view.filters || { show_active: true, show_closed: true };
 
     liveContent.replaceChildren();
     if (view.delta_available === false) { liveContent.appendChild(noDeltaNote()); }
     if (view.new_since) { liveContent.appendChild(newSinceSection(view.new_since)); }
-    liveContent.appendChild(tileGrid(tags, slugs));
+    liveContent.appendChild(tileGrid(tags, slugs, filters));
     tags.forEach(function (tagEntry, index) {
-      liveContent.appendChild(tagSection(tagEntry, slugs[index]));
+      liveContent.appendChild(tagSection(tagEntry, slugs[index], filters));
     });
 
     renderWarnings(document_.warnings);

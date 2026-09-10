@@ -169,7 +169,7 @@ Known keys: `phase`. Unknown keys are ignored.
 | `dashboard` | Phase P2 | P3, summary | dashboard view payload from `dashboard-composer` |
 | `from_arg` | Phase 0 | Phase 0 (`since_arg`), summary | pulse mode; resolved window start (`YYYY-MM-DD`) from `--from` or `--range`, or unset. Phase 0 sets `since_arg` from it, which is how it reaches Phase D1 |
 | `till_arg` | Phase 0 | Phase 0 (`filters`), summary | pulse mode; resolved window end (`YYYY-MM-DD`) from `--till` or `--range`, or unset. Never passed to Phase D1 |
-| `status_categories` | Phase 0 | Phase 0 (`filters`), summary | pulse mode; the deduped `--status` category set: `{in_progress}`, `{done}`, `{unfiltered}`, or unset |
+| `status_categories` | Phase 0 | Phase 0 (`filters`), summary | pulse mode; the deduped `--status` category set: `{in_progress}`, `{done}`, `{in_progress, done}`, `{unfiltered}`, or unset |
 | `filters` | Phase 0 | Phase P2 | pulse mode; `{ show_active, show_closed, till }` for `dashboard-composer` |
 | `today` | Phase 0, first step | Phase 0 (`--range`), Phase 4, Snapshot, D-*, P-* | ISO date; the agent reads the clock, skills cannot. Read once per run and never re-derived |
 
@@ -218,7 +218,12 @@ steps:
 | unset (`--status` absent) | `true` | `true` |
 | `{in_progress}` | `true` | `false` |
 | `{done}` | `false` | `true` |
+| `{in_progress, done}` (two or more categories) | `true` | `true` |
 | `{unfiltered}` | `true` | `true` |
+
+A single distinct category (the second and third rows) gates the tile down to that one side.
+Two or more distinct categories show both sides, the same as `unfiltered`, since there is no
+status left to gate out once both `in_progress` and `done` are requested.
 
 `filters = { show_active: <above>, show_closed: <above>, till: <till_arg, or null when unset> }`.
 

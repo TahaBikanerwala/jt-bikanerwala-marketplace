@@ -69,6 +69,7 @@ Return a single JSON object. Do not write files. Do not publish. Do not add pros
 ```json
 {
   "live_view": {
+    "filters": { "show_active": true | false, "show_closed": true | false },
     "tags": [
       {
         "tag":           "<display label>",
@@ -168,6 +169,15 @@ at all.
 `filters.show_active` false → the active pool is empty. `filters.show_closed` false → the closed
 pool is empty. Both fields stay in every tile, as `0` and `[]`; they are never dropped from the
 shape, so the page renders one structure whatever the filter.
+
+Copy the input `filters.show_active` and `filters.show_closed` verbatim onto
+`live_view.filters`. The page has no other way to tell "this side is `0` because it was
+filtered out" from "this side is genuinely `0`" — both look identical in a tile's
+`active_count`/`closed_count` — so it reads `live_view.filters` to decide whether to render a
+gated side's count and list at all, the same way `deck_text` already omits a gated side's
+sub-heading and `None.` line. Never fold gating into the counts or lists themselves; `0` and
+`[]` on a gated side and `0` and `[]` on a side that is simply empty must stay indistinguishable
+at the pool level and distinguishable only through `filters`.
 
 `new_since` is not gated by either flag. `--status` chooses which side of a tag's work to show;
 what arrived since the baseline is a separate reading and stays.
