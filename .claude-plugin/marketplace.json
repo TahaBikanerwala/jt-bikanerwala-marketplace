@@ -50,6 +50,11 @@
       "name": "ticket-summarizer",
       "source": "./plugins/ticket-summarizer",
       "description": "Fetches Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status (active, or delivered/closed between two dates), and summarizes each into a plain-language, client-facing one-to-two sentence blurb suited for a status update deck. States what was delivered and, only when the ticket itself supports it, why it matters; never invents a business-value claim. Read-only, no confirmation gate. Auto-installs issuekit; bring your own MCPs."
+    },
+    {
+      "name": "qa-tester",
+      "source": "./plugins/qa-tester",
+      "description": "Tests a ticket or pull request in a real browser like a senior QA. Reads the Azure DevOps or Jira ticket and its linked PRs (following links both ways), treats the ticket and acceptance criteria as the source of truth and reports every place the PR differs, drafts a full edge-case test plan on a minimal shared test data set, then executes every case through chrome-devtools MCP or Claude in Chrome with console, network and screenshot evidence. Untestable cases are marked and skipped over; all questions are asked once at the end. Writes a test plan and a verdict report, then optionally posts a results comment and files bugs through bug-reporter, each behind a gate. Environment and login preferences are asked once and saved. Auto-installs issuekit and acceptance-test-generator; bring your own MCPs."
     }
   ]
 }

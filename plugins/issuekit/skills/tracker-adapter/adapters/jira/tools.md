@@ -14,6 +14,7 @@ The adapter calls the tools below. Suffix-match against the available tool surfa
 | `searchIssues` | `__searchJiraIssuesUsingJql` | adapter builds the JQL — see `search.md` |
 | `getIssueTypeSchema` | `__getJiraIssueTypeMetaWithFields` | used for severity auto-discovery |
 | `linkedPullRequests` | walk `issuelinks` + smart-link metadata from `__getJiraIssue` | no separate call; the Atlassian MCP does not always expose dev-status |
+| `getPullRequest` | none | returns `null`; Jira hosts no PRs. Callers read GitHub/Bitbucket PRs with that host's CLI or MCP |
 | `getCurrentSprint` | `__searchJiraIssuesUsingJql` with `sprint in openSprints() AND project = <key>` | extract sprint name from first hit |
 | `getSprintItems` | `__searchJiraIssuesUsingJql` with `sprint = <id>` / `sprint in openSprints()`, plus `__getJiraIssueTypeMetaWithFields` for points-field discovery | see `sprint.md` |
 | `getTeamCapacity` | none | no capacity concept in core Jira; returns `null` |

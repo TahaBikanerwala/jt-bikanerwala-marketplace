@@ -1,0 +1,17 @@
+{
+  "name": "qa-tester",
+  "version": "0.1.0",
+  "description": "Tests a ticket or pull request in a real browser like a senior QA. Reads the Azure DevOps or Jira ticket and its linked PR (following links both ways), treats the ticket and acceptance criteria as the source of truth and reports every place the PR differs, drafts a full edge-case test plan on a minimal shared test data set, then executes every case through chrome-devtools MCP or Claude in Chrome, whichever is connected. Untestable cases are marked and skipped over, and all clarifying questions are asked once at the end. Writes a test plan and evidence-backed report, then optionally posts a results comment and files bugs (through bug-reporter) behind diff-and-confirm gates. Environment and login preferences are asked once and saved to .claude/qa-tester-policy.json. Auto-installs issuekit and acceptance-test-generator; bring your own MCPs.",
+  "author": {
+    "name": "Taha Bikanerwala",
+    "url": "https://github.com/TahaBikanerwala"
+  },
+  "homepage": "https://github.com/TahaBikanerwala/jt-bikanerwala-marketplace",
+  "repository": "https://github.com/TahaBikanerwala/jt-bikanerwala-marketplace",
+  "license": "MIT",
+  "keywords": ["qa", "testing", "manual-testing", "exploratory-testing", "browser-testing", "e2e", "chrome-devtools", "claude-in-chrome", "acceptance-criteria", "test-plan", "test-execution", "pull-request", "azure-devops", "jira", "tracker-agnostic", "subagent"],
+  "dependencies": [
+    { "name": "issuekit", "version": "^0.2.9" },
+    { "name": "acceptance-test-generator", "version": "^0.1.1" }
+  ]
+}
