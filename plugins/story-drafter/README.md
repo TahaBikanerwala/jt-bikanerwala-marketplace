@@ -9,8 +9,8 @@ Auto-installs [`issuekit`](../issuekit/); bring your own MCPs.
 ## Install
 
 ```
-/plugin marketplace add github.com/TahaBikanerwala/jt-bikanerwala-marketplace
-/plugin install story-drafter
+/plugin marketplace add TahaBikanerwala/jt-bikanerwala-marketplace
+/plugin install story-drafter@jt-bikanerwala-marketplace
 ```
 
 You also need a tracker MCP (`@azure-devops/mcp` or the Atlassian MCP) registered at the user or project level. See the [marketplace README](../../README.md#configure-your-mcps) for setup; `issuekit` matches tools by name **suffix**, so the registration name does not matter.

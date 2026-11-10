@@ -10,8 +10,8 @@ Auto-installs [`issuekit`](../issuekit/); bring your own MCPs.
 ## Install
 
 ```
-/plugin marketplace add github.com/TahaBikanerwala/jt-bikanerwala-marketplace
-/plugin install ticket-summarizer
+/plugin marketplace add TahaBikanerwala/jt-bikanerwala-marketplace
+/plugin install ticket-summarizer@jt-bikanerwala-marketplace
 ```
 
 You need at least one tracker MCP configured (`@azure-devops/mcp` or the Atlassian
