@@ -138,3 +138,4 @@ Existing `.feature` files are never clobbered — the agent merges new scenarios
 - `/story-drafter:run` — create the story + ACs this plugin tests against.
 - `/testid-injector:run` — add the `data-testid`s that make the generated steps executable.
 - `/issue-triager:run` — refine a rough story before you generate tests from it.
+- `/qa-tester:run` — execute the same AC analysis against the running app in a real browser and get a test report with defects.

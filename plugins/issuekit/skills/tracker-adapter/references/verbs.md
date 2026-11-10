@@ -23,6 +23,13 @@ Revision      = { at, by, field, from, to }
 Comment       = { at, by, body, url }       // body is markdown
 IssueSummary  = { id, url, title, state, type }
 PRRef         = { url, title, state, mergedAt }
+PullRequest   = {
+  url, id, title, body, state, isDraft, author,
+  sourceBranch, targetBranch, createdAt, mergedAt, mergeCommit,
+  files: [{ path, changeType }],            // add | edit | delete | rename
+  threads: [{ by, at, body, status }],      // review comments, oldest-first; status = active | resolved | null
+  workItemRefs: IssueId[]                   // work items the PR is linked to on the tracker side
+}
 Sprint        = { id, name, start, end }    // or null
 SprintItem    = {
   id, url, title, type, state, stateCategory,   // stateCategory ∈ {done, in_progress, todo, unknown}
@@ -171,6 +178,15 @@ optimization available here that preserves the substring semantic.
 ### `linkedPullRequests(id: IssueId, window?: { from?, to? })`
 **Out:** `PRRef[]`
 **Implements:** AzDO walks the `relations` array for `ArtifactLink`+`vstfs:///Git/PullRequestId/...` URLs, plus `repo_list_pull_requests_by_repo_or_project` (or `repo_pull_request` action `"list"`) filtered by branch-name mentioning `AB#<id>`; Jira walks `issuelinks` and any "remote links" plus PRs that smart-link to the issue key (queried via the Atlassian dev-status API if exposed, otherwise empty).
+
+### `getPullRequest(ref: string)`
+**In:** a PR URL, or `<repo>!<prId>` / a bare PR id when the repo is unambiguous in `defaultProject`.
+**Out:** `PullRequest | null`
+**Implements:**
+- AzDO: fetch the PR (`repo_get_pull_request_by_id`, or `repo_pull_request` action `"get"`) with work-item refs included, then its changed files (`repo_list_pull_request_changes` / action `"list_changes"` against the latest iteration) and its review threads (`repo_list_pull_request_threads` / action `"list_threads"`). Skip system-generated threads (vote and policy updates) so `threads` carries human review comments only.
+- Jira: returns `null`. Jira hosts no pull requests. Callers holding a GitHub or Bitbucket PR read it with that host's own CLI or MCP, then use the `workItemRefs` they parse from it with `getIssue`.
+
+Read-only, ungated. Returns `null` (never throws) when the PR cannot be resolved, so a caller can fall back to another source. Pairs with `linkedPullRequests`: that verb goes ticket → PRs, this one goes PR → details plus the tickets it references.
 
 ### `getCurrentSprint(team?: string)`
 **Out:** `Sprint | null`

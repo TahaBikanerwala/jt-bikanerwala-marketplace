@@ -1,13 +1,13 @@
 # issuekit
 
-Shared adapter layer for issue-tracker plugins in this marketplace. `postmortem-generator`, `issue-triager`, `sprint-status-reporter`, `story-drafter`, `acceptance-test-generator`, `bug-reporter`, and `ticket-summarizer` depend on it.
+Shared adapter layer for issue-tracker plugins in this marketplace. `postmortem-generator`, `issue-triager`, `sprint-status-reporter`, `story-drafter`, `acceptance-test-generator`, `bug-reporter`, `ticket-summarizer`, and `qa-tester` depend on it.
 
 This plugin ships **no** MCP, **no** agent, and **no** slash command. It is a library of skills and reference files that the verb-plugins invoke.
 
 ## What it provides
 
 - **Auto-detection.** Pattern-matches the available MCP tool surface and classifies the active tracker (Azure DevOps, Jira), chat backend (Slack, Teams), doc backend (Confluence, Azure Wiki), and log backend (Datadog).
-- **Abstract verb surface.** One contract for both vendors: `getIssue`, `getIssueHistory`, `getIssueComments`, `searchIssues`, `getIssueTypeSchema`, `linkedPullRequests`, `getCurrentSprint`, `whoAmI`, `resolveUser`, `mention`, `createIssue`, `assign`, `transition`, `updateFields`, `addComment`, `addLabel`, `removeLabel`, `linkIssue`, `linkPullRequest`.
+- **Abstract verb surface.** One contract for both vendors: `getIssue`, `getIssueHistory`, `getIssueComments`, `searchIssues`, `getIssueTypeSchema`, `linkedPullRequests`, `getPullRequest`, `getCurrentSprint`, `whoAmI`, `resolveUser`, `mention`, `createIssue`, `assign`, `transition`, `updateFields`, `addComment`, `addLabel`, `removeLabel`, `linkIssue`, `linkPullRequest`.
 - **Chat delivery.** `resolveChatUser` and `sendMessage`, for a verb-plugin that wants to post a summary or notification to Slack or Teams. These resolve and message a chat-platform identity, separate from `resolveUser`'s tracker identity, and never touch the tracker's diff-and-confirm gate. Slack sends through `slack_send_message`; Teams has no send-capable tool consistently available across supported Microsoft 365/Graph MCP registrations, so `sendMessage` reports a clean, in-band failure there instead of guessing.
 - **Body-format conversion.** Verb-plugins author in markdown with the reserved token `@[userRef]` for mentions. The adapter projects that down to AzDO HTML or Jira-flavored markdown before writing.
 - **Policy schema.** Reads `.claude/tracker-policy.json`; lazy-prompts for any missing key at the moment it's needed; offers to persist the answer.
@@ -22,7 +22,7 @@ This plugin ships **no** MCP, **no** agent, and **no** slash command. It is a li
 
 ## Install
 
-You don't install this directly — it's declared as a `dependencies` entry on every verb-plugin in this marketplace (`postmortem-generator`, `issue-triager`, `sprint-status-reporter`, `story-drafter`, `acceptance-test-generator`, `bug-reporter`, and `ticket-summarizer`), so Claude Code auto-installs it whenever you install any of them. To install it on its own:
+You don't install this directly — it's declared as a `dependencies` entry on every verb-plugin in this marketplace (`postmortem-generator`, `issue-triager`, `sprint-status-reporter`, `story-drafter`, `acceptance-test-generator`, `bug-reporter`, `ticket-summarizer`, and `qa-tester`), so Claude Code auto-installs it whenever you install any of them. To install it on its own:
 
 ```
 /plugin install issuekit@jt-bikanerwala-marketplace
