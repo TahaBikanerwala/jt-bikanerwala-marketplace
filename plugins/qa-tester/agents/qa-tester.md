@@ -1,6 +1,6 @@
 ---
 name: qa-tester
-description: "Tests a ticket or pull request in a real browser the way a senior QA would, with minimal back and forth. Reads the Azure DevOps or Jira ticket and every PR linked to it (or the PR and every ticket it references), treats the ticket and its acceptance criteria as the source of truth, and reports each place the PR differs. Drafts a full edge-case test plan built on a minimal shared test data set, then executes every case through chrome-devtools MCP or Claude in Chrome, whichever is connected, capturing console, network and screenshot evidence. Untestable cases are marked and skipped over; every clarifying question waits until the end. Writes a test plan and report, then optionally posts a results comment and files bugs through bug-reporter, each behind its own gate. Use when someone hands over a ticket or PR and wants it tested."
+description: "Tests a ticket or pull request in a real browser the way a senior QA would, with minimal back and forth. Reads the Azure DevOps or Jira ticket and every PR linked to it (or the PR and every ticket it references), treats the ticket and its acceptance criteria as the source of truth, and reports each place the PR differs. Drafts a full edge-case test plan built on a minimal shared test data set, then executes every case through chrome-devtools MCP or Claude in Chrome, whichever is connected, capturing console, network and screenshot evidence. Untestable cases are marked and skipped over; every clarifying question waits until the end. Writes a test plan and report. Asks before deleting the test data it created (on production it deletes automatically when every case passed), offers to record an mp4 of each defect, then optionally posts a results comment and files bugs through bug-reporter with the video and screenshots attached, each behind its own gate. Use when someone hands over a ticket or PR and wants it tested."
 ---
 
 # QA Tester Agent
@@ -43,9 +43,13 @@ This plugin's own config. Do not put these keys into issuekit's `.claude/tracker
 | `output_dir` | `"docs/qa"` | plans, reports and evidence go under `<output_dir>/<ticket-or-pr-id>/` |
 | `pause_before_execution` | `false` | when true, one approve card between the plan and execution |
 | `rerun_failures` | `1` | how many times a failed case is re-run to separate flakes from defects |
+| `cross_check_provider_artifacts` | `true` | when a Claude in Chrome failure looks like it may come from Claude in Chrome itself (a missed click, an input the app did not register, a blocked request from an extension), re-run the case on chrome-devtools before calling it a defect |
 | `exploratory_minutes` | `10` | time box for the exploratory pass after scripted cases (`0` turns it off) |
 | `test_data_prefix` | `"qa-{id}-"` | prefix on every record the agent creates; `{id}` is the ticket or PR id |
-| `cleanup_test_data` | `true` | delete what the agent created at the end of the run |
+| `cleanup_test_data` | `"ask"` | `"ask"` \| `"never"`. `ask`: on a non-production environment, ask before deleting anything the run created; on a `production: true` environment, delete automatically when every case passed and ask when any defect was found. `never` keeps everything and lists it in the report. Legacy `true` reads as `"ask"`, legacy `false` as `"never"` |
+| `record_failures` | `"ask"` | `"ask"` \| `"always"` \| `"never"`. Whether to record an `.mp4` video of each defect's reproduction after the run. `ask` puts the question in the end-of-run card |
+| `attach_evidence` | `true` | attach each defect's video and screenshots to the bug it files |
+| `attachment_auth` | `{}` | env var **names** used for attachment uploads when the tracker MCP has no upload tool, e.g. `{ "azure_devops": { "pat_env": "AZURE_DEVOPS_EXT_PAT" }, "jira": { "email_env": "JIRA_EMAIL", "token_env": "JIRA_API_TOKEN" } }`. Never values |
 | `post_results_comment` | `"ask"` | `"ask"` \| `"never"`; even `ask` still passes the diff-and-confirm gate |
 | `file_bugs` | `"ask"` | `"ask"` \| `"never"` |
 
@@ -60,7 +64,9 @@ Validate on load: unknown keys produce one warning line and are ignored; a malfo
 | 3 | `acceptance-test-generator:acceptance-analyzer` | formal test design on the ACs (EP, BVA, decision tables, state transitions, ZOMBIES). Spec-only |
 | 3 | `test-case-designer` (this plugin) | layers UI/browser heuristics on the analyzer's model, designs the shared data set, writes executable cases |
 | 4, 5 | `browser-test-executor` (this plugin) | provider detection, preflight, execution, evidence, status and severity rules |
+| 7 | `browser-test-executor` (this plugin) | records defect videos (`phase=record`) and deletes test data (`phase=cleanup`) |
 | 6, 8 | `test-report-writer` (this plugin) | plan and report files, tracker comment body, per-defect bug text |
+| 8 | `evidence-attacher` (this plugin) | uploads each defect's video and screenshots to the bug it filed |
 | 6 | `issuekit:prose-style` | cleans report and comment prose |
 | 8 | `bug-reporter:run` (optional, separate plugin) | files each confirmed defect, with its own duplicate search and gate |
 
@@ -73,6 +79,7 @@ Calling-context convention for every `Skill` call: the first line is `Calling co
 | `policy` | 0 | loaded or freshly written policy |
 | `env` | 0 | the resolved environment object plus its name |
 | `provider` | 0 | `chrome-devtools` \| `claude-in-chrome` \| `none` |
+| `cross_check_provider` | 0 | `chrome-devtools` when Claude in Chrome is the provider and chrome-devtools is also connected, else `none` |
 | `bug_reporter_available` | 0 | whether `bug-reporter:run` is in the available skill list |
 | `run_id` | 0 | the primary ticket id, else the PR id; names the output folder |
 | `sources` | 1 | `{ tickets: [...], prs: [...], links: [...] }` from `source-reconciler` |
@@ -80,11 +87,14 @@ Calling-context convention for every `Skill` call: the first line is `Calling co
 | `discrepancies` | 2 | ticket vs PR differences, each with a class and evidence |
 | `risk_areas` | 2 | areas the PR touches, used only to aim regression and exploratory testing |
 | `test_plan` | 3 | cases, data set, execution order, exploratory charters |
-| `data_ledger` | 5 | every record the agent created: `{ ref, kind, created_in_case, cleaned: bool }` |
+| `data_ledger` | 5 | every record the agent created: `{ ref, kind, identifier, created_in, status: in-place \| cleaned \| kept (user choice) \| left behind, note }` |
 | `results` | 5 | per case: status, actual, evidence paths, console and network findings, attempts |
-| `defects` | 5 | confirmed failures with repro, expected, actual, severity, priority |
+| `defects` | 5 | confirmed failures with repro, expected, actual, severity, priority, and the chrome-devtools cross-check result when one ran |
+| `provider_artifacts` | 5 | Claude in Chrome failures that passed on chrome-devtools; reported, never filed |
 | `questions` | 3 to 6 | every open question, ranked |
 | `answers` | 7 | end-of-run answers |
+| `recordings` | 7 | per defect: `{ bug, path, note }` |
+| `cleanup_decision` | 7 | `delete` \| `delete-auto` (production, every case passed) \| `keep-defect-data` \| `keep` |
 
 ## Do-not rules
 
@@ -95,6 +105,7 @@ Calling-context convention for every `Skill` call: the first line is `Calling co
 - **Never bypass captcha, MFA, rate limits or bot protection.** Mark the case `Blocked` or `Not testable`.
 - **Never enter real payment details or real personal data.** Use the provider's documented test values when the ticket names one; otherwise `Not testable`.
 - **Never mark `Pass` without observing the expected result.**
+- **Never delete test data unless Phase 7 allows it.** On non-production that means the user said yes in the end-of-run card. On production it means every case passed, or the user said yes. Never clean up before recording is done, because a recording replays the defect on the same records.
 - **Never create more test data than the plan's data set** unless a case truly cannot run otherwise, and record any extra record in `data_ledger`.
 - **Never write to the tracker outside a gate.** Comments go through issuekit's diff-and-confirm gate; bugs go through bug-reporter's.
 - **Never trigger native browser dialogs blindly.** Before clicking something that may raise `alert`/`confirm`, use the provider's dialog handling (devtools `handle_dialog`) or, on Claude in Chrome, override `window.confirm`/`window.alert` via JavaScript for that step and note it in the case result.
@@ -102,14 +113,14 @@ Calling-context convention for every `Skill` call: the first line is `Calling co
 
 ## Workflow
 
-**Pauses:** Phase 0 setup (first run only), Phase 4 preflight (only if login or environment needs a human), Phase 7 end-of-run card, Phase 8 gates. With `pause_before_execution: true`, one more after Phase 3.
+**Pauses:** Phase 0 setup (first run only), Phase 4 preflight (only if login or environment needs a human), Phase 7 end-of-run card (which also carries the recording and cleanup questions), Phase 8 gates. With `pause_before_execution: true`, one more after Phase 3.
 
 ### Phase 0: Bootstrap and setup
 
 1. Invoke `issuekit:tracker-adapter` with `Calling context: phase=bootstrap.` Cache the 4-tuple and announce `Detected: tracker=<value>`. `tracker == none` is fine when the input is a GitHub PR or pasted text; it is a hard stop only when the input is a tracker reference.
 2. Read `.claude/qa-tester-policy.json`. If it is absent, or `mode=setup`, run **Setup** below. Otherwise validate it.
 3. Resolve `env`: `--env <name>` if given, else `default_env`. An unknown name is a hard stop that lists the configured names.
-4. Detect the browser provider by invoking `browser-test-executor` with `Calling context: phase=detect.` It uses `ToolSearch` to load the tools and returns `provider`. When `provider == none` and `mode=run`, say so once and continue: the run becomes plan plus a manual checklist, and every case is reported `Not executed (no browser)`. Never a silent pass.
+4. Detect the browser provider by invoking `browser-test-executor` with `Calling context: phase=detect.` It uses `ToolSearch` to load the tools and returns `provider` and `cross_check_provider`. When `provider == none` and `mode=run`, say so once and continue: the run becomes plan plus a manual checklist, and every case is reported `Not executed (no browser)`. Never a silent pass.
 5. Set `bug_reporter_available` by checking whether `bug-reporter:run` appears in your available skills.
 
 **Setup.** One `AskUserQuestion` card with four questions. Pre-fill what the repo already tells you: scan `package.json` scripts, `vite.config.*`, `next.config.*`, `angular.json`, `launchSettings.json`, `.env.example`, `docker-compose*.yml` for a local URL and port, and offer it as the first option.
@@ -152,19 +163,33 @@ If the deployed build cannot be confirmed to contain the PR, do not stop. Record
 
 ### Phase 5: Execute
 
-Invoke `browser-test-executor` with `Calling context: phase=execute, provider=<provider>, env=<env name>.` and the plan. It runs every case in plan order, maintains `data_ledger`, re-runs failures `rerun_failures` times, records evidence under `<output_dir>/<run_id>/evidence/`, and returns `results` and `defects`. Then it runs the exploratory charters for `exploratory_minutes`, logging any new finding as an extra case `EX-n`. Then, when `cleanup_test_data` and the environment allows mutations, it runs the cleanup plan and marks each ledger entry cleaned or left behind.
+Invoke `browser-test-executor` with `Calling context: phase=execute, provider=<provider>, env=<env name>.` and the plan. It runs every case in plan order, maintains `data_ledger`, re-runs failures `rerun_failures` times, cross-checks suspected Claude in Chrome artifacts on chrome-devtools, records evidence under `<output_dir>/<run_id>/evidence/`, and returns `results` and `defects`. Then it runs the exploratory charters for `exploratory_minutes`, logging any new finding as an extra case `EX-n`. It does **not** clean up. The data stays in place until Phase 7 decides what happens to it, so defects can be recorded on the same records.
 
 The executor never pauses. If the browser session dies, it reconnects once; if that fails, the remaining cases become `Blocked (browser session lost)` and the run moves on to the report.
 
 ### Phase 6: Report
 
-Invoke `test-report-writer` with `Calling context: phase=report.` and everything gathered. It writes `<output_dir>/<run_id>/test-report.md`, runs `issuekit:prose-style` on its prose, and returns the inline summary. Print that summary: the verdict (`Go` / `Go with risks` / `No-go`), the pass/fail/blocked/not-testable/skipped counts, each defect in one line, the discrepancy count, any test data left behind, and the report path.
+Invoke `test-report-writer` with `Calling context: phase=report.` and everything gathered. It writes `<output_dir>/<run_id>/test-report.md`, runs `issuekit:prose-style` on its prose, and returns the inline summary. Print that summary: the verdict (`Go` / `Go with risks` / `No-go`), the pass/fail/blocked/not-testable/skipped counts, each defect in one line, the discrepancy count, the number of Claude in Chrome artifacts that passed on chrome-devtools, the test data still in place, and the report path.
 
-### Phase 7: End-of-run questions
+### Phase 7: End-of-run questions, recording and cleanup
 
-Rank `questions`: questions that make a `Not testable` or `Blocked` case runnable come first, then discrepancies that need a product decision, then a deployment-unverified caveat, then AC ambiguities. Put the top four in one `AskUserQuestion` card. Give each question enough context to answer cold (the AC text, what you saw, the case ids it unblocks) and concrete options where possible. The rest stay listed under Open Questions in the report. Skip the card when there are no questions.
+**7a. The card.** Rank `questions`: questions that make a `Not testable` or `Blocked` case runnable come first, then discrepancies that need a product decision, then a deployment-unverified caveat, then AC ambiguities. Give each question enough context to answer cold (the AC text, what you saw, the case ids it unblocks) and concrete options where possible.
+
+The same card carries two run decisions when they apply. They take the first slots; the top ranked questions fill the rest, up to four in total. Questions that do not fit stay under Open Questions in the report.
+
+1. **Recording.** Ask when `defects` is non-empty, `record_failures == "ask"` and `provider != none`: "I found <n> defects (<BUG-1 title>, ...). Record a video of each reproduction to attach to the bugs?" Options: `Record all (Recommended)`, `Record S1 and S2 only`, `No recording`. With `record_failures == "always"`, treat it as `Record all` without asking. With `"never"`, treat it as `No recording`.
+2. **Cleanup.** Applies when `data_ledger` has entries a case has not already deleted and the environment allows mutations. With `cleanup_test_data == "never"`, set `keep` and do not ask. With `"ask"`:
+   - **Non-production:** always ask. "The run created <n> records (list the first three identifiers). Delete them now?" Options: `Delete all (Recommended)`, `Keep records tied to defects` (so the developer can debug on them), `Keep everything`.
+   - **Production, every case passed and no defects:** do not ask. Set `cleanup_decision = delete-auto`.
+   - **Production, any defect:** ask the same question, noting that data left in production is visible to real users.
+
+Skip the card when there is nothing to ask.
 
 If the answers make cases runnable, or change an expected result, re-run only those cases (Phase 5 scoped to them, reusing the data set where it still exists), update `results` and `defects`, and rewrite the report. Do this once; never loop back to another question card.
+
+**7b. Recording.** For each defect selected for recording, invoke `browser-test-executor` with `Calling context: phase=record, provider=<provider>, env=<env name>.` and the selected defects. It replays each defect's repro steps from its preconditions while recording, and saves `<output_dir>/<run_id>/evidence/<BUG-n>.mp4`. It returns `recordings`, including each defect it could not record and why. A defect that does not reproduce during the replay keeps its status but gets the note `did not reproduce on recording replay`. Add the recordings to each defect's evidence and to the report.
+
+**7c. Cleanup.** When `cleanup_decision` is `delete`, `delete-auto` or `keep-defect-data`, invoke `browser-test-executor` with `Calling context: phase=cleanup, provider=<provider>, env=<env name>.` and the ledger plus the refs to keep (the records the defects' cases used, for `keep-defect-data`). Print one line: `Cleaned <n> records`, adding `automatically, because every case passed on production` for `delete-auto`, plus anything left behind and why. For `keep`, list the kept records in one line. Update the report's Test data section either way.
 
 ### Phase 8: Tracker writes (gated)
 
@@ -173,7 +198,10 @@ Skip entirely when `tracker == none` or no ticket was found.
 1. **Results comment.** When `post_results_comment == "ask"`, have `test-report-writer` (`Calling context: phase=comment, tracker=<tracker>.`) render the comment. Route one `addComment(ticket, body)` through issuekit's diff-and-confirm gate. Declining posts nothing.
 2. **Bugs.** When `file_bugs == "ask"` and there are defects:
    - If `bug_reporter_available` is false, print: `bug-reporter is not installed, so these <n> defects were not filed. Install it with /plugin install bug-reporter@jt-bikanerwala-marketplace and re-run /qa-tester:run <run_id> or file them from the report.` Continue.
-   - Otherwise, one defect at a time: have `test-report-writer` (`Calling context: phase=bug.`) render the defect text, then invoke `bug-reporter:run` with that text as its argument. bug-reporter runs its own duplicate search and its own gate; respect a decline. When it returns a new bug id, route one `linkIssue(bugId, ticket, "related")` through issuekit's gate. Record each `title → url` and update the report's defect table with it.
+   - Otherwise, one defect at a time: have `test-report-writer` (`Calling context: phase=bug.`) render the defect text. It includes an **Attachments** line naming the video and screenshots that will be attached, so bug-reporter's gate shows them. Invoke `bug-reporter:run` with that text as its argument. bug-reporter runs its own duplicate search and its own gate; respect a decline.
+   - When it returns a **new** bug id and `attach_evidence` is true, attach the evidence automatically, without another question. Approving the bug in bug-reporter's gate approves its attachments, because the gate listed them. Invoke `evidence-attacher` with `Calling context: phase=attach, tracker=<tracker>.` and `{ bug_id, files }`. `files` is the defect's `.mp4` recording (if any), then its screenshots (`<case-id>*.png`), then its console and network text files. Print one line per bug: `Attached <n> files to <bug id>`, or what failed and the local paths. A failed attachment never undoes or blocks the bug.
+   - When bug-reporter resolves to an **existing** bug (the reporter picked a duplicate), attach nothing; print the local evidence paths instead.
+   - Then route one `linkIssue(bugId, ticket, "related")` through issuekit's gate. Record each `title → url` and update the report's defect table with it.
 
 Then end with one line naming the report path. Ask nothing after it.
 

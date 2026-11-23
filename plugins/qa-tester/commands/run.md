@@ -26,10 +26,10 @@ Dispatch to the `qa-tester` agent with `mode=run` and the argument verbatim. The
 1. Bootstraps the tracker and browser provider. On the very first run, asks a four-question setup card (environments, login, data mutation rules, extra coverage) and saves it to `.claude/qa-tester-policy.json`.
 2. Reads the ticket(s) and PR(s), following links both ways, and reconciles them. The ticket wins; every difference is reported.
 3. Drafts the test plan: functional, negative, boundary, state, permission, data-variety, navigation, responsive and accessibility cases, plus exploratory charters, all running on a minimal shared data set. Written to `docs/qa/<id>/test-plan.md`.
-4. Preflights the environment and login, then executes every case without stopping, capturing console, network and screenshot evidence. Cleans up the test data it created.
+4. Preflights the environment and login, then executes every case without stopping, capturing console, network and screenshot evidence.
 5. Writes `docs/qa/<id>/test-report.md` with a Go / Go with risks / No-go verdict.
-6. Asks all clarifying questions in one card at the end, and re-runs any case the answers unblock.
-7. Offers a results comment on the ticket and one bug per defect (via `bug-reporter`), each behind its own diff-and-confirm gate.
+6. Asks all clarifying questions in one card at the end, and re-runs any case the answers unblock. The same card asks whether to record the defects as mp4 videos and whether to delete the test data. On production, when every case passed, the data is deleted without asking.
+7. Offers a results comment on the ticket and one bug per defect (via `bug-reporter`), each behind its own diff-and-confirm gate. Each created bug gets its video and screenshots attached automatically.
 
 ## See also
 

@@ -22,7 +22,7 @@ Write `test-report.md` from the report template (same no-overwrite rule).
 - `Go with risks`: open S2 or S3 defects not covered by No-go, or P1/P2 cases `Not testable`, or `deployment: unverified`, or open `contradicts-ac` discrepancies.
 - `Go`: every P1 and P2 case passed and none of the above.
 
-One sentence of reasoning goes with the verdict. Then run `issuekit:prose-style` over the summary and the defect and discrepancy prose (not the tables). Return the inline summary for the agent to print: verdict line, counts, one line per defect, discrepancy count, data left behind, report path.
+One sentence of reasoning goes with the verdict. Then run `issuekit:prose-style` over the summary and the defect and discrepancy prose (not the tables). Return the inline summary for the agent to print: verdict line, counts, one line per defect, discrepancy count, test data still in place, report path.
 
 When the agent re-runs cases after the end-of-run answers, rewrite the same report file and add a short "Re-tested after clarification" section listing what changed.
 
@@ -33,3 +33,9 @@ Render the tracker comment from the comment template: verdict, counts, defects (
 ## phase=bug
 
 Render one defect as a single self-contained text block for `bug-reporter:run`, using the bug template. It must answer everything bug-reporter asks for so its clarification card is skipped: summary, environment (URL, build, browser, viewport, role), preconditions, numbered steps, expected (quoting the AC and naming the ticket), actual, frequency (`reproduced n of n`), impact, evidence paths, regression status if known, workaround if one was found, and a fix-verification line (the case id to re-run). Omit anything you do not know; do not write placeholders.
+
+When the defect carries a `cross_check` result, add it to the bug text as `Verified on: Claude in Chrome and chrome-devtools`, or as the caveat when the check could not run.
+
+Add the **Attachments** line listing, by file name, every file the agent will attach once the bug is created: the defect's `.mp4` recording when one exists, then its screenshots, then its console and network files. This line is how the bug-reporter gate shows the reporter what will be attached. Omit the line when `attach_evidence` is false or there are no files.
+
+When the agent rewrites the report after recording or cleanup, update each defect's Video line and the Test data section in place.
