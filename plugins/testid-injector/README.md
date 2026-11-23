@@ -45,14 +45,16 @@ It skips presentational elements, `input[type=hidden]`, labels/fieldsets, and an
 Default scheme is semantic kebab-case: a descriptor from the strongest available signal (`id` → `name` → `<label>` → `aria-label` → `placeholder` → visible text → `value` → context) plus a role suffix.
 
 ```jsx
-<input type="email" name="email" data-testid="login-email-input" />
+<input type="email" name="email" data-testid="email-input" />
 
 <select name="country" data-testid="country-select">
   <option value="in" data-testid="country-option-in">India</option>
 </select>
 
-<button data-testid="login-submit-button">Sign in</button>
+<button data-testid="sign-in-button">Sign in</button>
 ```
+
+Set `scopePrefix` to `auto` or a literal such as `login` to prefix every id (`login-email-input`).
 
 Ids are deterministic and idempotent: the same element yields the same id every run, so re-running is safe and your tests can rely on the values.
 

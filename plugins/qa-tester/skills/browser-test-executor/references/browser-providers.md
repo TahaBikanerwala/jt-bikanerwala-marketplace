@@ -49,7 +49,7 @@ Call `tabs_context_mcp` first in every session, then create a new tab. Never reu
 | upload a file | `file_upload` | |
 | close tab | `tabs_close_mcp` | |
 
-**Evidence files on Claude in Chrome.** `computer` screenshots come back to you as images, not files. Use `gif_creator` (which exports a file) for defect videos, and for everything else record in the case result what the screenshot showed: the exact visible text, element states and URL. The report then lists the evidence as an observation instead of an image path.
+**Evidence files on Claude in Chrome.** Take failure screenshots with the `computer` screenshot action's `save_to_disk: true` when the tool offers it, and move the returned path to `evidence/<case-id>.png`. When the tool cannot save to disk, or saving fails, record in the case result what the screenshot showed (the exact visible text, element states and URL); the report then lists that evidence as an observation instead of an image path, and no screenshot is listed for attachment. Use `gif_creator` (which exports a file) for defect videos.
 
 **Not available on Claude in Chrome:** Lighthouse, network throttling and offline emulation, performance traces. Cases needing them are `Not testable (provider lacks <capability>)` with the note that chrome-devtools MCP would cover them.
 

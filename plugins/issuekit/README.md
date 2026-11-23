@@ -7,11 +7,11 @@ This plugin ships **no** MCP, **no** agent, and **no** slash command. It is a li
 ## What it provides
 
 - **Auto-detection.** Pattern-matches the available MCP tool surface and classifies the active tracker (Azure DevOps, Jira), chat backend (Slack, Teams), doc backend (Confluence, Azure Wiki), and log backend (Datadog).
-- **Abstract verb surface.** One contract for both vendors: `getIssue`, `getIssueHistory`, `getIssueComments`, `searchIssues`, `getIssueTypeSchema`, `linkedPullRequests`, `getPullRequest`, `getCurrentSprint`, `whoAmI`, `resolveUser`, `mention`, `createIssue`, `assign`, `transition`, `updateFields`, `addComment`, `addLabel`, `removeLabel`, `linkIssue`, `linkPullRequest`.
+- **Abstract verb surface.** One contract for both vendors: `getIssue`, `getIssuesBatch`, `getIssueHistory`, `getIssueComments`, `searchIssues`, `getIssueTypeSchema`, `linkedPullRequests`, `getPullRequest`, `getCurrentSprint`, `findSprint`, `getSprintItems`, `getTeamCapacity`, `whoAmI`, `resolveUser`, `mention`, `createIssue`, `assign`, `transition`, `updateFields`, `addComment`, `addLabel`, `removeLabel`, `linkIssue`, `linkPullRequest`.
 - **Chat delivery.** `resolveChatUser` and `sendMessage`, for a verb-plugin that wants to post a summary or notification to Slack or Teams. These resolve and message a chat-platform identity, separate from `resolveUser`'s tracker identity, and never touch the tracker's diff-and-confirm gate. Slack sends through `slack_send_message`; Teams has no send-capable tool consistently available across supported Microsoft 365/Graph MCP registrations, so `sendMessage` reports a clean, in-band failure there instead of guessing.
 - **Body-format conversion.** Verb-plugins author in markdown with the reserved token `@[userRef]` for mentions. The adapter projects that down to AzDO HTML or Jira-flavored markdown before writing.
 - **Policy schema.** Reads `.claude/tracker-policy.json`; lazy-prompts for any missing key at the moment it's needed; offers to persist the answer.
-- **Diff-and-confirm contract.** A single batched diff format that both verb-plugins reuse to gate every write.
+- **Diff-and-confirm contract.** A single batched diff format that every verb-plugin reuses to gate every write.
 - **Two utility skills:** `prose-style` (writing-style audit/rewrite) and `issue-investigator` (Bug/Incident orientation report).
 
 ## What it does NOT provide

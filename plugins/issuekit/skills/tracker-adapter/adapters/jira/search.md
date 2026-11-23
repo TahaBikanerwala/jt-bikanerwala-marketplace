@@ -19,6 +19,7 @@ ORDER BY created DESC
 | `scope` | `AND component = "<scope>"` or `AND labels = "<scope>"` (caller passes a component name or a label; adapter picks based on which the project recognizes — query schema first) |
 | `types` | `AND issuetype in (<comma-quoted list>)` |
 | `states` | `AND status in (<comma-quoted list>)` |
+| `excludeStates` | `AND status not in (<comma-quoted list>)` |
 | `dateWindow.from` | `AND created >= "<yyyy-MM-dd>"` |
 | `dateWindow.to` | `AND created <= "<yyyy-MM-dd>"` |
 | `limit` | pass through to the MCP call as `maxResults` |

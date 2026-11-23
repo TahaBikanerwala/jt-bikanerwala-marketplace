@@ -7,7 +7,7 @@ metadata:
 
 # Test Case Designer
 
-Input: the `acceptance-analyzer` coverage model, the normalized `acceptance_criteria`, `business_rules`, `discrepancies`, `risk_areas`, the environment (`production`, `allow_mutations`), `auth.roles`, `coverage_extras`, `viewports`, `test_data_prefix`, and the provider.
+Input: the `acceptance-analyzer` coverage model, the normalized `acceptance_criteria`, `business_rules`, `discrepancies`, `risk_areas`, the environment (`production`, `allow_mutations`), `auth.roles`, `coverage_extras`, `viewports`, `test_data_prefix`, the provider, and `missing_capabilities` (what the provider cannot do; plan those cases as `Not testable (provider lacks <capability>)`).
 
 Output: `test_plan` (shape at the end). Load `references/ui-qa-heuristics.md` before designing.
 
@@ -41,11 +41,11 @@ Procedure:
 1. **List the data each case needs**: entity type, the state it must be in, the role that owns it, and whether the case only reads it, changes it reversibly, or changes it irreversibly (delete, submit, archive, send).
 2. **Prefer existing data.** Any read-only case uses existing seed or production-like data when the environment has it (a list page, a search, a detail view). Note "uses existing data" and the record it expects to find; preflight verifies it exists.
 3. **Merge needs into the fewest records.** Cases that need the same entity type in compatible states share one record. Validation and boundary checks on a form do not need a saved record at all; they run on the unsaved form, with only the final valid submission creating anything.
-4. **Chain the lifecycle.** Order the cases so one record moves forward through its states: create (`TC` that verifies creation) → read and list checks → edits and boundary edits on the same record → state transitions in their valid order → invalid-transition checks at the state where each is invalid → delete last (which also serves as the delete test and the cleanup). One record can carry a whole CRUD and state-machine suite.
+4. **Chain the lifecycle.** Order the cases so one record moves forward through its states: create (`TC` that verifies creation) → read and list checks → edits and boundary edits on the same record → state transitions in their valid order → invalid-transition checks at the state where each is invalid → delete last, as the delete test. The delete case is a test, not the cleanup: give it a precondition on every earlier case that used the record, so when one of them failed reproducibly the delete case is `Blocked (precondition)` and the record survives for recording the defect and for debugging. One record can carry a whole CRUD and state-machine suite.
 5. **Revert reversible changes in place.** When a case changes a field another case depends on, its last step restores the value, or the next case is ordered to need the changed value.
 6. **Split only when you must.** Create a second record only when a case would leave the shared one in a state that later cases cannot use (an irreversible transition while other cases still need the earlier state), when two roles must each own a record, or when a concurrency case needs two. Write the reason next to the record.
 7. **Name everything with the prefix.** Every created record's visible name or identifier starts with `test_data_prefix` (`{id}` replaced), for example `qa-1234-order-A`. Free-text values that must be unique add a short suffix (`qa-1234-order-A-7f3`).
-8. **Plan the cleanup.** For each record: deleted by a case (which one), deleted in cleanup (how: UI action, or left for manual removal), or cannot be deleted (say so; it will be reported).
+8. **Plan the cleanup.** For each record: deleted by a case (which one), deleted in cleanup (how: UI action, or left for manual removal), or cannot be deleted (say so; it will be reported). The cleanup plan is not run automatically. The agent runs it at the end, only after the user agrees (or on production when every case passed).
 
 If `allow_mutations` is false for the environment, no record is created: every case that would create or change data is planned as `Skipped (mutation guard)` and the read-only cases use existing data only.
 
@@ -77,7 +77,7 @@ Two to four charters aimed at `risk_areas` and the gaps the ACs leave, each: mis
 
 ## 6. Order and output
 
-Order: setup and data creation first, then P1 smoke, then the lifecycle chain, then the rest by priority, cleanup cases last, mutation-guard skips listed but not ordered. Within that, group by role to minimize logins, and by viewport to minimize resizes.
+Order: setup and data creation first, then P1 smoke, then the lifecycle chain, then the rest by priority, delete cases last, mutation-guard skips listed but not ordered. Within that, group by role to minimize logins, and by viewport to minimize resizes.
 
 ```
 test_plan:

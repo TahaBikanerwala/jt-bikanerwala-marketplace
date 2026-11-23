@@ -46,8 +46,9 @@ This command is a thin shell. It dispatches to the `sprint-status-reporter` agen
 2. Resolve the sprint (current, or the one named in the argument).
 3. Fetch the sprint's current work items and (Azure DevOps only) team capacity, and compute
    the current metrics (`sprint-analyzer`).
-4. Resolve a baseline: the newest stored snapshot before today, or, when a window start
-   resolved from `--from` or `--range`, the newest snapshot on or before that date. This is the
+4. Resolve a baseline: the newest stored snapshot before today, and, when a window start
+   resolved from `--from` or `--range`, also on or before that date. Today's own snapshot is
+   never the baseline, so a window that starts today has none until history exists. This is the
    same baseline mechanism `:progress-delta --since` has always used, not a second query path.
    With no baseline available (first run, or Jira with no snapshot), it carries on and
    publishes a point-in-time view that says plainly that no delta is available yet.
@@ -84,8 +85,7 @@ tracker writes. Run it as often as you like.
   status filter at all, so combining it with any other value is a validation error.
 
 **A window never hides an active ticket.** Every currently non-done ticket appears in full, in
-its tag's active count and list, on every run, whatever the window
-(`docs/specs/0001-pulse-dashboard-spec.md` invariant 4.5). A window bounds two things only:
+its tag's active count and list, on every run, whatever the window. A window bounds two things only:
 which done-category tickets count as closed (those that shipped inside it), and which count as
 new. This is where these flags part company with the identically-named ones on
 `/ticket-summarizer:run`, which narrow a whole result set.
@@ -99,7 +99,7 @@ accepted set, rather than falling back to a default.
 ## Configuration
 
 Reads `.claude/tracker-policy.json` if present (shared with the rest of the suite).
-Lazy-prompts for any missing key it actually needs. Keys it uses: `state_categories`,
+Missing keys fall back to defaults without prompting. Keys it uses: `state_categories`,
 `blocked_indicators`, `stale_after_days`, `points_field_name`, `output_directory`.
 Snapshots are stored under `<output_directory>/.snapshots/` and the dashboard's URL at
 `<output_directory>/.dashboard.json` (no separate config keys).

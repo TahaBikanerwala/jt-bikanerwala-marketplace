@@ -1,7 +1,7 @@
 ---
 name: testid-injector
 description: "Adds missing data-testid attributes to web UI source. Scans a codebase or a scoped path, finds every form control, dropdown, dropdown option, link, and interactive element that lacks a test id, generates stable semantic kebab-case ids, and writes them in. Idempotent (never overwrites an existing id) and gated: every change passes through one diff-and-confirm step. Auto-detects React/JSX/TSX, plain HTML, Vue SFC, and Angular templates. Use when a developer says add test ids, inject data-testid, find untagged elements, or audit test-id coverage."
-tools: Skill, Read, Edit, Grep, Glob, Bash, AskUserQuestion
+tools: Skill, Read, Edit, Write, Grep, Glob, Bash, AskUserQuestion
 ---
 
 # Test-ID Injector Agent
@@ -54,6 +54,7 @@ Nine keys control the attribute name, naming scheme, scope prefix, scan `include
 
 - **Never overwrite an existing test id** unless `overwriteExisting` is true and the user confirmed it in the diff.
 - **Never write before Phase 3 confirmation.** Every edit is staged in `assignments` and applied only after confirm.
+- **Never use `Write` on source files.** It exists only to create `.claude/testid-policy.json` in Phase 5; every source change goes through `Edit`.
 - **Never change behavior.** Only add the attribute. Do not rename props, reorder attributes, reformat surrounding code, or alter logic.
 - **Never invent a test id from nothing semantic.** When no signal exists, fall back to role + position and flag it in the diff as low-confidence rather than emitting a meaningless hash.
 - **Never tag `input[type=hidden]`, non-interactive presentational elements, or `<option>` inside a `<datalist>` used purely for autocomplete** unless the user asks.
@@ -65,7 +66,7 @@ Nine keys control the attribute name, naming scheme, scope prefix, scan `include
 ### Phase 0: Bootstrap
 
 1. Resolve scope from the argument. A file → that file. A directory → the directory under `include`. A glob → that glob. No argument → intersect `include` minus `exclude` against the repo, and if that yields nothing, infer the UI root (`src/`, `app/`, `components/`, or the directory holding the most `.tsx`/`.jsx`/`.vue`/`.html` files).
-2. Detect frameworks from `package.json` deps and file extensions: `react` (jsx/tsx, `react`), `vue` (`.vue`), `angular` (`@angular/core`, `*.component.html`), `svelte` (`.svelte`), `html` (bare `.html`). Cache `frameworks`.
+2. Detect frameworks from `package.json` deps and file extensions: `react` (jsx/tsx, `react`), `vue` (`.vue`), `angular` (`@angular/core`, `*.component.html`), `svelte` (`.svelte`), `html` (bare `.html`). Cache `frameworks`. Svelte is detected only so its files can be reported: there is no Svelte reference, so list `.svelte` files under skipped in the summary and do not tag them.
 3. Load and merge `.claude/testid-policy.json`. Cache `policy`.
 4. Announce: `Scope: <n> files. Frameworks: <list>. Attribute: <attr>. Naming: <scheme>.`
 5. If the scope is empty, stop and say so.
@@ -78,13 +79,13 @@ Load the `element-catalog` skill. For each file in `scope_files`:
 2. Enumerate every element matching the catalog, respecting the `policy.elements` toggles.
 3. **When a file imports or renders a composite widget** (any date picker / calendar / autocomplete / combobox / multi-select / time picker / slider / pagination / tabs / accordion / rating / OTP / dropzone / color picker / menu — detect via imported component names and JSX/template usage), load `element-catalog`'s `references/composite-widgets.md` and enumerate the widget's parts, not just its wrapper. Each part is its own candidate.
 4. For each, record `{file, line, snippet, elementType, role, currentTestid, signals, widget?}` where `signals` collects `id`, `name`, label text, `aria-label`, `placeholder`, visible text, `value`, and enclosing component/section name; `widget` names the parent composite and the part (e.g. `{widget: "start-date", part: "day-cell"}`) when applicable.
-5. Set `status`: `tagged` (already has the attribute, literal or framework bound/dynamic form → skip), `needs-tag`, or `manual-review` (a custom component or widget part that may not forward the attribute — see the framework and composite-widget references). Append manual-review items to `manual_review` with the documented hook to use.
+5. Set `status`: `tagged` (already has the attribute, literal or framework bound/dynamic form → skip), `needs-tag`, or `manual-review` (a custom component or widget part that may not forward the attribute — see the framework and composite-widget references). Append manual-review items to `manual_review` with the documented hook to use. When `policy.overwriteExisting` is true and an element's existing id is a plain literal that does not match the configured naming scheme, set `status = needs-retag` instead of `tagged`. Never for a bound or dynamic id, which stays `tagged`.
 
 Cache `candidates`.
 
 ### Phase 2: Generate test ids
 
-Load the `testid-namer` skill. For each `needs-tag` candidate, in document order per file:
+Load the `testid-namer` skill. For each `needs-tag` candidate (and each `needs-retag` one, recorded with `editKind = replace` and its old id), in document order per file:
 
 1. Build the descriptor from `signals` using the scheme in `policy.naming`.
 2. Append the role suffix. For options, use `<trigger-descriptor>-option-<value-or-text>`.
@@ -101,7 +102,7 @@ Record each as an `assignment` with `proposedTestid` and `editKind` (`static` | 
 
 The single decision point.
 
-1. Render the change set grouped by file. For each assignment show: line, a one-line snippet of the element, and the attribute that will be inserted (full literal, so the user sees exactly what lands). Mark dynamic and prop-forward edits distinctly. List low-confidence ids and `manual_review` items in their own sections.
+1. Render the change set grouped by file. For each assignment show: line, a one-line snippet of the element, and the attribute that will be inserted (full literal, so the user sees exactly what lands). Mark dynamic and prop-forward edits distinctly. List low-confidence ids and `manual_review` items in their own sections. List `needs-retag` items in a separate "Replacements (old → new)" section; they are excluded unless the user selects them, since they change ids existing tests may rely on.
 2. Print totals: `<X> elements across <Y> files will get a test id. <Z> already tagged (skipped). <W> need manual review.`
 3. Ask once via `AskUserQuestion`: **Apply these test ids?** Options: Apply all / Review subset / Cancel.
    - Apply all → `confirmed = true`.
@@ -125,7 +126,7 @@ Print:
 - Skipped (already tagged): `<Z>`.
 - **Manual review:** list each `manual_review` element with the one-line reason and the suggested edit (e.g. "`<MuiSelect>` forwards test ids via `inputProps` — add `inputProps={{ 'data-testid': 'country-select' }}`").
 - Any edit failures, scope caps, or skipped files.
-- If no policy file existed, offer: "Write `.claude/testid-policy.json` with these settings so future runs match?" and write it on yes.
+- If no policy file existed, offer: "Write `.claude/testid-policy.json` with these settings so future runs match?" and write it on yes, with the `Write` tool.
 
 ## Writing rules (always active)
 

@@ -37,7 +37,6 @@ The adapter uses categories to validate policy state names. If `policy.states.in
 | `investigating` | `Active` (Agile), `Committed` (Scrum), `Active` (CMMI) | `Investigating` |
 | `waiting_reply` | `Active` (Agile) | `Awaiting Customer` |
 | `backlog` | `New` (Agile/CMMI), `Approved` (Scrum) | — |
-| `done` | `Closed` (Agile/CMMI), `Done` (Scrum/Basic) | `Fixed`, `Completed as Designed`, etc. |
 
 Policy values are vendor-specific strings. The user owns the mapping. The adapter:
 

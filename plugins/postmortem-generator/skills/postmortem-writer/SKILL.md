@@ -39,7 +39,8 @@ The caller passes a payload describing the incident, the cached timeline (a mark
     "url": "...",
     "title": "...",
     "created_at": "2026-04-29T14:32:00Z",
-    "resolved_at": "2026-04-29T16:08:00Z",
+    "resolved_at": "2026-04-29T16:08:00Z", // null when the incident is not resolved: render the duration as "ongoing", never a made-up end time
+    "author": "Dana Lee",                  // the person generating the document; "Unknown" when absent
     "severity": "1 - Critical",            // or "Sev-1"
     "reporter": "@alice",
     "responders": ["@bob", "@carol"],
@@ -103,7 +104,7 @@ Concatenate the header and the populated sections into a single markdown documen
 
 When `config.include_action_items` is `false`, omit the Action Items section header entirely and adjust the section numbering in the table of contents (when one is present, which the template doesn't ship by default).
 
-When `config.include_timeline_evidence_links` is `false`, the Timeline section's table is rendered with an empty Source column. (The cached `timeline_markdown` already includes the source links; the skill must rewrite the table to drop the column when this flag is false. Use the table's column-count as the only signal that needs adjusting.)
+When `config.include_timeline_evidence_links` is `false`, the Timeline section's table is rendered without the Source column. (The cached `timeline_markdown` already includes the source links; the skill must rewrite the table to drop the column when this flag is false. Use the table's column-count as the only signal that needs adjusting.)
 
 ## Anti-patterns
 
@@ -115,7 +116,7 @@ These are hard rules. Each one prevents a failure mode that has been observed on
 4. **Never fabricate impact numbers.** When `customer_impact_summary` is missing and the timeline doesn't ground a count, write `[UNKNOWN]` or "scope not measured at incident time" rather than guess.
 5. **Never weaken Root Cause with hedging.** "May have potentially contributed to" when the evidence supports "caused" defeats the document's purpose. Commit when the evidence supports it; downgrade to Contributing Factors when it doesn't.
 6. **Never include action items as prescriptive recommendations from the agent.** The template ships an empty Action Items table for the user to fill in (with optional placeholder rows derived from "What Went Wrong"). The agent does not assign owners or target dates without explicit user input.
-7. **Never mention an integration that returned no results.** If Datadog gathering came back empty, the Detection section says "Detection method: monitoring alert (specifics not gathered)" rather than "Datadog dashboards (no results found)."
+7. **Never mention an integration that returned no results.** If Datadog gathering came back empty, the Detection section uses the template's "Detection method not gathered." sentence, never a method nobody observed, rather than "Datadog dashboards (no results found)."
 8. **Never put references in the body.** External URLs go in the References section at the end; inline citations (in Timeline source links and Root Cause evidence quotes) are exceptions where the URL is part of the claim.
 
 ## Writing style

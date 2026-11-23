@@ -38,4 +38,4 @@ Reads `.claude/tracker-policy.json` if present. Falls back to defaults when miss
 - `postmortem_template: "google-sre"`
 - `incident_identifier: { tag: "incident", work_item_types: ["Issue", "Bug", "Incident"] }`
 
-Any missing key is lazy-prompted at the moment it's needed and (with your confirmation) persisted to `.claude/tracker-policy.json`.
+Every key has a default, so nothing is prompted. Set them in `.claude/tracker-policy.json` to override.

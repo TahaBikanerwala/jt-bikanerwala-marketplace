@@ -25,10 +25,10 @@ The HTML string must be syntactically valid. AzDO will accept malformed HTML up 
 For comments, `wit_add_work_item_comment` (or `wit_work_item_comment_write` action
 `"add"` on the consolidated shape) takes an HTML string in its `text` parameter
 (the field is sometimes named `comment` or `body` depending on the MCP tool's
-input shape; check the tool schema). Comments support the same safe-subset HTML —
-though the consolidated tool defaults its `format` to `Markdown` rather than HTML
-(see `writes.md`), so a caller using that shape may skip this page's conversion
-for comments specifically and pass markdown as-is.
+input shape; check the tool schema). Comments support the same safe-subset HTML.
+The consolidated tool defaults its `format` to `Markdown`, so pass `format: "Html"`
+with the converted body (see `writes.md`); never skip this page's conversion for
+comments, because mentions are only projected by it.
 
 ## Markdown-to-HTML conversion
 

@@ -64,9 +64,11 @@ Placeholders are in `<angle brackets>`. Drop any section that would be empty, ex
 
 **Environment:** <env> (<url>) · **Build:** <verified build | unverified: reason> · **Provider:** <provider> · **Run:** <date time>, <duration>
 
-| Pass | Fail | Blocked | Not testable | Skipped | Flaky |
-|---|---|---|---|---|---|
-| <n> | <n> | <n> | <n> | <n> | <n> |
+| Pass | Fail | Blocked | Not testable | Skipped | Flaky | Not executed | Claude in Chrome artifacts |
+|---|---|---|---|---|---|---|---|
+| <n> | <n> | <n> | <n> | <n> | <n> | <n> | <n> |
+
+Drop the last two columns when they are zero. Artifacts are already counted under Pass; the column says how many of those passes held only on chrome-devtools.
 
 ## Defects
 | ID | Severity | Case | AC | Title | Bug |
@@ -82,7 +84,7 @@ Placeholders are in `<angle brackets>`. Drop any section that would be empty, ex
 - Video: <evidence/BUG-1.mp4 | "not recorded: <reason>"> <"did not reproduce on recording replay", if so>
 - Console / network: <excerpt>
 - Caveat: <deployment unverified, if so>
-- Cross-check: <confirmed on chrome-devtools | possible Claude in Chrome artifact, not cross-checked: <why>>
+- Cross-check: <confirmed on chrome-devtools | fails differently on chrome-devtools (<difference>) | possible Claude in Chrome artifact, not cross-checked: <why>>
 
 ## Claude in Chrome artifacts (not filed)
 Cases that failed on Claude in Chrome but passed when re-run on chrome-devtools. They are not defects. They are listed so a reviewer can see what was discounted.
@@ -120,7 +122,7 @@ Cases that failed on Claude in Chrome but passed when re-run on chrome-devtools.
 
 | Ref | Identifier | Created in | Status |
 |---|---|---|---|
-Always include this section. Status is `cleaned`, `kept (user choice)` or `left behind (<why>)`. If anything is still in place, say what and why.
+Always include this section. Status is `in-place` (the report was written before the cleanup decision), `deleted by case (<TC-id>)`, `cleaned`, `kept (user choice)` or `left behind (<why>)`. If anything is still in place, say what and why.
 
 ## Open questions
 - <question> (unblocks <cases>)
@@ -134,10 +136,13 @@ Always include this section. Status is `cleaned`, `kept (user choice)` or `left 
 ```markdown
 **QA result: <verdict>** on <env> (<build or "build unverified">), <date>
 
-<pass> passed · <fail> failed · <blocked> blocked · <not testable> not testable · <skipped> skipped
+<pass> passed · <fail> failed · <blocked> blocked · <not testable> not testable · <skipped> skipped · <flaky> flaky
 
 **Defects**
-- <severity> <title> (<case>, <AC>) <bug link>
+- <severity> <title> (<case>, <AC>) <bug link or "not filed"> <"(unconfirmed: possible Claude in Chrome artifact)" when the defect was not cross-checked>
+
+**Discounted**
+- <n> failures seen only on Claude in Chrome passed on chrome-devtools and are not defects
 
 **Needs a decision**
 - <discrepancy or question, one line each>
@@ -169,6 +174,6 @@ Actual: <observed>
 Frequency: reproduced <n> of <n> attempts.
 Impact: <who is affected and how; P1 flow blocked or not; workaround or "no workaround found">
 Evidence: <paths>; console: "<error excerpt>"; network: <METHOD URL status>.
-Attachments (added automatically once this bug is created): <BUG-n>.mp4 (reproduction video), <case-id>.png, <case-id>-console.txt, <case-id>-network.txt
+Attachments (added automatically once this bug is created): <the files that exist, by name: BUG-n.mp4 or BUG-n.gif (reproduction video), <case-id>.png, <case-id>-console.txt, <case-id>-network.txt>
 Fix verification: re-run qa-tester case <TC-id> from <test-plan path>.
 ```

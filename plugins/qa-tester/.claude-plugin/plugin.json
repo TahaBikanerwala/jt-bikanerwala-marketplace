@@ -11,7 +11,7 @@
   "license": "MIT",
   "keywords": ["qa", "testing", "manual-testing", "exploratory-testing", "browser-testing", "e2e", "chrome-devtools", "claude-in-chrome", "acceptance-criteria", "test-plan", "test-execution", "pull-request", "azure-devops", "jira", "tracker-agnostic", "subagent"],
   "dependencies": [
-    { "name": "issuekit", "version": "^0.2.9" },
-    { "name": "acceptance-test-generator", "version": "^0.1.1" }
+    { "name": "issuekit", "version": "^0.2.10" },
+    { "name": "acceptance-test-generator", "version": "^0.1.2" }
   ]
 }

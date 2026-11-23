@@ -101,10 +101,16 @@ Group items by `stateCategory`:
   `Sprint '<name>' has no work items.`
 
 ### Blocked
-An item is blocked if ANY of:
-- a label in `policy.blocked_indicators.labels` is present on the item, or
-- the item's `state` is in `policy.blocked_indicators.states`, or
-- (only where board columns are exposed) its column equals `board_column`.
+Only a non-done item (bucket `in_progress` or `todo`) can be blocked. A `done`-bucket item
+is never at risk, even when it still carries a blocked label, so a finished ticket never shows
+up as active work. A non-done item is blocked if ANY of:
+- a label in `policy.blocked_indicators.labels` is present on the item (case-insensitive), or
+- the item's `state` is in `policy.blocked_indicators.states` (case-insensitive).
+
+`blocked_indicators.board_column` is not evaluated: `SprintItem` carries no board column.
+When it is set (non-null), add the warning `blocked_indicators.board_column is set but board
+columns are not available through the adapter; ignored.`
+
 Record it in `at_risk` with `reason: "blocked: <the matched label/state>"`. A blocked item
 that is also `in_progress` still appears in the `in_progress` list AND `at_risk`.
 
@@ -150,11 +156,16 @@ beyond `effective_cap`, truncate to `effective_cap` entries and add a warning:
   concept there, so a null value is an unexpected miss worth flagging). Stay silent when
   `tracker == jira` (Jira has no capacity concept at all, so a null value is expected;
   silence is correct and the deck simply omits the slide).
-- `capacity != null` → `total` = `capacity.totalCapacity`;
-  `committed` = sum of `in_progress` + `todo` points (the work still on the board), or null
-  when basis is count; `per_member` passed through; `note` = a one-line read such as
-  `Committed <committed> pts against <total> capacity` or, when committed > total,
-  `Over capacity by <diff> pts`.
+- `capacity != null` and `capacity.totalCapacity == 0` → `capacity_summary = null` and the
+  warning `Team capacity is not configured for this iteration.` Azure DevOps returns zeros,
+  not null, when nobody has entered capacity; that is "not set", never "over capacity".
+- Otherwise → `total` = `capacity.totalCapacity`. This is **hours** (per-member capacity per
+  day times working days), so it is only ever compared with hours, never with story points.
+  `committed` = the sum of `remainingWork` (hours) over non-done items, or null when no
+  non-done item carries `remainingWork`; `per_member` passed through; `note` = a one-line
+  read: `<committed> h remaining against <total> h capacity`, or `Over capacity by <diff> h`
+  when committed > total, or `<total> h capacity; no remaining-work hours on the sprint's
+  items to compare.` when committed is null.
 
 ## Determinism
 

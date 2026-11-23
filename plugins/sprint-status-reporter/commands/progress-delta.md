@@ -40,8 +40,8 @@ This command is a thin shell. It dispatches to the `sprint-status-reporter` agen
 2. Resolve the sprint (current, or the one named in the argument).
 3. Fetch the sprint's current work items and (Azure DevOps only) team capacity, and compute
    the current metrics (`sprint-analyzer`).
-4. Resolve a baseline, in order: `--baseline <path>` → the newest stored snapshot before now
-   (or at/before `--since`) → for `--since` with no snapshot, reconstruct the as-of state
+4. Resolve a baseline, in order: `--baseline <path>` → the newest stored snapshot before
+   today (and, with `--since`, also at/before that date; today's own snapshot is never used) → for `--since` with no snapshot, reconstruct the as-of state
    from item history (Azure DevOps only). With no baseline available (first run, or Jira with
    no snapshot), it writes a baseline snapshot and exits, telling you to run again later.
 5. Diff baseline against current (`delta-analyzer`).
@@ -56,6 +56,6 @@ tracker writes. Run it as often as you like.
 ## Configuration
 
 Reads `.claude/tracker-policy.json` if present (shared with the rest of the suite).
-Lazy-prompts for any missing key it actually needs. Keys it uses: `state_categories`,
+Missing keys fall back to defaults without prompting. Keys it uses: `state_categories`,
 `blocked_indicators`, `stale_after_days`, `points_field_name`, `output_directory`.
 Snapshots are stored under `<output_directory>/.snapshots/` (no separate config key).

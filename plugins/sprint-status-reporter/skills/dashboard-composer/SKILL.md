@@ -100,6 +100,7 @@ shaped lists. That is correct, and the page shows each field when it is there:
 | active, in progress | `metrics.in_progress` | `points`, `days_since_update` | `reason` |
 | active, up next | `metrics.up_next` | `points` | `days_since_update`, `reason` |
 | closed, baseline resolved | `delta.shipped` | `from_state`, `to_state`, `updated` | `state` |
+| closed, added and already done | `delta.added` | `updated`, and whatever else `delta.added` carries | `from_state`, `to_state` |
 | closed, point-in-time | `metrics.completed` | `state` | `updated` |
 
 A blocked in-progress ticket is listed from `at_risk`, so its row carries no `points` even
@@ -122,7 +123,7 @@ pool is computed from a raw `state` string, and no item's fields are rewritten.
 | Pool | Source | Selection |
 |---|---|---|
 | active | `metrics.at_risk`, `metrics.in_progress`, `metrics.up_next` | every `at_risk` entry, verbatim; plus every `in_progress` entry whose `id` is not in `at_risk`; plus every `up_next` entry whose `id` is not in `at_risk` |
-| closed | `delta.shipped`, or `metrics.completed` when `delta` is `null` | every entry, then, when `filters.till` is set and the source is `delta.shipped`, only those closed on or before it |
+| closed | `delta.shipped` plus `delta.added`, or `metrics.completed` when `delta` is `null` | every `delta.shipped` entry; plus every `delta.added` entry whose `id` appears in `metrics.completed` (a ticket that joined the sprint after the baseline and is already done; membership in the analyst's list decides, never the raw `state`); then, when `filters.till` is set and `delta` is not `null`, only those whose `updated` is on or before it |
 | new-since | `delta.added` | every entry, then, when `filters.till` is set, only those added on or before it. Empty pool when `delta` is `null` |
 
 **The active pool is blind to the date window, and cannot be otherwise.** Its entries carry no
@@ -138,7 +139,9 @@ blocked ticket in both its `at_risk` list and whichever of `in_progress` / `up_n
 to; the dashboard lists it once, as the at-risk row, so the `reason` travels with it.
 
 **Closed means closed inside the window, not done at some point.** With a baseline resolved, a
-tag's closed list is `delta.shipped`, the tickets that reached done since that baseline. It is
+tag's closed list is `delta.shipped`, the tickets that reached done since that baseline, plus
+the tickets that were added since the baseline and are already done (they are absent from
+`delta.shipped`, which needs a ticket on both sides, and would otherwise appear in no tile). It is
 not `metrics.completed`, which is every currently-done ticket in the sprint and has no window
 behind it at all. This is a narrower reading than a plain "done" list, and it is the point of
 the window.

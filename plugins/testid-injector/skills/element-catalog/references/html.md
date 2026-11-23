@@ -6,14 +6,14 @@ Static `.html` files and server-rendered templates (the markup portion of EJS, H
 <!-- before -->
 <input type="email" name="email">
 <!-- after -->
-<input type="email" name="email" data-testid="login-email-input">
+<input type="email" name="email" data-testid="email-input">
 
 <select name="country" data-testid="country-select">
   <option value="in" data-testid="country-option-in">India</option>
   <option value="us" data-testid="country-option-us">United States</option>
 </select>
 
-<button type="submit" data-testid="login-submit-button">Sign in</button>
+<button type="submit" data-testid="sign-in-button">Sign in</button>
 <a href="/pricing" data-testid="nav-pricing-link">Pricing</a>
 ```
 

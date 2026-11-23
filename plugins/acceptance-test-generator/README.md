@@ -110,6 +110,7 @@ Drop a `.claude/acceptance-test-policy.json` in your project root (this plugin's
 | Key | Default | Notes |
 |---|---|---|
 | `test_output_dir` | `tests/acceptance` | Where `.feature` files are written. |
+| `feature_file_extension` | `.feature` | Extension of the written files. |
 | `test_framework` | `auto` | Detects cucumber-js/jvm, SpecFlow, behave, pytest-bdd, playwright-bdd; sets step + tag conventions. Or set explicitly. |
 | `test_case_work_item_type` | `{azure-devops: "Test Case", jira: "Test"}` | The work-item type each scenario is created as. |
 | `test_label` | `acceptance-test` | Tag on every created Test Case. |

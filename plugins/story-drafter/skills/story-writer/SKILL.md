@@ -20,6 +20,7 @@ This skill writes. It does not ask questions, brainstorm, or touch the tracker â
 
 The caller passes, after `Calling context: phase=<n>, tracker=<tracker>.`:
 
+- the **`source_label`** (where the requirements came from, cited in Background);
 - the **candidate** (title + one-liner);
 - the relevant slice of the **brainstorm** analysis;
 - **blocking answers** the team gave;

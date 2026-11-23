@@ -9,7 +9,7 @@
     {
       "name": "issuekit",
       "source": "./plugins/issuekit",
-      "description": "Shared adapter layer for issue-tracker plugins. Auto-detects the active MCP (Azure DevOps, Jira) and exposes an abstract verb surface (getIssue, addComment, transition, linkIssue, ...). Auto-installed as a dependency of postmortem-generator and issue-triager. Bring your own MCPs; no .mcp.json bundled."
+      "description": "Shared adapter layer for issue-tracker plugins. Auto-detects the active MCP (Azure DevOps, Jira) and exposes an abstract verb surface (getIssue, createIssue, addComment, transition, linkIssue, getPullRequest, getSprintItems, ...). Auto-installed as a dependency of postmortem-generator, issue-triager, sprint-status-reporter, story-drafter, bug-reporter, acceptance-test-generator, ticket-summarizer, and qa-tester. Bring your own MCPs; no .mcp.json bundled."
     },
     {
       "name": "postmortem-generator",

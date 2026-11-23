@@ -62,8 +62,12 @@ when someone picks it up.
 Reads `.claude/tracker-policy.json` if present (issuekit's shared policy file). Keys this plugin
 uses: `bug_work_item_type`, `reported_label` (default `needs-triage`, `null` to skip),
 `bug_repro_steps_field` and `bug_system_info_field` (Azure DevOps field routing),
-`severity_label_map`, `priority_label_map`. Missing keys are lazy-prompted at the
-moment they are needed, with an offer to persist the answer.
+`severity_label_map`, `priority_label_map`. A key with no shipped default is lazy-prompted
+at the moment it is needed. This agent has no file-write tool, so instead of saving the answer it
+prints the JSON fragment to paste into the policy file.
+
+The run always ends with one `Result:` line (`created`, `updated`, `duplicate-of` or `not-filed`)
+carrying the bug's id and url, so a calling plugin can tell a new bug from an existing one.
 
 ## Boundaries
 

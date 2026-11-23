@@ -45,6 +45,8 @@ Replay resolves them positionally: when a tuple's target is `"(new)"` and an ear
 
 If the `createIssue` fails, its dependents never run: the batch has already stopped at the first failure.
 
+If the user removes the `createIssue` row through "Apply selected", every tuple whose target is `"(new)"` is removed with it. Show the pruned table and re-confirm; never replay a dependent tuple without the item it depends on.
+
 Long bodies (`before` and `after` of `updateFields(body: ...)`, `createIssue(body/acceptanceCriteria: ...)`, or `addComment`) are abridged to:
 - First 6 lines, then a `...` row, then the last 2 lines.
 - A separate "Full diff" section appears below the table, rendered as a unified-diff block per multi-line field.
@@ -98,6 +100,7 @@ The caller decides whether to retry or surface the failure to the user.
 - No write verb fires before the gate confirms.
 - No write verb fires on decline.
 - The user sees, in one place, every change about to land. There is no hidden tail of writes after the table.
+- Nothing is asked between confirmation and replay. Every value a write needs (a lazy-prompted policy key, a Jira transition id and its required fields, a work-item type) is resolved while the batch is built, so the table shows final values.
 
 ## What the gate does NOT do
 

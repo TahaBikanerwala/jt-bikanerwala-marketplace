@@ -80,8 +80,10 @@ The keys this agent reads:
 | `severity_label_map` | `sev1: [1 - Critical, Sev-1, Critical], ...` | Phase 4 (the adapter projects the tier) |
 | `priority_label_map` | `{ P0: Highest, P1: High, P2: Medium }` (Jira only) | Phase 4 |
 
-If `bug_work_item_type` for the active tracker is not a valid type on `target_project`, the adapter
-lazy-prompts with the live type list when `createIssue` runs. Both AzDO field keys are ignored on
+`bug_work_item_type` is validated in Phase 4 while the batch is built, before the gate: call
+`getIssueTypeSchema(<type>)`. An error or an empty field list means the type does not exist on
+`target_project`; lazy-prompt for the type name as free text (offer `Bug` and `Issue`) and re-check
+the answer the same way. Both AzDO field keys are ignored on
 Jira; the adapter warns once and folds those sections into the description.
 
 ## Sibling skills
@@ -108,7 +110,8 @@ Known directive keys:
   the literal string `bootstrap` instead of a number).
 - `mode` — `run | draft`.
 - `submode` — `create | refine`.
-- `tracker` — `azure-devops | jira`, so a skill can tailor field guidance.
+- `tracker` — `azure-devops | jira | none`, so a skill can tailor field guidance (`none` only in a
+  draft of pasted text).
 
 Unknown keys are ignored.
 
@@ -121,10 +124,11 @@ Unknown keys are ignored.
 | `raw_input` | Phase 0 | Phases 1, 3 | string | the symptom text as given, verbatim |
 | `issue_payload` | Phase 0 | Phases 1, 3, 4 | `Issue & { comments: Comment[], history: Revision[] }` | refine submode only |
 | `dup_candidates` | Phase 1 | Phases 2, 3, 4, 5 | array of `{ id, url, title, state, why }` | confirmed by reading the candidate, not by title alone |
-| `related_candidates` | Phase 1 | Phases 3, 4 | array of `{ id, url, title, state }` | same area, different symptom |
+| `related_candidates` | Phase 1 | Phases 3, 5 | array of `{ id, url, title, state }` | same area, different symptom |
 | `gaps` | Phase 2 | Phases 2, 3 | array of gap names | the report components the input does not answer |
 | `reporter_answers` | Phase 2 | Phase 3 | map of gap → answer | a skipped gap has no entry |
-| `dup_decision` | Phase 2 | Phases 4, 5 | `"duplicate" \| "related" \| "neither" \| null` | null when no candidate was found |
+| `dup_decision` | Phase 2 | Phases 4, 5 | `{ kind: "duplicate" \| "related" \| "neither", ids: IssueId[] } \| null` | null when no candidate was found; `ids` are the candidates the reporter chose (empty for `neither`) |
+| `written` | Phase 4 | Phase 5 | `{ id, url }` | the created bug, or in refine submode the refined issue's own id and url |
 | `severity_decision` | Phase 3 | Phases 4, 5 | `{ tier, priority, rationale }` | `tier` is abstract `sev1..sev4`; the adapter projects the label |
 | `report` | Phase 3 | Phases 4, 5 | `{ title, bodyMarkdown, reproStepsMarkdown, systemInfoMarkdown }` | the two field blocks are null when folded into the body |
 | `pending_writes` | Phase 4 | Phase 4 gate + execution | array of `{verb, target, before, after}` | never built in `mode=draft` |
@@ -184,13 +188,25 @@ Unknown keys are ignored.
   against it.
 - **Phase 4 decline:** declining the gate exits with no writes.
 
+**Every exit ends with one result line**, as the last line printed, on every path in `mode=run`
+(a completed run, a duplicate stop, a gate decline, a failed write). Callers such as `qa-tester`
+read it to learn the bug id and whether the bug is new:
+
+- `Result: created <id> <url>`
+- `Result: updated <id> <url>` (refine submode)
+- `Result: duplicate-of <id> <url> (nothing created)`
+- `Result: not-filed (<declined | failed at #<k>: <error> | stopped: <reason>>)`
+
 ---
 
 ### Phase 0: Ingest and detect the submode
 
 1. Take the argument passed to the agent.
-2. **If it looks like a tracker reference** (a tracker URL, a `PROJ-123` style key, or a bare numeric
-   id), set `submode=refine`:
+2. **If the whole argument is a single tracker reference and nothing else** (one tracker URL, one
+   `PROJ-123` style key, or one bare numeric id, with no other words), set `submode=refine`. An
+   argument that is prose containing a URL or key is pasted text (step 4), never a refine request:
+   a defect description routinely names the ticket it was found under, and that ticket must not be
+   rewritten. For a true reference:
    - Extract the id. With both trackers detected and a bare numeric id, the adapter's tiebreak asks
      once.
    - Call `getIssue(id)`, `getIssueComments(id)`, and `getIssueHistory(id)`. Merge into
@@ -199,7 +215,11 @@ Unknown keys are ignored.
      trust the content, the way `issue-refiner` does. A work item typed `Task` describing
      user-visible breakage is a Bug and continues; a work item typed `Bug` whose body is acceptance
      criteria is not, and stops per the Stops list.
-   - Set `source_label` to the issue's id, `raw_input` to its title plus description.
+   - Set `source_label` to the issue's id, `raw_input` to its title plus description plus, on Azure
+     DevOps, the current values of `issue_payload.customFields[bug_repro_steps_field]` and
+     `[bug_system_info_field]`. On an Azure DevOps Bug the reproduction detail usually lives in
+     those two fields, not in the description, and refining without reading them would overwrite
+     them blind.
 3. **If it resolves to a readable file**, `Read` it. Set `submode=create`, `source_label` to the
    filename, `raw_input` to the contents.
 4. **Otherwise treat it as pasted text**, however short. Set `submode=create`,
@@ -231,8 +251,9 @@ Build two or three queries from the Phase 0 signals, most distinctive first:
 - the feature area plus the symptom noun (`"checkout coupon crash"`);
 - the affected entity, customer, or endpoint name.
 
-Call `searchIssues({ keywords, types: ["Bug", "Incident"], states: ["!Closed"], dateWindow: { from: <90 days ago> }, limit: 10 })`
-per query. In refine submode, drop the issue itself from the results.
+Call `searchIssues({ keywords, types: ["Bug", "Incident"], excludeStates: <policy.state_categories.done>, dateWindow: { from: <90 days ago> }, limit: 10 })`
+per query. `excludeStates` takes literal state names; there is no `!` negation, and a `states`
+value such as `"!Closed"` matches nothing. In refine submode, drop the issue itself from the results.
 
 Then confirm before labelling anything. Call `getIssue` on at most the top three candidates and read
 their descriptions:
@@ -263,7 +284,9 @@ Walk the report components against `raw_input` and `issue_payload`. Cache the un
 | `regression` | whether it used to work, and the last known good version or deploy |
 | `workaround` | whether one exists |
 
-Skip the card entirely when nothing material is missing and `dup_candidates` is empty. Otherwise send
+Skip the card entirely when `environment`, `steps`, `expected_actual`, `frequency` and `scope` are
+all answered and `dup_candidates` is empty. `evidence`, `regression` and `workaround` never trigger
+the card on their own; unanswered, they go straight to Missing Information. Otherwise send
 **one** `AskUserQuestion` with up to four questions:
 
 - Lead with a compact digest: the symptom as you understand it, and any duplicate candidate as
@@ -272,8 +295,9 @@ Skip the card entirely when nothing material is missing and `dup_candidates` is 
 - Ask the highest-value gaps first. Severity depends on `scope`, so ask it whenever it is unknown.
 - Every question carries a "Not known" option. State plainly in the card that anything not answered
   is left out of the report and listed as Missing Information instead, and that nothing is invented.
-- When `dup_candidates` is non-empty, spend one question on it: duplicate of `<id>` / related to
-  `<id>` / neither. Cache as `dup_decision`.
+- When `dup_candidates` is non-empty, spend one question on it, with one option per candidate:
+  duplicate of `<id>` / related to `<id>` / neither. Cache the kind and the chosen id(s) as
+  `dup_decision`.
 
 One card, once. Do not open a second round to chase what the reporter skipped: a skipped gap is a
 Missing Information line, which is the whole design.
@@ -281,8 +305,9 @@ Missing Information line, which is the whole design.
 Cache the answers as `reporter_answers`. Unanswered gaps stay in `gaps` and become Missing
 Information lines in Phase 3.
 
-If `dup_decision == "duplicate"` and `submode == create`, stop per the Stops list: print the
-original's url and suggest `/bug-reporter:run <that id>` to improve it instead.
+If `dup_decision.kind == "duplicate"` and `submode == create`, stop per the Stops list: print the
+original's url, suggest `/bug-reporter:run <that id>` to improve it instead, and end with
+`Result: duplicate-of <id> <url> (nothing created)`.
 
 ---
 
@@ -318,7 +343,8 @@ alone: no environment details means no System Info block and no write to that fi
 as null and leave them out of `customFields` in Phase 4. Never substitute a placeholder to keep a field
 populated.
 
-Then run `issuekit:prose-style` on each returned block. Cache the cleaned result as `report`.
+Then run `issuekit:prose-style` on each returned block, leaving any line that begins
+`Attachments (` byte-for-byte unchanged. Cache the cleaned result as `report`.
 
 **Resolve severity.** Read the impact evidence (the `scope` answer, the affected counts in the input)
 against the evidence table below:
@@ -358,7 +384,7 @@ Build `pending_writes`.
   - `project` = `target_project`
   - `customFields` = the AzDO repro-steps and system-info fields, each included only when
     `report` carries a non-null block for it
-- when `dup_decision == "related"`, one `linkIssue` per chosen candidate, `kind: "related"`, with
+- when `dup_decision.kind == "related"`, one `linkIssue` per id in `dup_decision.ids`, `kind: "related"`, with
   `target: (new)` and the note `id resolved from #1`. These are chained writes on a created item; the
   gate resolves them positionally after the create returns (see the Chained writes section of
   `references/diff-and-confirm.md`). Only one `createIssue` is ever in the batch, which is the
@@ -366,20 +392,33 @@ Build `pending_writes`.
 
 **Refine submode:**
 
-- `updateFields` with `before` the current title, description, and severity, and `after`
-  `{ title, body, severity, customFields }`.
+- `updateFields` with `before` the current title, description, severity, and the current value of
+  each custom field being written, and `after` `{ title, body, severity, customFields }`. The gate
+  must show what is in Repro Steps and System Info today, since the write replaces them.
 - `addLabel(reported_label)` when set and not already on the issue.
-- when `dup_decision == "duplicate"`, `linkIssue(issue.id, <dup id>, "duplicate-forward")`; when
-  `"related"`, `kind: "related"`.
+- one `linkIssue(issue.id, <id>, ...)` per id in `dup_decision.ids`: `"duplicate-forward"` when
+  `dup_decision.kind == "duplicate"`, `"related"` when `"related"`.
+
+**Check the routed fields exist (Azure DevOps, routing set).** Before building the batch, read
+`getIssueTypeSchema(<type>).fields` (already fetched for the type check). For each routed field the
+type does not have (the Basic process's `Issue` has neither), re-invoke `bug-report-writer` with
+that `field_routing` entry null so its sections fold into the body, and add a warning. A create
+must never fail after the user confirmed because a field does not exist.
 
 Route the whole batch through the diff-and-confirm gate (`issuekit:tracker-adapter` owns it; read
 `references/diff-and-confirm.md`). Render the create row with the type and title and note
 `(severity: <tier> → <label>, tags: <reported_label>)`; abridge the long body and field blocks per
 the gate's rules, and show the full unified diff for the refine body so the superset is visible.
 
-On confirm the adapter fires each write in order. Cache the returned `{ id, url }` as `written`. On a
-failure the gate stops the batch and reports what landed; do not retry, and surface the partial state
-in Phase 5.
+When `report.bodyMarkdown` contains a line beginning `Attachments (`, print that line verbatim
+directly under the gate table. A caller (`qa-tester`) uploads those files as soon as the bug
+exists, so confirming here is the reporter's approval for them, and the abridged body alone would
+hide the line.
+
+On confirm the adapter fires each write in order. Cache the returned `{ id, url }` as `written`; in
+refine submode `updateFields` returns nothing, so set `written = { id: issue_payload.id, url:
+issue_payload.url }`. On a failure the gate stops the batch and reports what landed; do not retry,
+and surface the partial state in Phase 5. On decline, print `Result: not-filed (declined)` and stop.
 
 ---
 
@@ -387,14 +426,16 @@ in Phase 5.
 
 **`mode=run`.** A short inline summary, no card, no chat send:
 
-- the work item as `title` → `url`, with its type, severity tier and projected label, and tags;
+- the work item as `<id>` `title` → `url`, with its type, severity tier and projected label, and tags;
 - on Azure DevOps with routing applied, one line naming which sections went to Repro Steps and
   System Info;
 - the Missing Information list, verbatim, so the reporter can see exactly what to add;
 - duplicates or related items linked;
 - the handoff line, always present:
   `Not investigated. Run /issue-triager:run <id> to localize it in the code, propose a fix, and set the triage fields.`
-- anything from `warnings`, plus a one-line note if a write failed.
+- anything from `warnings`, plus a one-line note if a write failed;
+- last, the result line from the Stops section: `Result: created <id> <url>`,
+  `Result: updated <id> <url>`, or `Result: not-filed (failed at #<k>: <error>)`.
 
 **`mode=draft`.** Print, in this order:
 

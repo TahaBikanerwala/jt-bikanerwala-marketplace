@@ -10,9 +10,15 @@ Markdown bodies are the universal authoring format. The reserved token `@[userRe
 IssueId       = string                  // "1234" or "PROJ-1234"; vendor-defined
 UserRef       = opaque                  // returned by resolveUser; valid for assign/mention/comment
 Issue         = {
-  id, url, title, body, type, state, severity, assignee, reporter,
-  created, updated, resolved, closed, labels, parent, customFields, raw
+  id, url, title, body, acceptanceCriteria, type, state, severity, assignee, reporter,
+  created, updated, resolved, closed, labels, parent, links, customFields, raw
 }
+// `acceptanceCriteria` is markdown, or null when the tracker or type has no
+// acceptance-criteria field (AzDO: the standard field; Jira: the custom field named by
+// `policy.acceptance_criteria_field`, else null, in which case any criteria live in `body`).
+// `links` is `[{ id: IssueId, kind: "related" | "duplicate" | "child" | "other" }]`:
+// the issue's links to other issues, excluding the parent (which is `parent`) and
+// excluding pull requests (which are `linkedPullRequests`). Empty array when none.
 // `closed` is distinct from `resolved`: on AzDO some work-item types (e.g. Task)
 // can transition straight to a closed-category state without ever populating a
 // Resolved-category date, so `resolved` alone can be absent on a genuinely closed
@@ -20,6 +26,9 @@ Issue         = {
 // `resolved` already covers it. Callers that need "when did this finish" should
 // check `resolved` first and fall back to `closed`, never rely on `resolved` alone.
 Revision      = { at, by, field, from, to }
+// `field` is the abstract name (`state`, `assignee`, `title`, `points`, `sprint`,
+// `labels`, `severity`) when the changed vendor field maps to one; otherwise the
+// vendor's own field reference name. One `Revision` per changed field per revision.
 Comment       = { at, by, body, url }       // body is markdown
 IssueSummary  = { id, url, title, state, type }
 PRRef         = { url, title, state, mergedAt }
@@ -56,7 +65,7 @@ only implementation.
 ### `whoAmI()`
 **In:** none
 **Out:** `{ trackerUser: UserRef, defaultProject: string, defaultTeam: string|null, email: string|null }`
-**Implements:** AzDO `core_list_projects` + `wit_my_work_items` (or `wit_work_item` action `"my"`); Jira `getAccessibleAtlassianResources` + `atlassianUserInfo`.
+**Implements:** AzDO `core_list_projects` + `wit_my_work_items` (or `wit_work_item` action `"my"`); Jira `getAccessibleAtlassianResources` + `atlassianUserInfo` (identity and site only; `defaultProject` is resolved as described under "Resolving Jira's `defaultProject`" below).
 
 `email` is best-effort: Jira's `atlassianUserInfo` returns `emailAddress` directly, so
 it is populated there whenever the API exposes one. AzDO's identity lookup returns a
@@ -84,23 +93,39 @@ stopping at the first that yields a value, and cache the result for the session
    `ado_mcp_project` (and/or `ado_mcp_team`), use it. This is the official server's
    own built-in "skip the selection prompt" mechanism — the repo's ADO MCP config is
    the intended fallback here, and skipping this step is what makes the agent
-   re-prompt for a project the repo already told it about.
+   re-prompt for a project the repo already told it about. Read only those two keys.
+   The same `env` block commonly holds a personal access token: never print, quote,
+   cache or persist any other `env` value or the file's contents.
 3. **Single-project org.** If neither of the above resolved a value, call
    `core_list_projects`. When it returns exactly one project, use it — there is no
    ambiguity to ask about.
-4. **Lazy-prompt.** Only when all three above are exhausted: `AskUserQuestion` with
-   the live project list from `core_list_projects` (and, for `defaultTeam`, that
-   project's team list), then persist the answer to `policy.default_project` /
-   `policy.default_team` per the standard lazy-prompt persistence flow (see
-   `policy-schema.md`). Never ask again in the same or a later session once
+4. **Lazy-prompt** (`defaultProject` only). Only when all three above are exhausted:
+   `AskUserQuestion` with the live project list from `core_list_projects`, then persist
+   the answer to `policy.default_project` per the standard lazy-prompt persistence flow
+   (see `policy-schema.md`). Never ask again in the same or a later session once
    persisted.
 
 `defaultTeam` follows the same precedence through steps 1-2 (policy override, then
 the AzDO MCP server's `ado_mcp_team` config). It has no step-3 equivalent — a
 project can have several teams with no single obvious default — so when steps 1-2
-don't resolve it, it stays `null` per its existing `string|null` contract rather than
-lazy-prompting; callers that need a team (`getCurrentSprint`, `getSprintItems`,
-`getTeamCapacity`) already handle a `null` team on their own terms.
+don't resolve it, it stays `null` per its existing `string|null` contract and is never
+lazy-prompted. A caller that needs a team for an AzDO sprint read (`getCurrentSprint`,
+`findSprint`, `getSprintItems`, `getTeamCapacity`) must check for a `null` team before
+calling and stop with a message asking for a team name or `policy.default_team`.
+
+#### Resolving Jira's `defaultProject`
+
+`getAccessibleAtlassianResources` returns sites, not projects, so Jira needs its own
+rule. Resolve in this order, stopping at the first that yields a value, and cache it:
+
+1. **`policy.default_project`** (the Jira project key), when set.
+2. **The project prefix of the issue key the caller is acting on** (`PROJ-123` → `PROJ`).
+   This covers every flow that starts from an issue reference.
+3. **Lazy-prompt.** `AskUserQuestion` with the project keys from `getVisibleJiraProjects`
+   (free text when that tool is absent), then offer to persist to
+   `policy.default_project`.
+
+Jira has no team concept in this adapter; `defaultTeam` is always `null` there.
 
 ### `getIssue(id: IssueId, fields?: string[])`
 **Out:** `Issue` (body in markdown; `customFields` is an opaque map of vendor-specific keys for the caller's use)
@@ -154,13 +179,19 @@ SearchQuery = {
   project?: string,
   scope?: string,            // AzDO area path; Jira component or label
   types?: string[],
-  states?: string[],
+  states?: string[],         // exact state names to include; no negation syntax
+  excludeStates?: string[],  // exact state names to exclude (e.g. policy.state_categories.done)
   dateWindow?: { from?: ISO, to?: ISO },
   limit?: number             // default 25
 }
 ```
 **Out:** `IssueSummary[]`
 **Implements:** AzDO `wit_query_by_wiql` (or `wit_query` action `"wiql"`; the adapter builds the WIQL either way); Jira `searchJiraIssuesUsingJql` (the adapter builds the JQL).
+
+`states` and `excludeStates` take literal state names. A `!`-prefixed value is not a
+negation; it matches a state literally named that and returns nothing. To search
+"everything not closed", pass `excludeStates` with the tracker's closed state names
+(`policy.state_categories.done` is the usual source).
 
 `SearchQuery` deliberately has no `tags` parameter. A tag/label filter cannot be
 pushed into either tracker's search reliably: AzDO's WIQL `CONTAINS` on
@@ -172,6 +203,8 @@ substring tag matching must always filter client-side against the fetched
 optimization available here that preserves the substring semantic.
 
 ### `getIssueTypeSchema(type: string)`
+**In:** a work-item type name, never a project. There is no verb that lists a project's
+types: a type is "not valid on the project" when this call errors or returns no fields.
 **Out:** `{ fields: FieldSpec[], severityOptions: string[], requiredFields: string[] }`
 **Implements:** AzDO `wit_get_work_item_type` (or `wit_work_item` action `"get_type"`); Jira `getJiraIssueTypeMetaWithFields`. Severity auto-discovery (`Severity Level` → `Severity` → `Bug Severity` → `priority`) happens here for Jira.
 
@@ -190,9 +223,18 @@ Read-only, ungated. Returns `null` (never throws) when the PR cannot be resolved
 
 ### `getCurrentSprint(team?: string)`
 **Out:** `Sprint | null`
-**Implements:** AzDO `work_list_team_iterations` with `timeframe: "current"` (or `work` action `"list_team_iterations"`); Jira `searchJiraIssuesUsingJql` with `sprint in openSprints() AND project = <key>` then extract the sprint name from the first result.
+**Implements:** AzDO `work_list_team_iterations` with `timeframe: "current"` (or `work` action `"list_team_iterations"`); Jira `searchJiraIssuesUsingJql` with `sprint in openSprints() AND project = <key>`, then read the sprint custom field on the first result and take the entry whose state is active: `id` (numeric), `name`, `startDate` → `start`, `endDate` → `end`.
+
+### `findSprint(nameOrId: string, team?: string)`
+**Out:** `Sprint | null` — the sprint whose `id` or `name` matches, case-insensitively. `null` when nothing matches; never a guess at the nearest name.
+**Implements:** see `adapters/<tracker>/sprint.md`.
+- AzDO: `work_list_team_iterations` with no `timeframe` (or `work` action `"list_team_iterations"`), matched against each iteration's id, path and name.
+- Jira: `searchJiraIssuesUsingJql` with `sprint = "<name>"` (or the bare number for a numeric id) `AND project = <key>`, one result; read the matching entry of the sprint custom field. A sprint with no issues cannot be found this way and resolves to `null`.
+
+Use this to turn a user-supplied sprint name into the `Sprint` that `getSprintItems` and `getTeamCapacity` take. It is the only way to select a non-current sprint.
 
 ### `getSprintItems(sprint?: Sprint, team?: string)`
+**In:** `sprint` is a `Sprint` object (from `getCurrentSprint` or `findSprint`), never a bare name.
 **Out:** `SprintItem[]` — every work item assigned to the iteration, enriched with the fields needed for a status report.
 **Implements:** see `adapters/<tracker>/sprint.md`.
 - AzDO: `wit_get_work_items_for_iteration` (item ids for the iteration; or `wit_work_item` action `"list_for_iteration"`) → `wit_get_work_items_batch_by_ids` with `expand: "all"` (or `wit_work_item` action `"get_batch"` with an explicit `fields` list — the consolidated action has no expand-all equivalent) for details. `stateCategory` comes from the work-item-type category (`wit_get_work_item_type` → `states[].category`, or `wit_work_item` action `"get_type"`), overridden by `policy.state_categories` when the state is listed there.
@@ -237,6 +279,7 @@ fields instead of a JSON Patch document; a Markdown-by-default comment body).
 - Jira: `getTransitionsForJiraIssue` → look up transition by name → `transitionJiraIssue`.
 
 ### `updateFields(id: IssueId, fields: { title?, body?, severity?, dueDate?, sprint?, storyPoints?, customFields? })`
+`sprint` is a `Sprint` object: AzDO writes `sprint.id` as the iteration path; Jira writes the numeric `sprint.id`.
 **Implements:** AzDO single `wit_update_work_item` with one `op: add` per field, paths drawn from `adapters/azure-devops/writes.md`. Jira one `editJiraIssue` call with `fields` and (separately, when needed) any custom-field side-writes documented in `adapters/jira/writes.md`. Body conversion to HTML / ADF happens here.
 
 ### `createIssue(input: { type, title, body, acceptanceCriteria?, labels?, priority?, severity?, project?, customFields? })`
@@ -245,7 +288,7 @@ fields instead of a JSON Patch document; a Markdown-by-default comment body).
 - `type` — work-item type name (AzDO: `User Story`, `Bug`, ...; Jira: `Story`, `Bug`, ...). The caller passes the vendor-appropriate type.
 - `title` — plain text.
 - `body` — markdown; converted to the tracker body format (HTML / ADF) at write time, same path as `updateFields`.
-- `acceptanceCriteria?` — markdown; written to the tracker's acceptance-criteria field when one exists (AzDO `Microsoft.VSTS.Common.AcceptanceCriteria`), otherwise appended to the body.
+- `acceptanceCriteria?` — markdown; written to the tracker's acceptance-criteria field when the target type has one (AzDO `Microsoft.VSTS.Common.AcceptanceCriteria`, checked against `getIssueTypeSchema(type).fields`; Jira `policy.acceptance_criteria_field`), otherwise appended to the body under an `## Acceptance Criteria` heading.
 - `labels?` — tag/label strings (AzDO tags, Jira labels).
 - `priority?` — abstract priority `P0 | P1 | P2`, mapped per adapter.
 - `severity?` — abstract severity tier `sev1 | sev2 | sev3 | sev4`, projected through `policy.severity_label_map` exactly as `updateFields` does. Callers that file bugs (the `bug-reporter` plugin) set severity at creation time so the work item lands with a real field value rather than severity described in the body. Ignored by types that have no severity field; the adapter warns once and drops it rather than failing the create.
@@ -320,7 +363,9 @@ send-capable tool found for teams" }` rather than improvising a call against an
 unrelated tool.
 
 `body` is sent as markdown, as-is. No HTML/ADF conversion happens here;
-`body-format.md` governs tracker bodies only, not chat messages.
+`body-format.md` governs tracker bodies only, not chat messages. `@[userRef]` tokens
+are **not** projected in chat bodies and would post literally: name people by display
+name, or target them with a `ChatUserRef`.
 
 `target.kind == "channel"`'s `value` is the same opaque channel/group reference
 `policy.escalation.channel` already documents: a Slack `#channel-name` or channel id,
@@ -333,6 +378,17 @@ When a verb's underlying tool returns an error:
 1. Reads: stop and tell the caller which call failed. Do not fabricate substitutes.
 2. Writes: stop the batch on the first failure. Print which verb failed and what was written before it. Do not roll back successful writes — the user inspects the partial state and decides.
 3. Chat (`resolveChatUser`, `sendMessage`): never throw. `resolveChatUser` returns `null` on no match; `sendMessage` returns `{ sent: false, reason }` on any failure, including no send-capable tool being present for the detected `chat` backend. The caller reports the reason and does not retry.
+
+## Attachments (outside the verb surface)
+
+There is no attachment verb. One caller uploads files to a work item: `qa-tester`'s
+`evidence-attacher`, which attaches a defect's video, screenshots and logs to a bug that
+`bug-reporter` has just created. It is a documented exception to "no invented verbs", on
+these terms: it only ever targets a bug created in the same run; the files are listed by
+name in the bug text, and `bug-reporter` prints that list at its diff-and-confirm gate, so
+confirming the bug is the confirmation for its attachments; and it never edits fields,
+comments or links. Any other plugin that needs attachments must add a gated verb here
+rather than copy that path.
 
 ## Detection-time pre-checks
 

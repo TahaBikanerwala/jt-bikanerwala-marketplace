@@ -58,7 +58,7 @@ This plugin owns its config at `.claude/acceptance-test-policy.json` (separate f
 | `scenario_granularity` | `"per-scenario-work-item"` | Phase 6 (`per-scenario-work-item` \| `per-feature-work-item`) |
 | `traceability_tags` | `true` | Phase 4 (emit an `@AC-<n>` tag on each scenario tracing it to its acceptance criterion) |
 
-`test_case_work_item_type` is this plugin's own key, not an issuekit policy key, so issuekit has no built-in validation for it. Before calling `createIssue` in Phase 6, this plugin validates it itself: call `issuekit:tracker-adapter`'s `getIssueTypeSchema` for `target_project`, and if the configured `test_case_work_item_type` for the active tracker is not in the live type list that returns, lazy-prompt the author (via `AskUserQuestion`) with that list before building the write.
+`test_case_work_item_type` is this plugin's own key, not an issuekit policy key, so issuekit has no built-in validation for it. Before building any Phase 6 write, this plugin validates it itself: call `issuekit:tracker-adapter`'s `getIssueTypeSchema(<configured type>)`. The verb takes a type name and returns that type's fields; there is no verb that lists a project's types. If it errors or returns no fields, the type does not exist on `target_project`: ask the author (via `AskUserQuestion`, free text, offering `Test Case` and `Test`) for the Test Case type name to use, then re-check the answer the same way. Keep the returned `fields` to decide where acceptance criteria go (see Phase 6).
 
 ## Sibling skills
 
@@ -90,7 +90,7 @@ When invoking a skill via the `Skill` tool, the first line of the prompt is the 
 | `selected` | Phase 3.5 | 4, 5, 6 | the behavior groups the user chose to generate |
 | `extra_notes` | Phase 3.5 | 4 | free-form notes — **authoritative** over the model on conflict |
 | `create_choice` | Phase 3.5 | 6 | whether to also create Test Case work items |
-| `feature_files` | Phase 4 | 5, 6, 7 | array of `{ path, content, feature, scenarios: [{ name, acRefs, tags }] }` |
+| `feature_files` | Phase 4 | 5, 6, 7 | array of `{ path, content, feature, scenarios: [{ name, acRefs, tags, testCase?: { body, acceptanceCriteria, stepsXml? } }] }`; `testCase` is present only when tracker Test Cases will be created |
 | `written_files` | Phase 5 | 7 | paths actually written |
 | `pending_writes` | Phase 6 | gate + exec | `createIssue` / `linkIssue` tuples |
 | `created` | Phase 6 | 7 | `[{ scenario, id, url }]` |
@@ -109,6 +109,7 @@ When invoking a skill via the `Skill` tool, the first line of the prompt is the 
 
 **Pauses (halt until the user answers):**
 
+0. **Phase 0** — only when the story has no acceptance criteria: one question on whether to treat the description as informal criteria.
 1. **Phase 2** — the blocking-ambiguity clarification card (skipped when nothing blocks).
 2. **Phase 3.5** — the scope-selection card (which behaviors to generate, tracker-creation choice, free-form notes).
 3. **Phase 5** — the local `.feature` write confirmation.
@@ -177,11 +178,12 @@ Cache the chosen groups as `selected`. Nothing selected → stop per the Stops l
 
 ### Phase 4: Write the BDD suite
 
-Invoke `bdd-scenario-writer` with `Calling context: phase=4, tracker=<tracker>, framework=<test_framework>.` and a payload of: the `selected` slice of `coverage_model`, `blocking_answers`, `extra_notes` (authoritative), the relevant `code_refs`, the numbered `acceptance_criteria` (for traceability tags), and the config (`scenario_granularity`, `traceability_tags`, `test_output_dir`). It returns one or more Gherkin features — Feature narrative, Background for shared preconditions, `Rule:` blocks grouping scenarios under each AC, `Scenario` and `Scenario Outline` + `Examples`, tags (`@smoke`/`@regression`/`@negative`/`@boundary`/`@permissions`/`@edge`/`@inferred`, plus `@AC-<n>` when `traceability_tags`), data tables, and doc strings — applying the smart-consolidation-not-coupling rule and the detailed-step rule.
+In `mode=coverage`, do not invoke `bdd-scenario-writer`: emit the read-only coverage report (see the Coverage-mode output below) and end.
 
-Run `issuekit:prose-style` on the Feature narrative and any scenario descriptions to clean the prose before the gate. Cache the result as `feature_files`, each `{ path, content, feature, scenarios }`. File paths default under `test_output_dir`, named in kebab-case from the story title, matching any existing convention `code_refs` reported.
+Invoke `bdd-scenario-writer` with `Calling context: phase=4, tracker=<tracker>, framework=<test_framework>.` and a payload of: the `selected` slice of `coverage_model`, `blocking_answers`, `extra_notes` (authoritative), the relevant `code_refs`, the numbered `acceptance_criteria` (for traceability tags), `source_label`, `create_test_cases` (true when `tracker != none` and either `create_choice == yes` or `create_in_tracker == "always"`; it tells the skill to render a Test Case payload per scenario), and the config (`scenario_granularity`, `traceability_tags`, `test_output_dir`, `feature_file_extension`, `test_label`). It returns one or more Gherkin features — Feature narrative, Background for shared preconditions, `Rule:` blocks grouping scenarios under each AC, `Scenario` and `Scenario Outline` + `Examples`, tags (`@smoke`/`@regression`/`@negative`/`@boundary`/`@permissions`/`@edge`/`@inferred`, plus `@AC-<n>` when `traceability_tags`), data tables, and doc strings — applying the smart-consolidation-not-coupling rule and the detailed-step rule.
 
-In `mode=coverage`, skip writing features — instead emit the read-only coverage report (see the Coverage-mode output below) and end.
+Run `issuekit:prose-style` on the Feature narrative and any scenario descriptions to clean the prose before the gate. Cache the result as `feature_files`, each `{ path, content, feature, scenarios }`, with each scenario's `testCase` payload when `create_test_cases` was true. File paths default under `test_output_dir`, named in kebab-case from the story title, matching any existing convention `code_refs` reported.
+
 
 ### Phase 5: Write the `.feature` files (gated)
 
@@ -190,7 +192,7 @@ Show the local write plan and **pause**:
 - For each file in `feature_files`: the path, whether it is **new** or **exists** (check with `Read`/`Bash`), the scenario count, and an abridged preview (Feature line + scenario names; first ~8 body lines then `…`). For an existing file, state the strategy — merge new scenarios in, or write a suffixed sibling — never overwrite.
 - Ask once via `AskUserQuestion`: "Write these `<n>` feature file(s) to `<test_output_dir>`?" — Write all / Write selected / Cancel.
 
-On confirm, `Write` each file (creating `test_output_dir` with `Bash mkdir -p` first). Cache `written_files`. On decline, write nothing and skip to Phase 7 (report what would have been written).
+On confirm, `Write` each file (creating `test_output_dir` with `Bash mkdir -p` first). Cache `written_files`. On decline, write nothing locally. Continue to Phase 6 when tracker creation was chosen (the two write paths are independent); otherwise go to Phase 7 and report what would have been written.
 
 ### Phase 6: Create Test Case work items (gated) — optional
 
@@ -199,10 +201,10 @@ Run only when `create_choice == yes` (or `create_in_tracker == "always"`) and `t
 - `type` = `test_case_work_item_type[<tracker>]`
 - `title` = the scenario name (or Feature name for per-feature)
 - `body` = the Gherkin scenario (fenced), plus a line citing the source story and the AC(s) it covers
-- `acceptanceCriteria` = the source AC text the scenario verifies (ADO writes it to the AC field; Jira folds it in)
+- `acceptanceCriteria` = the source AC text the scenario verifies. The adapter writes it to the acceptance-criteria field when the Test Case type has one and folds it into the body otherwise (the Azure DevOps `Test Case` type often has no such field; Jira folds unless `acceptance_criteria_field` is set), so the gate shows where it lands
 - `labels` = `[test_label]`
 - `project` = `target_project`
-- `customFields` — on Azure DevOps, set `Microsoft.VSTS.TCM.Steps` to the steps XML `bdd-scenario-writer` rendered (each When/Then group → one step with Action + Expected Result), so the Test Case is runnable in Test Plans, not just prose. See `bdd-scenario-writer/references/tracker-test-cases.md`.
+- `customFields` — on Azure DevOps, set `Microsoft.VSTS.TCM.Steps` to the scenario's `testCase.stepsXml`, the steps XML `bdd-scenario-writer` rendered (each When/Then group → one step with Action + Expected Result), so the Test Case is runnable in Test Plans, not just prose. See `bdd-scenario-writer/references/tracker-test-cases.md`.
 
 When `link_to_story` and `story_source.kind == tracker`, each unit also gets a dependent `linkIssue` back to the source story: `linkIssue(newId, story_source.id, "related")` with `target: "(new)"` resolved from that unit's own `createIssue`. (The verb surface exposes `related`; note in the summary that this stands in for a semantic "Tests" link.)
 
@@ -218,8 +220,7 @@ Short inline summary (no card, no chat send):
 - **Test Cases:** each created scenario `title → url` (or "not created"), noting the `test_label` tag and the story link.
 - **Open Questions:** every unresolved ambiguity and every drift finding from `code_refs`, so the author can close the loop. Be explicit that these were *not* silently resolved from the code.
 - **Out of scope:** behaviors the ACs imply but that need tooling/environment to test (perf thresholds, a11y audits, security tests), listed so nobody assumes they're covered.
-
-If `.claude/acceptance-test-policy.json` was absent, offer once to persist this session's choices.
+- **Config:** when `.claude/acceptance-test-policy.json` was absent, print the JSON for this session's choices so the author can save it there. Print it; do not ask.
 
 This is the end of the run. Do not ask a question after it.
 

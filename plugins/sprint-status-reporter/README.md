@@ -47,7 +47,7 @@ or the slash commands:
 ```
 /sprint-status-reporter:run [sprint name or ID] [--team <name>] [--export pptx|pdf]
 /sprint-status-reporter:progress-delta [sprint name or ID] [--team <name>] [--since <YYYY-MM-DD>] [--baseline <path>] [--export pptx|pdf]
-/sprint-status-reporter:pulse [sprint name or ID] [--team <name>]
+/sprint-status-reporter:pulse [sprint name or ID] [--team <name>] [--from <date>] [--till <date>] [--range this-week|last-week|this-month|last-month] [--status active|closed|delivered|updated]
 ```
 
 Examples:
@@ -64,6 +64,7 @@ Examples:
 
 /sprint-status-reporter:pulse
 /sprint-status-reporter:pulse --team "Payments"
+/sprint-status-reporter:pulse --range last-week --status closed
 ```
 
 All arguments are optional. With none, `/run` reports the current sprint for your default
@@ -76,8 +77,10 @@ snapshot; `/pulse` does the same comparison and puts the result on your dashboar
 one in this order:
 
 1. `--baseline <path>` — a specific saved snapshot JSON.
-2. The newest stored snapshot before today (or at/before `--since <date>`). Snapshots are
-   written on every `/run` and `/progress-delta`, under `<output_directory>/.snapshots/`.
+2. The newest stored snapshot before today (and, with `--since <date>`, also at/before that
+   date). Today's own snapshot is never the baseline, and a snapshot from another sprint or
+   team is skipped. Snapshots are written on every `/run`, `/progress-delta` and `/pulse`,
+   under `<output_directory>/.snapshots/`.
 3. `--since <date>` with no stored snapshot: reconstruct the as-of state from item history.
    **Azure DevOps only** (Jira does not expose issue history through the adapter).
 4. Nothing to compare (first run, or Jira with no snapshot): it establishes a baseline
@@ -99,14 +102,16 @@ re-run the command to refresh it.
 
 The dashboard has two views:
 
-- **Live status** — four sections, each item with its id, title, owner, and one-line detail:
-  - **Delivered** — items whose `stateCategory` is Done under your `state_categories` policy.
-  - **In Progress** — items still in flight and not currently at risk.
-  - **Currently at risk** — every blocked or stale item, with its reason (`blocked: <indicator>`
-    or `stale: <n>d`).
-  - **Newly at risk** — the ones that became blocked or stale since the baseline.
-- **Copy for deck** — the same three sections (Delivered, In Progress, Risks & Blockers) as
-  plain paste-ready text, with a copy button.
+- **Live status** — one tile per ticket tag (plus `Untagged`). Each tile shows an active and
+  a closed count and the two ticket lists, each ticket with its id, title, owner, and one-line
+  detail. At-risk tickets carry their reason (`blocked: <indicator>` or `stale: <n>d`), and
+  the ones that became blocked or stale since the baseline are marked as newly at risk. A
+  "New since <baseline date>" callout lists tickets added to the sprint since the baseline.
+- **Copy for deck** — the same tiles as plain paste-ready text, with a copy button.
+
+`--from`/`--till` or `--range` bound which tickets count as closed and as new; `--status`
+shows only the active or only the closed side. A window never hides an active ticket. See
+[`commands/pulse.md`](./commands/pulse.md) for the details.
 
 A visible "last updated" line always shows when the data was last refreshed successfully.
 
@@ -164,14 +169,15 @@ Read-only phases, shared until the mode branch:
 Marp markdown with `---` slide separators and a Mermaid pie chart for the summary (so it's
 self-contained; no plotting dependency). Slides:
 
-1. **Title** — sprint name, date range, team, generated-on date.
+1. **Title** — sprint name, date range, generated-on date.
 2. **Summary** — done/in-progress/to-do pie + headline numbers (% complete, remaining,
    at-risk count).
 3. **Completed this sprint** — each ticket with a one-line detail of what shipped.
 4. **In progress** — each ticket with a one-line detail, owner, and idle time.
 5. **Blocked / at risk** (blocked items + stale in-progress items, each with its reason).
 6. **Up next** — top of the remaining backlog order, each with a one-line detail.
-7. **Capacity** — only when capacity data is available (Azure DevOps).
+7. **Capacity** — only when capacity is configured for the iteration (Azure DevOps). It
+   compares remaining-work hours with capacity hours, never story points with hours.
 
 Completed, in-progress, and up-next tickets render as detail bullets
 (`**#123 Title** (owner). Brief description of the ticket.`) so a reader gets the gist of
@@ -192,9 +198,11 @@ Read from `.claude/tracker-policy.json` (shared with the rest of the suite). Key
 plugin uses:
 
 - `state_categories` — maps vendor states to Done / In Progress / To Do. Rarely needs
-  setting: the adapter falls back to the tracker's own state category. Prompted only when a
-  sprint contains a state the vendor category can't classify.
-- `blocked_indicators` — `{ labels, states, board_column }`; an item matching any is blocked.
+  setting: the adapter falls back to the tracker's own state category. A state neither can
+  classify is counted as To Do, with a warning that names this key.
+- `blocked_indicators` — `{ labels, states, board_column }`; a non-done item matching a label
+  or state is blocked. `board_column` is not evaluated (the adapter exposes no board column);
+  setting it produces a warning.
 - `stale_after_days` — an in-progress item older than this is flagged at-risk. Default `3`.
 - `points_field_name` — Jira-only override for the story-points field. Default: auto-detect.
 - `output_directory` — where decks are written. Defaults to `./sprint-reports/` for this
@@ -203,8 +211,8 @@ plugin uses:
   publishes at `<output_directory>/.dashboard-page.html`. There are no separate keys for any of
   them.
 
-When the file is absent, defaults are used and the agent lazy-prompts (and offers to
-persist) any key it actually needs. Defaults are documented in
+When the file is absent, defaults are used without prompting. On Azure DevOps a team is
+required: pass `--team <name>` or set `default_team` in the policy file. Defaults are documented in
 [`issuekit/skills/tracker-adapter/references/policy-schema.md`](../issuekit/skills/tracker-adapter/references/policy-schema.md).
 
 ## Plugin-bundled skills
@@ -215,7 +223,7 @@ persist) any key it actually needs. Defaults are documented in
 | `deck-composer` | Pure rendering: metrics model → Marp status deck written to `output_directory`. |
 | `delta-analyzer` | Pure computation: a baseline snapshot + the current state → a delta model (shipped, started, added/removed, new risk, headline movement). |
 | `delta-narrator` | Pure rendering: delta model → Marp "what changed" deck written to `output_directory`. |
-| `dashboard-composer` | Pure computation: metrics model + delta model → the Pulse dashboard's view payload (four buckets plus paste-ready deck text). Returns the payload; the agent publishes it. |
+| `dashboard-composer` | Pure computation: metrics model + delta model → the Pulse dashboard's view payload (one tile per tag with active and closed lists, a new-since callout, plus paste-ready deck text). Returns the payload; the agent publishes it. |
 
 The agent also invokes `issuekit:tracker-adapter` for every tracker read.
 

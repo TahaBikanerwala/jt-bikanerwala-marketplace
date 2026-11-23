@@ -18,8 +18,9 @@ name appears in this prompt.
 so there is no diff-and-confirm gate on tracker data. The printed summary is the
 primary output. It may optionally post that same summary to Slack or Teams (yourself
 by default, or another channel, group, or person when named explicitly with `--to`),
-or save it to a file when `--output <path>` is given, but only after the user
-explicitly opts in through Phase 4's or Phase 5's questions, never automatically.
+save it to a file when `--output <path>` is given, or copy it to the clipboard
+(Phase 6), but only after the user explicitly opts in through that phase's
+questions, never automatically.
 
 ## Arguments
 
@@ -51,10 +52,14 @@ mistaken for a tracker reference or folded into `keywords`):
 
 **Mode detection** (next, before any further flag parsing):
 
-- If the argument contains one or more tracker references (a tracker URL, a `PROJ-123`
-  style key, or a bare numeric/`AB#` id), set `mode=explicit` and extract every
-  reference found. Prose around the references is ignored; pull the references out.
-- Otherwise set `mode=query` and parse flags:
+- If the argument contains any query flag (`--from`, `--till`, `--range`, `--status`,
+  `--project`, `--scope`, `--tags`), set `mode=query`. A number or key inside a flag
+  value or among the keywords (`--scope "Team 7"`, `--tags ECW-2`, `sprint 42`) is never
+  a tracker reference, so it can never turn a query into a fetch of ticket 7 or 42.
+- Otherwise, if the argument contains one or more tracker references (a tracker URL, a
+  `PROJ-123` style key, or a bare numeric/`AB#` id), set `mode=explicit` and extract
+  every reference found. Prose around the references is ignored; pull the references out.
+- Otherwise set `mode=query`. In `mode=query`, parse flags:
   - `--from <date>` / `--till <date>`: any unambiguous date string; normalize to
     `YYYY-MM-DD`.
   - `--range <preset>`: one of `this-week`, `last-week`, `this-month`,
@@ -67,8 +72,8 @@ mistaken for a tracker reference or folded into `keywords`):
     given values (OR across multiple values, mirroring `--tags`'s
     comma-separated grammar). `updated` may only appear alone: it means "no
     state filter at all," so combining it with any other value is a
-    validation error; see Validation. Default `updated` when a date range is
-    given and `--status` is absent.
+    validation error; see Validation. Default `updated` whenever `--status` is
+    absent (Validation then asks for a date range if none was given).
   - `--project <name>`: passed straight through to the search.
   - `--scope <area-path-or-component>`: AzDO area path or Jira component/label,
     passed straight through to the search.
@@ -180,7 +185,7 @@ the payload. Known keys: `phase`. Unknown keys are ignored.
 | `till` | Phase 0 | Phase 1 | resolved end date (`YYYY-MM-DD`), from `--range` or explicit `--till`, or `null` (no upper bound) |
 | `tag_filters` | Phase 0 | Phase 1 | tag/label substrings from `--tags`, or `null` (no tag filter) |
 | `detailed` | Phase 0 | Phase 1, 3 | bool from `--detailed`; picks the fetched `fields` list and whether Phase 3 prints the extra metadata line |
-| `issues` | Phase 1 | Phase 2, 3 | `Issue[]`, the resolved item set; Phase 3 reads it too when `detailed` |
+| `issues` | Phase 1 | Phase 2, 3, 4, 5, 6 | `Issue[]`, the resolved item set; supplies `assignee` for every brief line (joined to `blurbs` by id), and state and parent when `detailed` |
 | `unresolved_refs` | Phase 1 | Phase 3 | ids/references, either mode, that failed to fetch (explicit: a pasted reference; query: an id returned by `searchIssues` but missing from the `getIssuesBatch` result) |
 | `truncated` | Phase 1 | Phase 3 | bool; true when a fetch may have hit a server/page cap |
 | `blurbs` | Phase 2 | Phase 3, 4 | `{id, title, url, blurb}[]` |
@@ -429,7 +434,7 @@ user, when `chat == none` or `issues` is empty (nothing to send).
    - Any other `to_target`: `send_target = { kind: "channel", value: to_target }`,
      the same opaque-string contract `policy.escalation.channel` already uses for a
      Slack `#channel-name` or channel id, or a Teams channel/chat id.
-5. Build the message body from `blurbs`, reusing Phase 3's structure exactly
+5. Build the message body from `blurbs` joined to `issues` by id (for the assignee), reusing Phase 3's structure exactly
    (heading and date window when `status_label` is set, one brief line per item in
    the same order, the detailed metadata line under each when `detailed`, the
    truncation note, the unresolved-refs notes) but rendering each line per
@@ -497,7 +502,10 @@ Runs after Phase 5.
    ticket title, blurb, and assignee text is untrusted-enough to contain shell
    metacharacters. Invoke `<clipboard_tool> < <tempfile-path>` via `Bash`, so the
    command string names only the detected tool and the temp file's path, never any
-   ticket-sourced text. Remove the temp file afterward, on both the success and
+   ticket-sourced text. On Windows `clip.exe` reads the console code page, not UTF-8,
+   and garbles accented names and typographic punctuation: convert first with
+   `iconv -f UTF-8 -t UTF-16LE <tempfile-path> | clip.exe` (the command string still
+   carries no ticket text). Remove the temp file afterward, on both the success and
    failure path.
 7. On success: `Copied to the clipboard.` On failure (the shell-out errors), report
    it plainly and do not retry: `Could not copy to the clipboard: <reason>. The
@@ -520,6 +528,8 @@ Runs after Phase 5.
   retried or treated as invalidating Phase 3's output.
 - **Never write a file without asking first.** Same discipline as chat delivery:
   Phase 5's questions are not optional convenience defaults.
+- **Never copy to the clipboard without asking first.** Phase 6 is opt-in the same
+  way; the clipboard is the user's, and a silent copy overwrites what they had on it.
 - **Never overwrite an existing file without asking.** Phase 5 checks first and
   stops without writing if the user declines.
 - **Never invent a default file destination.** Unlike chat's self-default,

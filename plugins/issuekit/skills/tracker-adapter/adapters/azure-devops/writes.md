@@ -162,6 +162,17 @@ value}` differs):
 | `severity` | `Microsoft.VSTS.Common.Severity` | project `severity_label_map[<abstractTier>]` |
 | `customFields[<refName>]` | `<refName>` | as-is |
 
+`Microsoft.VSTS.Common.AcceptanceCriteria` exists on backlog-level types (`User Story`,
+`Product Backlog Item`, `Bug` in most templates) but not on every type (`Task`, `Test Case`,
+`Basic/Issue`). Check `getIssueTypeSchema(type).fields` while building the batch: when the
+target type lacks the field, append the criteria to `body` under an `## Acceptance Criteria`
+heading instead, so the gate shows where they will land. Never fail a create over this field.
+
+`customFields` are written as-is, so a ref name the target type lacks fails the create. A
+caller that routes content into a type-specific field (the `bug-reporter` repro-steps and
+system-info fields) checks `getIssueTypeSchema(type).fields` first and folds the content
+into `body` when the field is absent.
+
 `Microsoft.VSTS.Common.Severity` exists on `Bug` in the Agile and CMMI templates and on `Impediment` in
 Scrum. When the target type has no severity field (`User Story`, `Task`, `Basic/Issue`), drop the
 operation, warn once, and let the create proceed. Never fail a create over a severity field.
@@ -187,19 +198,17 @@ wit_add_work_item_comment(workItemId: <id>, text: <html>)
 
 Body is markdown; convert to safe HTML using the rules in `body-format.md` before the call.
 
-Consolidated — the tool defaults `format` to `Markdown`, so the raw markdown body
-can be passed as-is, skipping the `body-format.md` conversion this verb otherwise
-always requires:
+Consolidated — the tool defaults `format` to `Markdown`, but always convert to HTML
+and say so explicitly, exactly as on the classic shape:
 
 ```
-wit_work_item_comment_write(action: "add", workItemId: <id>, text: <markdown>)
+wit_work_item_comment_write(action: "add", workItemId: <id>, text: <html>, format: "Html")
 ```
 
-To keep both shapes' output byte-identical instead of relying on the shape
-difference, convert to HTML and pass `format: "Html"` on the consolidated call too
-— either is correct, but do not silently mix (converting for one shape and not the
-other across otherwise-identical calls would produce inconsistent comment
-rendering between sessions).
+Do not pass raw markdown here. `@[userRef]` tokens only become real mentions through the
+`body-format.md` HTML conversion (see `mentions.md`), so a markdown comment posts the
+token as literal text and notifies nobody. Converting on both shapes also keeps comment
+rendering identical between sessions.
 
 ## `addLabel(id, label)`
 

@@ -19,7 +19,7 @@ All tracker access goes through `issuekit:tracker-adapter`, so no vendor-specifi
 The dispatcher accepts a `mode` parameter:
 
 - `mode=full` (default; invoked from `/issue-triager:run`) — run every phase, including the Phase 2b code dig.
-- `mode=investigate-and-refine` (invoked from `/issue-triager:investigate-and-refine`) — run Phases 0, 1, 2a (read-only) and 5 (title + description refinement). The diff-and-confirm gate at Phase 3 covers only the Phase 5 writes. Skip Phases 2b, 4a/4b/4c, 6, 7, 8, 9, 10.
+- `mode=investigate-and-refine` (invoked from `/issue-triager:investigate-and-refine`) — run Phases 0 and 1 (read-only) and 5 (title + description refinement). The diff-and-confirm gate at Phase 3 covers only the Phase 5 writes: no assignment, no state transition, no comment, no label. Skip Phases 2a, 2b, 2.5, 4a/4b/4c, 6, 7, 8, 9 and the Phase 10 channel notification. The Phase 10 inline summary and deferred warnings still print.
 
   Phase 2b is skipped here on purpose. This mode exists to clean up a ticket's wording cheaply, and the codebase dig is the most expensive thing the agent does. Someone who wants the defect localized wants `/issue-triager:run`.
 
@@ -50,7 +50,7 @@ The shipped defaults the agent reads:
 | `states.waiting_reply` | (lazy-prompted) | Phase 4c, 9 |
 | `states.backlog` | (lazy-prompted) | Phase 9 |
 | `severity_scheme` | `sev1: 1d, sev2: 3d, sev3: 7d, sev4: 30d` (1 & 2 escalate) | Phase 6 |
-| `severity_label_map` | `sev1: [Sev-1, 1-Critical, Critical], ...` | Phase 6 |
+| `severity_label_map` | `sev1: [1 - Critical, Sev-1, Critical], ...` | Phase 6 |
 | `escalation.channel` | null | Phase 10 |
 | `skip_labels` | `["triaged"]` | Phase 0 |
 | `triaged_label` | `triaged` | Phase 8 |
@@ -91,7 +91,7 @@ Unknown keys are ignored.
 | `datadog_findings` | Phase 2a | Phase 4a (Bug/Incident only) | array | empty when log==none |
 | `fix_findings` | Phase 2b | Phase 4a, 10 | `{ suspected_areas, proposals, where_to_look, no_proposal_reason }` | null outside Bug/Incident and outside `mode=full`; `proposals` is often empty, which is a valid result |
 | `gap_followup_text` | Phase 2.5 | Phase 4c | markdown string or null | non-null only when investigation has critical UNKNOWNs |
-| `severity_decision` | Phase 3 (resolved from investigation+policy) | Phase 4a, 6 | `{ tier: "sev1..sev4", label: "<vendor>", due: ISO }` | Bug/Incident only |
+| `severity_decision` | Phase 3 step 2 (resolved from the issue, the investigation and policy) | Phase 4a, 6, 10 | `{ tier: "sev1..sev4", label: "<vendor>", due: ISO }` | Bug/Incident only |
 | `pending_writes` | Phase 3 (built) | Phase 3 gate; Phase 4–9 execution | array of `{verb, target, before, after}` | |
 | `confirmed` | Phase 3 | Phase 4–9 entry guards | bool | |
 | `refined_title`, `refined_body` | Phase 5 draft | included in `pending_writes` | string / markdown string | |
@@ -109,7 +109,7 @@ Unknown keys are ignored.
 - **Never post a proposed fix that fails `fix-proposer`'s confidence floor.** No proposal is a correct, expected outcome. Say so plainly in the summary and move on.
 - **Never write a fix proposal into the issue's description.** It goes in the assessment comment, where it reads as this triage pass's analysis rather than as part of the reported record. `issue-refiner` does not receive `fix_findings`.
 - **Never paste a patch into a comment.** Quoting existing code as evidence is allowed; writing the replacement is not.
-- **Never mention an integration that returned no results** (chat, Datadog).
+- **Never mention an integration that returned no results** (chat, Datadog) in anything written to the tracker or posted to chat. The run's own terminal summary at Phase 10 is the one place a skipped or failed backend is named, once, so the user knows what was not searched.
 
 ## Workflow
 
@@ -117,14 +117,13 @@ For each issue the user pastes, execute these phases in order.
 
 **Stops (halt the run until the user explicitly continues or overrides):**
 
-- **Phase 0 skip-label match:** if any of `policy.skip_labels` matches a label on the issue, halt and print: `Issue carries skip label '<label>'. Skipping triage. (Re-run with --force to override.)` Exit cleanly.
+- **Phase 0 skip-label match:** if any of `policy.skip_labels` matches a label on the issue, halt and print: `Issue carries skip label '<label>'. Skipping triage. Remove the label to triage it again.` Exit cleanly.
 - **Phase 0 unsupported archetype:** if the issue type doesn't fit any archetype in the taxonomy AND can't be detected from labels, halt and ask: "I can't classify this issue type ('<type>'). Treat as: Bug / Incident / Story / Feature / Task / Spike / Cancel?"
 
 **Pauses:**
 
 1. **Phase 3 main panel:** the diff-and-confirm gate.
-2. **Phase 3 lazy-prompts:** when a needed policy value is unset.
-3. **Phase 9 follow-up confirmation** (Phase 4c path only): "Posted follow-up comment to @reporter. Transition issue to waiting_reply?" Yes/No.
+2. **Phase 3 lazy-prompts:** when a needed policy value is unset, or severity cannot be read from the evidence. These come before the gate renders, never after it.
 
 ---
 
@@ -143,7 +142,7 @@ For each issue the user pastes, execute these phases in order.
    - `Spike`, `Research`, `Investigation` → `Spike`
    - Unknown → halt per the Stops list.
    Cache as `archetype`.
-7. **Prepare the Phase 0 bootstrap writes.** Append to `pending_writes`:
+7. **Prepare the Phase 0 bootstrap writes (`mode=full` only; in `mode=investigate-and-refine` append nothing here).** Append to `pending_writes`:
    - `assign(issue.id, running_user)` (unless `issue.assignee == running_user` already).
    - `transition(issue.id, "investigating")`.
    These are *prepared*, not executed. Phase 3 confirms.
@@ -189,7 +188,7 @@ Skip when `archetype not in [Bug, Incident]` OR `log == none`.
 
 Build queries from signals in `investigation_report`: error strings, service names, customer IDs, HTTP status codes. Call `search_datadog_logs` with appropriate time window (default: 7 days before the issue's `created` date through the issue's `updated` date).
 
-**Suppression rule:** if Datadog returns any error or empty results, append a warning to `gathering_warnings` and treat Datadog as unavailable. Never mention Datadog in any output if its call failed.
+**Suppression rule:** if Datadog returns any error or empty results, append a warning to `gathering_warnings` and treat Datadog as unavailable. Never mention Datadog in a tracker comment, the refined description or a chat post when its call failed; the warning surfaces only in the Phase 10 terminal summary.
 
 Cache the parsed results as `datadog_findings`.
 
@@ -251,21 +250,35 @@ This is the single decision point for the run.
 
 1. **Build `pending_writes`.** Walk the planned writes for every subsequent phase and assemble them as a list of `{verb, target, before, after}` tuples:
 
-   - Phase 0 (already prepared): `assign`, `transition(investigating)`.
+   - Phase 0 (`mode=full` only, already prepared): `assign`, `transition(investigating)`.
    - Phase 4a (Bug/Incident only): `addComment` with the assessment text, including the suspected-area and proposed-fix blocks when `fix_findings` supplied them.
    - Phase 4b (Story/Feature/Task/Spike): `addComment` with the scope summary.
-   - Phase 4c (gap_followup_text != null): `addComment` with the follow-up question; also a planned Phase 9 transition to `states.waiting_reply` and a reassign to the reporter (or their EM if reporter is inactive).
+   - Phase 4c (gap_followup_text != null): `addComment` with the follow-up question, in addition to the 4a or 4b comment; also a planned Phase 9 transition to `states.waiting_reply` and a reassign to the reporter (or their EM if reporter is inactive).
    - Phase 5: `updateFields({ title: refined_title, body: refined_body })`. (Mode `investigate-and-refine` stops here — no further writes.)
    - Phase 6 (Bug/Incident): `updateFields({ severity, dueDate })`. (Story/Feature/Task/Spike): `updateFields({ sprint, storyPoints })`.
-   - Phase 7: `linkIssue` per related candidate; `linkPullRequest` per PR candidate (AzDO only — Jira returns no-op).
-   - Phase 8: `addLabel(triaged_label)`.
-   - Phase 9: `assign` per `archetype_assignment_after_triage`; `transition` to backlog or waiting_reply.
+   - Phase 7: `linkIssue` per related candidate; `linkPullRequest` per PR in `pr_candidates` (AzDO only — Jira returns no-op).
+   - Phase 8: `addLabel(triaged_label)`, except on the Phase 4c path (see Phase 8).
+   - Phase 9: `assign` and `transition` as Phase 9 describes.
 
-   For Phase 5's refinement, invoke `issue-refiner` now to produce `refined_title` and `refined_body`. Pass `issuekit:prose-style` to clean the body before caching.
+   Read what those tuples need first. Call `linkedPullRequests(issue.id)` and cache the result as `pr_candidates`; drop any PR already linked to the issue. For Story / Feature / Task / Spike, call `getCurrentSprint(team)` and cache it as `current_sprint`; when it returns null (no active sprint, or no team on Azure DevOps), leave `sprint` out of the Phase 6 write and add a one-line warning.
 
-2. **Lazy-prompt for missing policy values.** Before building tuples that depend on `states.investigating`, `severity_scheme`, etc., check if they're set in policy. If not, ask once via `AskUserQuestion` (using the question templates in `issuekit/skills/tracker-adapter/references/policy-schema.md`) and offer to persist the answer.
+   For Phase 5's refinement, invoke `issue-refiner` now with `Calling context: phase=3, archetype=<archetype>, mode=<mode>.` and a payload of `{ issue_payload, investigation_report }`, to produce `refined_title` and `refined_body`. The skill runs `issuekit:prose-style` itself before returning; do not run it again. Append any `warnings` it returns under the diff, so the user sees them before confirming.
+
+2. **Resolve everything the tuples depend on, before rendering.**
+
+   **Policy values.** Before building tuples that depend on `states.investigating`, `states.waiting_reply`, `states.backlog`, `severity_scheme`, etc., check if they're set in policy. If not, ask once via `AskUserQuestion` (using the question templates in `issuekit/skills/tracker-adapter/references/policy-schema.md`) and offer to persist the answer.
+
+   **Severity (Bug / Incident).** Set `severity_decision`:
+   - When `issue_payload.severity` is already set, map it back to a tier through `policy.severity_label_map` and keep it.
+   - Otherwise propose a tier from the report's scope and state evidence: every user affected or a production outage → `sev1`; a segment affected with no workaround → `sev2`; a segment affected with a workaround → `sev3`; cosmetic or a single user → `sev4`.
+   - When that evidence is tagged `[INFERRED]` or `[UNKNOWN]`, do not guess: ask once via `AskUserQuestion`, showing the proposed tier and the evidence behind it.
+   - `label` = the first entry of `severity_label_map[tier]` the live schema accepts; `due` = today + `severity_scheme[tier].due_offset_days`.
+
+   **Story points (Story / Feature / Task / Spike).** The investigation produces no estimate. Keep the item's existing points; when it has none, leave `storyPoints` out of the Phase 6 write. Never invent an estimate.
 
 3. **Render the diff** through `issuekit:tracker-adapter`'s diff-and-confirm contract (`references/diff-and-confirm.md`). The adapter formats the table and asks the single `AskUserQuestion`.
+
+   When Phase 10 will post an escalation (the resolved tier escalates and `policy.escalation.channel` is set), add a notes line under the table: `Will also post a one-line escalation to <channel>.` It is a chat message, not a tracker write, but the user should see it before confirming.
 
 4. **On confirm:** set `confirmed = true`. Phases 4–9 execute as a sequence of write verb calls. The adapter handles each write; on the first failure, the batch stops and the failure summary surfaces at Phase 10.
 
@@ -331,7 +344,7 @@ Same mention/markdown rules as 4a.
 
 ### Phase 4c: Follow-up question (alternative path, when gap_followup_text != null)
 
-Executes after Phase 3 confirms. Adapter posts a comment containing `gap_followup_text` with `@[reporter]` mention at the start. Phase 9 then transitions to `states.waiting_reply` and reassigns to the reporter.
+Executes after Phase 3 confirms. The 4a or 4b comment still posts; 4c is an additional comment. Adapter posts a comment containing `gap_followup_text` with `@[reporter]` mention at the start. Phase 9 then transitions to `states.waiting_reply` and reassigns to the reporter. Phase 8 does not add the triaged label on this path, so the issue is triaged again once the reporter answers.
 
 When the reporter's tracker account is inactive (deleted or deactivated), the comment instead tags the reporter's engineering manager (resolved via the policy's `escalation.primary_contact` if no EM is known) and the reassignment goes to the EM.
 
@@ -351,7 +364,7 @@ Executes after Phase 3 confirms.
 
 **Bug or Incident:** the adapter applies `updateFields({ severity: severity_decision.tier, dueDate: severity_decision.due })`. The adapter projects the abstract `sev<n>` tier to the vendor label via `policy.severity_label_map`.
 
-**Story / Feature / Task / Spike:** the adapter applies `updateFields({ sprint, storyPoints })`. Sprint comes from `getCurrentSprint(team)` (cached in Phase 3 prep). Story points come from the investigation's estimate or a lazy-prompt at Phase 3 if absent.
+**Story / Feature / Task / Spike:** the adapter applies `updateFields({ sprint, storyPoints })`. `sprint` is the `current_sprint` object cached in Phase 3 (omitted when it was null). `storyPoints` is the item's existing value, omitted when it has none; the investigation does not estimate.
 
 ---
 
@@ -359,9 +372,9 @@ Executes after Phase 3 confirms.
 
 Executes after Phase 3 confirms.
 
-For each related issue surfaced in `investigation_report` (with the user's confirmation embedded in the diff): adapter's `linkIssue(issue.id, related.id, kind)`.
+For each related issue surfaced in `investigation_report` (with the user's confirmation embedded in the diff): adapter's `linkIssue(issue.id, related.id, kind)`. `kind` is `duplicate-forward` when the investigation tagged the candidate a duplicate at `[VERIFIED]`, otherwise `related`. Never `parent`.
 
-For each PR surfaced in `investigation_report.linkedPullRequests`: adapter's `linkPullRequest(issue.id, pr.url)`. On Jira, this returns `{ linked: false, reason: "auto-link" }` — the agent surfaces a one-line note in the Phase 10 summary, no failure.
+For each PR in `pr_candidates` (cached in Phase 3): adapter's `linkPullRequest(issue.id, pr.url)`. On Jira, this returns `{ linked: false, reason: "auto-link" }` — the agent surfaces a one-line note in the Phase 10 summary, no failure.
 
 ---
 
@@ -369,30 +382,31 @@ For each PR surfaced in `investigation_report.linkedPullRequests`: adapter's `li
 
 Executes after Phase 3 confirms. Adapter's `addLabel(issue.id, policy.triaged_label)`.
 
+Skipped on the Phase 4c path. That issue is waiting on the reporter, and the label is in the default `skip_labels`, so adding it would block the next triage run once the answer arrives.
+
 ---
 
 ### Phase 9: Final transition
 
 Executes after Phase 3 confirms.
 
-Resolve `policy.archetype_assignment_after_triage[archetype]`:
+**Phase 4c path** (a follow-up question was posted): `assign(issue.id, reporter)`, or the engineering manager per Phase 4c when the reporter is inactive, then `transition(issue.id, "waiting_reply")`. Ignore `archetype_assignment_after_triage` on this path. Both writes are in the Phase 3 diff; nothing is asked here.
+
+**Otherwise**, resolve `policy.archetype_assignment_after_triage[archetype]`:
 
 - `"self"` — leave `issue.assignee` as `running_user` (already assigned at Phase 0). No write needed.
 - `"unassign"` — adapter's `assign(issue.id, null)`.
 - `"keep"` — adapter doesn't touch assignment.
 
-Then transition:
-
-- Phase 4c was taken (follow-up posted) → transition to `policy.states.waiting_reply`.
-- Otherwise → transition to `policy.states.backlog` for Bug archetype only (assignment above just unassigned it, so it's unclaimed until someone picks it up); every other archetype — Incident, Story, Feature, Task, Spike — stays in `policy.states.investigating` (assignment above kept it on the running user, who is actively working on it).
+Then transition to `policy.states.backlog` for Bug archetype only (assignment above just unassigned it, so it's unclaimed until someone picks it up); every other archetype — Incident, Story, Feature, Task, Spike — stays in `policy.states.investigating` (assignment above kept it on the running user, who is actively working on it).
 
 ---
 
 ### Phase 10: Notification + summary
 
-Always runs (skipped only if Phase 3 was declined).
+Always runs (skipped only if Phase 3 was declined). In `mode=investigate-and-refine`, skip step 1 and run steps 2 to 4.
 
-1. **Channel notification (when configured).** If `policy.escalation.channel` is set AND the issue's resolved severity is one that escalates (`sev1` or `sev2` with `escalate_immediately: true`), the adapter's `sendMessage` posts a one-line summary to the channel: `<archetype> <issue.url> assigned to @[running_user] (sev1; due <dueDate>). Investigation: <one-line top hypothesis>.` Cache `escalation_posted = true`.
+1. **Channel notification (`mode=full`, when configured).** If `policy.escalation.channel` is set AND `severity_decision.tier` is one whose `severity_scheme` entry has `escalate_immediately: true`, call `sendMessage({ kind: "channel", value: policy.escalation.channel }, body)` with the one-line body `<archetype> <issue.url> triaged by <running user's display name> (<tier>; due <dueDate>). Investigation: <one-line top hypothesis>.` Use the display name, never an `@[userRef]` token: tracker mentions are not projected in chat and would post literally. Set `escalation_posted` from the returned `sent`; on `{ sent: false, reason }`, add the reason to the summary and do not retry.
 
 2. **Inline summary.** Print a one-paragraph summary of what was done:
    - Archetype detected.
@@ -403,7 +417,7 @@ Always runs (skipped only if Phase 3 was declined).
 
 3. **Deferred warnings.** Append all entries from `gathering_warnings` and any one-time legacy-config / missing-skill notices.
 
-4. **Trailer.** If no `.claude/tracker-policy.json` exists, append: `No policy file detected. Defaults used. Any values you saved during lazy-prompts have been persisted at .claude/tracker-policy.json.`
+4. **Trailer.** If no `.claude/tracker-policy.json` exists, append: `No policy file detected. Defaults used.`
 
 ---
 

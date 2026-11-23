@@ -42,7 +42,7 @@ The one rule: **test cases come only from the story and its acceptance criteria.
 
 ## Configuration
 
-Reads `.claude/acceptance-test-policy.json` if present (this plugin's own config — not issuekit's `tracker-policy.json`). Keys: `test_output_dir` (default `tests/acceptance`), `test_framework` (default `auto`), `test_case_work_item_type`, `test_label`, `create_in_tracker` (`ask`/`always`/`never`), `link_to_story`, `scenario_granularity`, `traceability_tags`. Missing keys use defaults; the agent offers to persist your choices at the end.
+Reads `.claude/acceptance-test-policy.json` if present (this plugin's own config — not issuekit's `tracker-policy.json`). Keys: `test_output_dir` (default `tests/acceptance`), `feature_file_extension` (default `.feature`), `test_framework` (default `auto`), `test_case_work_item_type`, `test_label`, `create_in_tracker` (`ask`/`always`/`never`), `link_to_story`, `scenario_granularity`, `traceability_tags`. Missing keys use defaults; when the file is absent the agent prints this session's choices as JSON at the end so you can save them.
 
 ## See also
 

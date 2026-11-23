@@ -32,7 +32,7 @@ The attribute the agent adds to untagged elements. **Default:** `"data-testid"`.
 
 The id-generation scheme. One of:
 
-- `"semantic-kebab"` (default) — descriptor + role suffix, kebab-case (`login-email-input`).
+- `"semantic-kebab"` (default) — descriptor + role suffix, kebab-case (`email-input`; `login-email-input` with `scopePrefix: "login"`).
 - `"component-scoped"` — descriptor prefixed with the component name (`LoginForm__email-input`).
 - `"camelCase"` — same descriptor, camelCase instead of kebab-case.
 

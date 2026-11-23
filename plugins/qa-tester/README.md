@@ -76,7 +76,7 @@ Answers go to `.claude/qa-tester-policy.json`. It holds no secrets, so you can c
 
 ## Configure
 
-`.claude/qa-tester-policy.json`. Setup writes the first four keys; the rest are optional.
+`.claude/qa-tester-policy.json`. Setup writes `environments`, `default_env`, `auth`, `coverage_extras` and `mutations` (and `browser_provider` when you choose your logged-in Chrome session); the rest are optional.
 
 ```json
 {
@@ -119,7 +119,7 @@ Answers go to `.claude/qa-tester-policy.json`. It holds no secrets, so you can c
 | `cross_check_provider_artifacts` | `true` | Re-runs suspected Claude in Chrome artifacts on chrome-devtools before filing them. |
 | `exploratory_minutes` | `10` | `0` turns the exploratory pass off. |
 | `test_data_prefix` | `qa-{id}-` | Every created record starts with this. |
-| `cleanup_test_data` | `ask` | `ask`: non-production asks before deleting; production deletes automatically when every case passed and asks otherwise. `never` keeps everything. |
+| `cleanup_test_data` | `ask` | `ask`: non-production asks before deleting; production deletes automatically when every case passed cleanly and asks otherwise (any defect, or any blocked, not-testable or flaky case). `never` keeps everything. |
 | `record_failures` | `ask` | `always` or `never` to skip the question. Videos go to `evidence/BUG-n.mp4`. |
 | `attach_evidence` | `true` | Attaches the video, screenshots and logs to each bug it files. |
 | `attachment_auth` | `{}` | Env var **names** for the REST upload fallback: `azure_devops.pat_env`, `jira.email_env`, `jira.token_env`. |

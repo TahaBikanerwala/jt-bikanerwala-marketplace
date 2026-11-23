@@ -176,8 +176,11 @@ The artifacts. Screenshots and video links, log or trace urls, request and corre
 order ids, related work items and pull requests, chat threads that carry detail. One bullet each, with
 what the artifact shows.
 
-Every item comes from the input or from a verified search hit. Never construct a plausible log url or
-identifier.
+Every item comes from the input. Never construct a plausible log url or identifier.
+
+When the input carries a line beginning `Attachments (`, copy that line verbatim as the last line
+of Evidence. Do not reword it, split it into bullets, or drop it: it names files a caller attaches
+once the bug exists, and the reporter approves them by seeing this line at the gate.
 
 ### Regression
 

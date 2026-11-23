@@ -55,6 +55,12 @@ If nothing semantic exists, name it `<scope>-<role>-<n>` by document position an
 | `[role=menuitem]` | `-menuitem` |
 | `[role=switch]`, toggle | `-toggle` |
 | `form` | `-form` |
+| `[role=textbox]`, `[role=searchbox]`, `[role=spinbutton]`, `[contenteditable]` | `-input` |
+| `[role=combobox]` | `-select` |
+| `[role=menuitemcheckbox]`, `[role=menuitemradio]` | `-menuitem` |
+| `summary` (a `details` disclosure) | `-toggle` |
+| `optgroup` | `-group` |
+| any other element tagged only because it has a click handler | `-button` |
 
 If the descriptor already ends in the role word (e.g. visible text "Submit" on a button → `submit`), don't double it into `submit-button-button`; the reference covers the de-dup of the role word.
 
