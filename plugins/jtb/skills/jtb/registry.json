@@ -1,0 +1,298 @@
+{
+  "schema": 1,
+  "subjects": {
+    "ticket": "One tracker work item: an Azure DevOps or Jira URL, a Jira key (PROJ-123), AB#123, or a bare number.",
+    "pr": "One pull request: an Azure DevOps or GitHub pull request URL, or #123 for the current repo's GitHub remote.",
+    "text": "Pasted prose with no reference in it: rough requirements, meeting notes, a symptom, a story with its acceptance criteria.",
+    "file": "A path to a document: notes, a transcript, a spec, a rough bug report.",
+    "source": "A path or glob of UI source code.",
+    "none": "No subject. The action works on the current sprint, a date range, or the whole checkout."
+  },
+  "actions": [
+    {
+      "id": "test",
+      "command": "qa-tester:run",
+      "label": "Test it",
+      "description": "Runs it in a real browser like a senior QA: test plan, execution with evidence, a Go / No-go report. Offers to file the bugs it finds.",
+      "accepts": ["ticket", "pr"],
+      "intents": ["test", "qa", "verify", "check it works", "run the tests in the browser"],
+      "next": [
+        {
+          "action": "triage",
+          "when": "the run filed new bugs",
+          "subject": "each new bug id"
+        },
+        {
+          "action": "report-bug",
+          "when": "the run found defects that are not filed, and the user was not asked about filing them during the run (bug-reporter was missing or filing is switched off)",
+          "subject": "each unfiled defect as text: its title, steps, expected and actual, taken from the test report"
+        }
+      ]
+    },
+    {
+      "id": "triage",
+      "command": "issue-triager:run",
+      "label": "Triage it",
+      "description": "Full triage of any work item type: investigates, digs into the code on a Bug or Incident, refines the wording, sets severity or sprint, links related work. One gate before any write.",
+      "accepts": ["ticket"],
+      "intents": ["triage", "investigate", "find the cause", "propose a fix", "set severity"],
+      "next": [
+        {
+          "action": "acceptance-tests",
+          "when": "the item is a Story or Feature",
+          "subject": "the same ticket"
+        },
+        {
+          "action": "test",
+          "when": "the change for this item is already built (the triage summary names a linked pull request, or the user said so)",
+          "subject": "the same ticket"
+        },
+        {
+          "action": "postmortem",
+          "when": "the item is an Incident",
+          "subject": "the same ticket"
+        }
+      ]
+    },
+    {
+      "id": "cleanup",
+      "command": "issue-triager:investigate-and-refine",
+      "label": "Clean it up",
+      "description": "Rewrites the title and description of any work item type so it reads clearly. Cheap: no code dig, no field changes, no state change.",
+      "accepts": ["ticket"],
+      "intents": ["clean up", "cleanup", "tidy", "refine", "reword", "rewrite the description", "fix the wording"],
+      "next": [
+        {
+          "action": "test",
+          "when": "always",
+          "subject": "the same ticket"
+        },
+        {
+          "action": "triage",
+          "when": "always",
+          "subject": "the same ticket"
+        },
+        {
+          "action": "acceptance-tests",
+          "when": "the item is a Story or Feature",
+          "subject": "the same ticket"
+        }
+      ]
+    },
+    {
+      "id": "acceptance-tests",
+      "command": "acceptance-test-generator:run",
+      "label": "Write acceptance tests",
+      "description": "Turns the story and its acceptance criteria into Gherkin feature files, and can create them as linked Test Cases behind a gate.",
+      "accepts": ["ticket", "text", "file"],
+      "types": ["Story", "Feature", "Task"],
+      "intents": ["acceptance tests", "gherkin", "bdd", "feature files", "test cases", "scenarios"],
+      "next": [
+        {
+          "action": "test",
+          "when": "the subject is a ticket",
+          "subject": "the same ticket"
+        }
+      ]
+    },
+    {
+      "id": "test-plan",
+      "command": "qa-tester:plan",
+      "label": "Draft a test plan",
+      "description": "Read-only. Reconciles the ticket and its pull requests and writes the edge-case test plan. Opens no browser.",
+      "accepts": ["ticket", "pr"],
+      "intents": ["test plan", "plan the testing", "plan only", "what would you test"],
+      "next": [
+        {
+          "action": "test",
+          "when": "always",
+          "subject": "the same ticket or pull request"
+        }
+      ]
+    },
+    {
+      "id": "postmortem",
+      "command": "postmortem-generator:run",
+      "label": "Write the postmortem",
+      "description": "Gathers evidence for a resolved incident, rebuilds the timeline, and writes a blameless postmortem.",
+      "accepts": ["ticket"],
+      "types": ["Incident", "Bug"],
+      "intents": ["postmortem", "post-mortem", "rca", "root cause analysis", "incident review"],
+      "next": [
+        {
+          "action": "draft-stories",
+          "when": "the postmortem lists action items",
+          "subject": "the saved postmortem file when one was saved, otherwise its action items as text"
+        }
+      ]
+    },
+    {
+      "id": "refine-bug",
+      "command": "bug-reporter:run",
+      "label": "Rewrite as bug report",
+      "description": "Bug only. Restructures a vague existing bug into a complete report (steps, expected vs actual, severity) without losing a fact. One gate.",
+      "accepts": ["ticket"],
+      "types": ["Bug"],
+      "intents": ["rewrite the bug", "restructure the bug", "complete the bug report", "make it a proper bug"],
+      "next": [
+        {
+          "action": "triage",
+          "when": "the run ended with Result: updated",
+          "subject": "the same bug"
+        },
+        {
+          "action": "test",
+          "when": "the fix for this bug is already built (the user said so)",
+          "subject": "the same bug"
+        }
+      ]
+    },
+    {
+      "id": "report-bug",
+      "command": "bug-reporter:run",
+      "label": "Report a bug",
+      "description": "Files a complete Bug from a symptom: duplicate search, one clarification card, one gate. No investigation.",
+      "accepts": ["text", "file"],
+      "intents": ["report a bug", "file a bug", "log a bug", "raise a bug", "create a bug"],
+      "next": [
+        {
+          "action": "triage",
+          "when": "the run ended with Result: created, updated or duplicate-of",
+          "subject": "the bug id on the Result line"
+        }
+      ]
+    },
+    {
+      "id": "draft-stories",
+      "command": "story-drafter:run",
+      "label": "Draft user stories",
+      "description": "Turns rough requirements into INVEST user stories and creates the ones you pick, tagged Draft, behind one gate.",
+      "accepts": ["text", "file"],
+      "intents": ["draft stories", "write stories", "user stories", "break this into stories", "requirements"],
+      "next": [
+        {
+          "action": "acceptance-tests",
+          "when": "the run created stories",
+          "subject": "each created story id"
+        },
+        {
+          "action": "triage",
+          "when": "the run created stories",
+          "subject": "each created story id"
+        }
+      ]
+    },
+    {
+      "id": "sprint-status",
+      "command": "sprint-status-reporter:run",
+      "label": "Sprint status deck",
+      "description": "Read-only. Tallies the current sprint by state, flags blocked and stale items, and writes a Marp status deck.",
+      "accepts": ["none"],
+      "intents": ["sprint status", "status deck", "sprint report", "how is the sprint going"],
+      "args": "The sprint name and any flags the user typed, otherwise empty for the current sprint.",
+      "next": []
+    },
+    {
+      "id": "sprint-pulse",
+      "command": "sprint-status-reporter:pulse",
+      "label": "Refresh Pulse dashboard",
+      "description": "Publishes or refreshes the private, always-current sprint dashboard Artifact.",
+      "accepts": ["none"],
+      "intents": ["pulse", "dashboard", "live status"],
+      "args": "The sprint name and any flags the user typed, otherwise empty for the current sprint.",
+      "next": []
+    },
+    {
+      "id": "sprint-delta",
+      "command": "sprint-status-reporter:progress-delta",
+      "label": "What changed this sprint",
+      "description": "Read-only. Compares the sprint now against an earlier snapshot: shipped, newly started, scope added or dropped, new risk.",
+      "accepts": ["none"],
+      "intents": ["what changed", "progress delta", "delta", "what shipped since"],
+      "args": "The sprint name and any flags the user typed, otherwise empty for the current sprint.",
+      "next": []
+    },
+    {
+      "id": "summarize",
+      "command": "ticket-summarizer:run",
+      "label": "Summarize for clients",
+      "description": "Read-only. One plain-language line per ticket for a client update deck, for the tickets given or for a date range and status.",
+      "accepts": ["ticket", "none"],
+      "intents": ["summarize", "summarise", "summary", "client update", "blurb", "status update"],
+      "args": "Every ticket reference separated by spaces, or the user's flags verbatim (--range, --from, --till, --status, --tags, --to, --output). With no reference and no flags, ask which period first and pass the matching flags: --range this-week --status delivered, --range last-week --status delivered, or --status active.",
+      "next": []
+    },
+    {
+      "id": "coverage",
+      "command": "acceptance-test-generator:coverage",
+      "label": "Review AC coverage",
+      "description": "Read-only. Reports how each acceptance criterion breaks down into testable behaviors, with gaps and open questions. Writes nothing.",
+      "accepts": ["ticket", "text", "file"],
+      "types": ["Story", "Feature", "Task"],
+      "intents": ["coverage", "coverage plan", "are the acceptance criteria testable", "ac gaps"],
+      "next": [
+        {
+          "action": "acceptance-tests",
+          "when": "always",
+          "subject": "the same story"
+        }
+      ]
+    },
+    {
+      "id": "draft-bug",
+      "command": "bug-reporter:draft",
+      "label": "Preview a bug report",
+      "description": "Read-only. Prints the bug report that would be filed, including what is still missing. Nothing is created or changed.",
+      "accepts": ["text", "file", "ticket"],
+      "intents": ["preview the bug", "draft the bug", "dry run the bug report", "show me the bug report"],
+      "next": [
+        {
+          "action": "report-bug",
+          "when": "the subject was text or a file",
+          "subject": "the same input"
+        },
+        {
+          "action": "refine-bug",
+          "when": "the subject was a ticket",
+          "subject": "the same ticket"
+        }
+      ]
+    },
+    {
+      "id": "audit-testids",
+      "command": "testid-injector:audit",
+      "label": "Audit test ids",
+      "description": "Read-only. Lists every interactive element in the UI source and which ones lack a data-testid.",
+      "accepts": ["source", "none"],
+      "intents": ["audit test ids", "testid coverage", "which elements lack a test id"],
+      "args": "The path or glob the user gave, otherwise empty for the project's UI source.",
+      "next": [
+        {
+          "action": "add-testids",
+          "when": "the audit found elements missing a test id",
+          "subject": "the same path"
+        }
+      ]
+    },
+    {
+      "id": "add-testids",
+      "command": "testid-injector:run",
+      "label": "Add missing test ids",
+      "description": "Writes stable data-testid attributes onto every interactive element that lacks one. One gate before any edit.",
+      "accepts": ["source", "none"],
+      "intents": ["add test ids", "inject test ids", "data-testid", "tag the elements"],
+      "args": "The path or glob the user gave, otherwise empty for the project's UI source.",
+      "next": []
+    },
+    {
+      "id": "qa-setup",
+      "command": "qa-tester:setup",
+      "label": "Set up QA environments",
+      "description": "Asks which environments, login method and data rules qa-tester should use, and saves them. No secrets are stored.",
+      "accepts": ["none"],
+      "intents": ["qa setup", "set up testing", "change the test environment", "configure qa"],
+      "args": "Empty.",
+      "next": []
+    }
+  ]
+}

@@ -12,7 +12,15 @@ Add the marketplace once:
 
 The full URL works too: `/plugin marketplace add https://github.com/TahaBikanerwala/jt-bikanerwala-marketplace`.
 
-Then install any plugin from the table below:
+Then install everything with one plugin:
+
+```
+/plugin install jtb@jt-bikanerwala-marketplace
+```
+
+`jtb` depends on every other plugin here, so that one install brings the whole marketplace, and `/jtb` is the one command you need: hand it a ticket, a pull request or pasted notes and it asks what you want done, runs the right agent, then offers the next step. See [One command for everything](#one-command-for-everything).
+
+Or install a single plugin from the table below:
 
 ```
 /plugin install <plugin-name>@jt-bikanerwala-marketplace
@@ -20,10 +28,23 @@ Then install any plugin from the table below:
 
 For example, `/plugin install qa-tester@jt-bikanerwala-marketplace`. Dependencies such as `issuekit` install automatically. To pick up new versions later, run `/plugin marketplace update jt-bikanerwala-marketplace`.
 
+## One command for everything
+
+```
+/jtb 1234                     asks: Test it / Triage it / Clean it up / More actions
+/jtb 1234 clean it up         runs the clean-up, then asks what next (Test it, Triage it, Done)
+/jtb #321 test it             tests the pull request; if bugs are filed, offers to triage them
+/jtb <pasted notes>           asks: Draft user stories / Report a bug / Write acceptance tests
+/jtb                          asks what you are working on
+```
+
+`/jtb` runs in the main conversation and routes to the commands in the table below. It does none of their work and writes nothing itself: every tracker write still passes through the gate of the agent that owns it. After each agent finishes it offers only the follow-ups that fit what just happened, one card at a time, until you pick `Done`. Details and the full routing table are in the [`jtb` README](./plugins/jtb/).
+
 ## Available plugins
 
 | Plugin | Version | What it does |
 |--------|---------|--------------|
+| [`jtb`](./plugins/jtb/) | 0.1.0 | The orchestrator: one entry point for every plugin below. Type `/jtb` with a ticket, a pull request, pasted notes, a document, or nothing. It classifies what you handed over, finds the agents that can work on it, and asks which one you want in a single card (`Test it`, `Triage it`, `Clean it up`, `More actions`); say what you want in the same line (`/jtb 1234 clean it up`) and the card is skipped. It then invokes that plugin's own command, waits for the agent to finish, reads the outcome, and offers the follow-ups that fit: after a clean-up, test or triage; after a test run that filed bugs, triage them; after a bug report, triage it; after drafted stories, acceptance tests. One card between steps, until you pick `Done`, then a recap of everything that ran. **It routes and never works**: it does not read the ticket, test, or investigate, and it writes nothing to the tracker, so every write still passes through the gate of the agent that owns it. Routing lives in one file, `skills/jtb/registry.json`, and a CI check fails the build when any plugin ships a command the registry does not route. Ships `/jtb` (short for `/jtb:jtb`). Auto-installs every other plugin in the marketplace. |
 | [`issuekit`](./plugins/issuekit/) | 0.2.10 | Shared adapter layer for issue-tracker plugins. Auto-detects the active MCP (Azure DevOps, Jira) and exposes an abstract verb surface (`getIssue`, `getIssuesBatch`, `createIssue`, `addComment`, `transition`, `linkIssue`, `linkedPullRequests`, `getPullRequest`, `getSprintItems`, `getTeamCapacity`, ...). Auto-installed as a dependency of `postmortem-generator`, `issue-triager`, `sprint-status-reporter`, `story-drafter`, `acceptance-test-generator`, `bug-reporter`, `ticket-summarizer`, and `qa-tester`. Ships no MCP, no agent, no slash command — it's a library. Bring your own MCPs. |
 | [`postmortem-generator`](./plugins/postmortem-generator/) | 2.0.1 | Paste an incident URL (Azure DevOps or Jira) and the agent gathers evidence from chat (Slack/Teams), the tracker, Datadog logs, and merged pull requests; reconstructs a chronological timeline with evidence tags; pauses for review; then writes a Google-SRE-style blameless postmortem. Bundles `incident-timeline-builder` and `postmortem-writer`. Ships `/postmortem-generator:run <URL or ID>`. Auto-installs `issuekit`. |
 | [`issue-triager`](./plugins/issue-triager/) | 2.1.1 | Triages an issue end-to-end across all archetypes (Bug, Incident, Story, Feature, Task, Spike) on any supported tracker (Azure DevOps, Jira): assigns, transitions to investigating, runs the matching investigation skill, refines title and description, posts an assessment comment, sets severity + due date or sprint + story points, links related work, applies the triaged label, and posts a chat summary. **This is where the codebase dig lives.** On a Bug or Incident it runs `fix-proposer` over your checkout to localize the defect, and adds a **Proposed fix (unverified)** to the assessment comment naming the file, symbol, why the code produces the symptom, blast radius, and the confirming check **only** when the suspect code was actually read and explains the symptom at `[VERIFIED]`/`[OBSERVED]`; below that bar you get a suspected area and a where-to-look instead, and no patch is ever written. All writes pass through a single diff-and-confirm gate; the diff is the dry-run. Bundles `issue-refiner`, `requirements-investigator`, and `fix-proposer`. Ships `/issue-triager:run <URL or ID>` (full workflow) and `/issue-triager:investigate-and-refine <URL or ID>` (lightweight subset, skips the code dig). Auto-installs `issuekit`. |
@@ -35,13 +56,17 @@ For example, `/plugin install qa-tester@jt-bikanerwala-marketplace`. Dependencie
 | [`ticket-summarizer`](./plugins/ticket-summarizer/) | 0.2.1 | Fetches Azure DevOps or Jira work items — either an explicit list of tickets, or everything matching a date range and status — and turns each into a concise, plain-language blurb for a client-update deck: one short sentence, rarely a second, never a third. Accepts pasted ticket ids/urls, a `--from`/`--till` window or a `--range this-week/last-week/this-month/last-month` preset, and a `--status` that combines `active`, `delivered`, `closed` and `updated`. Queries are scoped to Story, Bug and Epic (plus Feature on Azure DevOps). Prints one ready-to-paste brief line per item (id, title, blurb, assignee). Every blurb states what was delivered and, only when the ticket's own text supports it, why it matters; it never invents a business-value claim. After asking, it can send the summary to Slack or Teams, save it to a file, or copy it to the clipboard. Bundles `executive-blurb-writer`. Ships `/ticket-summarizer:run`. Read-only against the tracker: no tracker writes, no confirmation gate. Auto-installs `issuekit`. |
 | [`qa-tester`](./plugins/qa-tester/) | 0.2.1 | Tests a ticket or pull request in a real browser like a senior QA. Reads the Azure DevOps or Jira ticket and every linked PR, following links both ways. **The ticket and its acceptance criteria are the source of truth**: anything in the PR that differs (missing scope, extra scope, contradicting values, scope changed in review) is reported as a discrepancy and tested against the ticket. Drafts a full edge-case test plan built on a **minimal shared test data set**, so many cases reuse the same records and cleanup is trivial. Then executes every case through chrome-devtools MCP or Claude in Chrome, whichever is connected, with console, network and screenshot evidence and flake re-runs. Untestable cases are marked with the reason and the run continues; **all questions come once, at the end**, and any case the answers unblock is re-run. Writes `docs/qa/<id>/test-plan.md` and a `test-report.md` with a Go / Go with risks / No-go verdict, **Asks before deleting the test data it created**; on production it deletes automatically only when every case passed. A failure that looks like it could come from Claude in Chrome itself is **re-run on chrome-devtools** before it counts as a defect. When it finds defects it offers to **record an mp4 of each reproduction**. It then optionally posts a results comment and files one Bug per defect through `bug-reporter`, each behind a gate, with the video, screenshots and console and network logs attached automatically. Environments, login method and data rules are asked once and saved to `.claude/qa-tester-policy.json` (no secrets). Bundles `source-reconciler`, `test-case-designer`, `browser-test-executor`, `test-report-writer`, and `evidence-attacher`. Ships `/qa-tester:run`, `/qa-tester:plan`, and `/qa-tester:setup`. Auto-installs `issuekit` and `acceptance-test-generator`; `bug-reporter` is optional. |
 
-`postmortem-generator`, `issue-triager`, `sprint-status-reporter`, `story-drafter`, `acceptance-test-generator`, `bug-reporter`, `ticket-summarizer`, and `qa-tester` declare `issuekit` as a dependency; Claude Code auto-installs it when you install any of them. Install `issuekit` directly only if you want the shared verb surface for some other purpose. `qa-tester` also auto-installs `acceptance-test-generator`, whose `acceptance-analyzer` skill it reuses. `testid-injector` has no dependencies.
+`postmortem-generator`, `issue-triager`, `sprint-status-reporter`, `story-drafter`, `acceptance-test-generator`, `bug-reporter`, `ticket-summarizer`, and `qa-tester` declare `issuekit` as a dependency; Claude Code auto-installs it when you install any of them. Install `issuekit` directly only if you want the shared verb surface for some other purpose. `qa-tester` also auto-installs `acceptance-test-generator`, whose `acceptance-analyzer` skill it reuses. `testid-injector` has no dependencies. `jtb` declares every plugin that ships a command as a dependency, so installing it installs them all.
 
 ### Naming convention
 
 Every plugin is named for the tool it is — an actor noun ending in `-er` or `-or`. Each one's primary entry point is `:run`; secondary commands keep descriptive names (`:audit`, `:draft`, `:coverage`, `:plan`, `:setup`, `:pulse`, `:progress-delta`, `:investigate-and-refine`).
 
-The same rule governs bundled skills, with one carve-out: skills that *do* work take actor nouns (`postmortem-writer`, `delta-analyzer`, `fix-proposer`), while skills that *are* a reference or adapter layer keep descriptive nouns — `tracker-adapter`, `element-catalog`, `prose-style`. `issuekit` is exempt for that same reason: it's a library, not an actor.
+The same rule governs bundled skills, with one carve-out: skills that *do* work take actor nouns (`postmortem-writer`, `delta-analyzer`, `fix-proposer`), while skills that *are* a reference or adapter layer keep descriptive nouns — `tracker-adapter`, `element-catalog`, `prose-style`. `issuekit` is exempt for that same reason: it's a library, not an actor. `jtb` is the other exception: it is the front door, named for what you type, and its one entry point is `/jtb` instead of `:run`.
+
+### Adding a plugin
+
+A new plugin or command is not finished until `/jtb` can route to it. Add an action for each command to [`plugins/jtb/skills/jtb/registry.json`](./plugins/jtb/skills/jtb/registry.json), add the plugin to `jtb`'s `dependencies`, bump the `jtb` version, and run `node scripts/check-jtb-registry.mjs`. The same check runs in CI on every pull request and fails when the registry and the plugins disagree. The steps are spelled out in the [`jtb` README](./plugins/jtb/#adding-a-new-agent) and in [`CLAUDE.md`](./CLAUDE.md), which Claude Code reads when it works in this repo.
 
 ## Configure your MCPs
 
