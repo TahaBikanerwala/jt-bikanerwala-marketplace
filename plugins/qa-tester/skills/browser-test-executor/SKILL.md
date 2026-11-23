@@ -1,6 +1,6 @@
 ---
 name: browser-test-executor
-description: "Runs a qa-tester test plan in a real browser. Detects the provider (chrome-devtools MCP preferred for console, network, emulation and Lighthouse; Claude in Chrome when the user's logged-in session is wanted or devtools is absent), preflights the environment, login and deployed build, then executes every case in order without pausing: drives the steps, asserts expected results from the page, captures console errors, failed requests and screenshots, re-runs failures to separate flakes, keeps a ledger of every record created, runs exploratory charters and cleans up test data. Assigns Pass, Fail, Blocked, Not testable or Skipped with evidence and severity. Invoked by the qa-tester agent in Phases 0, 4 and 5."
+description: "Runs a qa-tester test plan in a real browser. Detects the provider (chrome-devtools MCP preferred for console, network, emulation and Lighthouse; Claude in Chrome when the user's logged-in session is wanted or devtools is absent), preflights the environment, login and deployed build, then executes every case in order without pausing: drives the steps, asserts expected results from the page, captures console errors, failed requests and screenshots, re-runs failures to separate flakes, keeps a ledger of every record created, and runs exploratory charters. Assigns Pass, Fail, Blocked, Not testable or Skipped with evidence and severity. After the run, records an mp4 video of each chosen defect's reproduction (phase=record) and deletes the test data once the agent allows it (phase=cleanup). Invoked by the qa-tester agent in Phases 0, 4, 5 and 7."
 metadata:
   author: Taha Bikanerwala
 ---
@@ -50,7 +50,7 @@ Run the cases in `order`. **Never pause, never ask.** For each case:
 4. **Create data** only as the plan says, with the planned prefixed names. Append every created record to `data_ledger` immediately with its identifier (name, id from the URL or page), so cleanup works even if the run dies.
 5. **Assert** each `expected` item by reading the page (snapshot text, element state, URL, field value after reload). For data-table cases, run and report each row.
 6. **Health.** Read console messages and network requests for this case. Uncaught errors or unexpected 4xx/5xx fail the case even if the UI looked right; expected errors the case provokes on purpose (a 422 on invalid input) do not.
-7. **Evidence.** Screenshot on every failure and at the final state of each P1 case, saved to `<output_dir>/<run_id>/evidence/<case-id>[-<row>].png`. On failure also save the console errors and failed request summaries (method, URL, status, short response body with tokens and personal data removed) to `<case-id>-console.txt` / `<case-id>-network.txt`. For long P1 flows on Claude in Chrome, a GIF via `gif_creator` is welcome; name it `<case-id>.gif`.
+7. **Evidence.** Screenshot on every failure and at the final state of each P1 case, saved to `<output_dir>/<run_id>/evidence/<case-id>[-<row>].png`. On failure also save the console errors and failed request summaries (method, URL, status, short response body with tokens and personal data removed) to `<case-id>-console.txt` / `<case-id>-network.txt`. Do not record video during execution. Videos are made afterward, in `phase=record`, only for the defects the user chooses.
 8. **Status.**
    - `Pass`: every expected item observed, health clean.
    - `Fail`: an expected item contradicted, or a health failure.
@@ -64,15 +64,41 @@ Keep going until every case has a status.
 
 **Dialogs.** Before an action that may raise a native `alert`/`confirm`/`beforeunload`, use chrome-devtools `handle_dialog` after the action; on Claude in Chrome, run `javascript_tool` first to stub `window.confirm = () => true` (or `false` for a cancel test) and `window.alert = () => {}`, and note the stub in the case result.
 
-**Session loss.** If a provider call fails because the tab or browser is gone, recreate the tab and log in once. If that fails, every remaining case is `Blocked (browser session lost)`; skip to cleanup.
+**Session loss.** If a provider call fails because the tab or browser is gone, recreate the tab and log in once. If that fails, every remaining case is `Blocked (browser session lost)`; return results so far.
 
 ### Exploratory pass
 
 After the scripted cases, run each charter within the overall `exploratory_minutes` budget, using the shared records. Log each finding as `EX-n` with the same evidence and defect rules. A finding that needs a decision rather than a fix becomes a question.
 
-### Cleanup
+**No cleanup here.** Leave every record in place and close the tab you opened. The agent decides in its end-of-run card whether to record defects and whether to delete data, then calls `phase=record` and `phase=cleanup`.
 
-When `cleanup_test_data` is true and the environment allows mutations, walk `data_ledger` newest first and remove each record not already deleted by a case, using the plan's cleanup action. Mark each entry `cleaned` or `left behind (<why>)`. Never delete a record that is not in the ledger, and never delete anything whose name lacks the run's prefix.
+**Reopening for record and cleanup.** The agent may wait on the user between execution and these phases, so each of them starts like preflight: open a new dedicated tab, navigate to the environment, and confirm the signed-in state, logging in again per `auth.method` if the session expired. Close that tab at the end of the phase.
+
+## phase=record
+
+Input: the selected defects. Record one video per defect, saved as `<output_dir>/<run_id>/evidence/<BUG-n>.mp4`. Never pause and never ask.
+
+1. **Check the format path once.** On chrome-devtools, `screencast_start` writes `.mp4` directly. On Claude in Chrome, `gif_creator` exports only GIF, so check for ffmpeg (`ffmpeg -version`) before the first defect. Without ffmpeg, still record, keep `<BUG-n>.gif`, and set the note `mp4 conversion skipped: ffmpeg not installed`.
+2. **Mutation check.** If replaying a defect's steps would create or change data and the environment's `allow_mutations` is false, do not record it. Note `not recorded: replay would mutate data`. Replays reuse the shared records where they still exist. Any new record goes into `data_ledger` like any other.
+3. **Per defect:**
+   1. Return to the defect's preconditions without recording: role, viewport, starting page, and the record state it needs.
+   2. Start recording (see `references/browser-providers.md`, "Recording"). On Claude in Chrome, take a screenshot right after starting so the first frame shows the starting state.
+   3. Replay the numbered repro steps at a readable pace. Wait for each state to settle and pause about one second on the failing state, so a viewer sees the bug.
+   4. Stop recording. On Claude in Chrome, take a screenshot right before stopping, then export.
+   5. Move the file to `evidence/<BUG-n>.mp4`. On Claude in Chrome, find the exported GIF in the browser's download folder (newest `<BUG-n>*.gif`), move it to `evidence/`, then convert it:
+      `ffmpeg -y -i <BUG-n>.gif -movflags faststart -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" <BUG-n>.mp4`
+      Delete the GIF after a successful conversion.
+   6. If the expected failure did not appear during the replay, keep the video and set the note `did not reproduce on recording replay`.
+4. **Never record a credential.** Log in before starting a recording, never during one. If a repro step is the login itself, start recording after the password field is filled and submitted.
+5. On a provider error, retry the recording once. If it fails again, note `not recorded: <error>` and move on.
+
+Output: `recordings: [{ bug, path | null, note }]`.
+
+## phase=cleanup
+
+Input: `data_ledger` and the set of refs to keep. The agent only calls this once the user agreed, or on production when every case passed.
+
+Walk `data_ledger` newest first and remove each record that is not in the keep set and was not already deleted by a case, using the plan's cleanup action. Mark each entry `cleaned`, `kept (user choice)`, or `left behind (<why>)`. Never delete a record that is not in the ledger, and never delete anything whose name lacks the run's prefix. Before a delete raises a native confirm, follow the Dialogs rule above.
 
 Close the tab you opened.
 
@@ -82,6 +108,7 @@ Close the tab you opened.
 preflight: { reachable, roles: [{role, signed_in, note}], deployment: verified|unverified, deployment_note, seed: [...] }
 results:   [{ id, status, rows?: [...], actual, evidence: [...], console: [...], network: [...], attempts, note }]
 defects:   [{ id: BUG-n, case, title, severity, priority, ac, env, build, role, viewport, browser, preconditions, steps, expected, actual, frequency, evidence, console, network, caveat? }]
-data_ledger: [{ ref, kind, identifier, created_in, cleaned, note }]
+data_ledger: [{ ref, kind, identifier, created_in, status: in-place|cleaned|kept (user choice)|left behind, note }]
 questions: [{ text, unblocks: [...], kind }]
+recordings: [{ bug, path | null, note }]      # phase=record only
 ```

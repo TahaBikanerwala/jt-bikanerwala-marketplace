@@ -79,6 +79,7 @@ Placeholders are in `<angle brackets>`. Drop any section that would be empty, ex
 - Actual: <...>
 - Frequency: reproduced <n> of <n>
 - Evidence: <paths or observations>
+- Video: <evidence/BUG-1.mp4 | "not recorded: <reason>"> <"did not reproduce on recording replay", if so>
 - Console / network: <excerpt>
 - Caveat: <deployment unverified, if so>
 
@@ -108,9 +109,11 @@ Placeholders are in `<angle brackets>`. Drop any section that would be empty, ex
 <summary of the NFR cases and any Lighthouse scores; console and network health across the run>
 
 ## Test data
-| Ref | Identifier | Created in | Cleaned |
+**Cleanup:** <deleted after confirmation | deleted automatically (production, every case passed) | kept by choice | kept for defects | pending>
+
+| Ref | Identifier | Created in | Status |
 |---|---|---|---|
-Always include this section. If anything was left behind, say what and why.
+Always include this section. Status is `cleaned`, `kept (user choice)` or `left behind (<why>)`. If anything is still in place, say what and why.
 
 ## Open questions
 - <question> (unblocks <cases>)
@@ -159,5 +162,6 @@ Actual: <observed>
 Frequency: reproduced <n> of <n> attempts.
 Impact: <who is affected and how; P1 flow blocked or not; workaround or "no workaround found">
 Evidence: <paths>; console: "<error excerpt>"; network: <METHOD URL status>.
+Attachments (added automatically once this bug is created): <BUG-n>.mp4 (reproduction video), <case-id>.png, <case-id>-console.txt, <case-id>-network.txt
 Fix verification: re-run qa-tester case <TC-id> from <test-plan path>.
 ```

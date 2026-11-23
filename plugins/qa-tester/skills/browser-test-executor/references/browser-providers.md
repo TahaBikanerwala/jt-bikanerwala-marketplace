@@ -4,7 +4,7 @@ Both providers are MCP servers whose tools are usually deferred. Load every tool
 
 ## chrome-devtools MCP (preferred)
 
-Load: query `chrome-devtools` (or `select:` the full names once known) for `new_page, select_page, list_pages, close_page, navigate_page, take_snapshot, take_screenshot, click, fill, fill_form, type_text, press_key, hover, drag, upload_file, wait_for, handle_dialog, evaluate_script, list_console_messages, get_console_message, list_network_requests, get_network_request, emulate, resize_page, lighthouse_audit, performance_start_trace, performance_stop_trace`.
+Load: query `chrome-devtools` (or `select:` the full names once known) for `new_page, select_page, list_pages, close_page, navigate_page, take_snapshot, take_screenshot, click, fill, fill_form, type_text, press_key, hover, drag, upload_file, wait_for, handle_dialog, evaluate_script, list_console_messages, get_console_message, list_network_requests, get_network_request, emulate, resize_page, lighthouse_audit, performance_start_trace, performance_stop_trace, screencast_start, screencast_stop`.
 
 | Action | Tool (suffix) | Notes |
 |---|---|---|
@@ -25,6 +25,7 @@ Load: query `chrome-devtools` (or `select:` the full names once known) for `new_
 | viewport | `__resize_page` or `__emulate` | `__emulate` also does network throttling and offline |
 | screenshot | `__take_screenshot` | pass a file path under the evidence folder |
 | Lighthouse | `__lighthouse_audit` | accessibility, best practices, performance |
+| record video | `__screencast_start`, `__screencast_stop` | `screencast_start({ pageId, filePath: ".../evidence/<BUG-n>.mp4" })` writes mp4 directly; stop with the same `pageId`. Load both in the detect `ToolSearch` |
 | close tab | `__close_page` | |
 
 ## Claude in Chrome
@@ -44,15 +45,26 @@ Call `tabs_context_mcp` first in every session, then create a new tab. Never reu
 | console | `read_console_messages` | use a `pattern` to filter noise |
 | network | `read_network_requests` | |
 | viewport | `resize_window` | |
-| recording | `gif_creator` | long P1 flows; capture extra frames before and after |
+| record video | `gif_creator` | `start_recording` → steps → `stop_recording` → `export` with `download: true`, `filename: "<BUG-n>.gif"`, `options: { showWatermark: false }`. GIF only: convert to mp4 with ffmpeg (see `phase=record`) |
 | upload a file | `file_upload` | |
 | close tab | `tabs_close_mcp` | |
 
-**Evidence files on Claude in Chrome.** `computer` screenshots come back to you as images, not files. Use `gif_creator` (which exports a file) for evidence that must exist on disk, and for everything else record in the case result what the screenshot showed: the exact visible text, element states and URL. The report then lists the evidence as an observation instead of an image path.
+**Evidence files on Claude in Chrome.** `computer` screenshots come back to you as images, not files. Use `gif_creator` (which exports a file) for defect videos, and for everything else record in the case result what the screenshot showed: the exact visible text, element states and URL. The report then lists the evidence as an observation instead of an image path.
 
 **Not available on Claude in Chrome:** Lighthouse, network throttling and offline emulation, performance traces. Cases needing them are `Not testable (provider lacks <capability>)` with the note that chrome-devtools MCP would cover them.
 
 **Never trigger a native dialog without stubbing it first.** A blocking `alert` or `confirm` freezes the extension; if it happens, the remaining cases become `Blocked (browser dialog)` and the report asks the user to dismiss it.
+
+## Recording
+
+| | chrome-devtools | Claude in Chrome |
+|---|---|---|
+| start | `__screencast_start` with `filePath` ending in `.mp4` | `gif_creator` `start_recording`, then one `computer` screenshot |
+| stop | `__screencast_stop` | one `computer` screenshot, `gif_creator` `stop_recording`, then `export` (`download: true`) |
+| output | `.mp4`, written where `filePath` says | `.gif` in the browser's download folder; move it and convert with ffmpeg |
+| needs | nothing extra | `ffmpeg` on PATH for mp4; without it the GIF is kept and the note says so |
+
+Only one recording at a time per page. Always stop a recording before starting the next defect, including after an error.
 
 ## Rules for both
 

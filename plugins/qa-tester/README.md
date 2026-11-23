@@ -8,7 +8,9 @@ Hand it a ticket or a pull request and it tests the change in a real browser the
 - **Ticket and PR differences are reported, not absorbed.** Missing scope, extra scope, contradicting values, scope changed in code review, and unmerged PRs all appear as discrepancies. The disputed behavior is tested so you can see which version shipped.
 - **Everything is executed.** A case that can't run in a browser (an email, a captcha, a third-party payment, a vague AC) is marked `Not testable` with the reason, and the run moves on.
 - **Questions wait until the end.** One card with the questions that matter most, and any case your answers unblock is re-run.
-- **Minimal test data.** It designs one small shared data set and tests many things on the same records. For example, one order is created, read, edited, moved through its states, and deleted by the last case, so cleanup is close to free. Every created record is prefixed (`qa-<id>-`), tracked, and cleaned up at the end. Anything left behind is listed.
+- **Minimal test data.** It designs one small shared data set and tests many things on the same records. For example, one order is created, read, edited, moved through its states, and deleted by the last case, so cleanup is close to free. Every created record is prefixed (`qa-<id>-`) and tracked.
+- **It asks before deleting test data.** On non-production environments it asks in the end-of-run card whether to delete, keep, or keep only the records tied to defects. On production it deletes automatically when every case passed, and asks when it found a bug. Whatever is kept is listed in the report.
+- **Video of every bug, if you want it.** When it finds defects, it asks whether to record them. It then replays each reproduction while recording and saves `evidence/BUG-n.mp4`. When you approve a bug for filing, the video, screenshots and console and network logs are attached to it automatically.
 - **No pass without evidence.** It also fails a case on uncaught console errors or unexpected 4xx/5xx responses, even when the page looks right.
 
 ## Install
@@ -24,6 +26,8 @@ You also need:
 - **A tracker MCP** (Azure DevOps or Jira) to read tickets. Optional when testing a GitHub PR alone.
 - **The `gh` CLI**, authenticated, to read GitHub PRs. Azure DevOps PRs are read through the Azure DevOps MCP.
 - **Optional: `bug-reporter`** (`/plugin install bug-reporter@jt-bikanerwala-marketplace`) to file defects as Bugs. If it isn't installed, qa-tester tells you and keeps the defects in the report.
+- **For mp4 recordings on Claude in Chrome: `ffmpeg`** on your PATH. chrome-devtools MCP records mp4 directly; Claude in Chrome records a GIF that is converted. Without ffmpeg the GIF is kept.
+- **For attachments:** if your tracker MCP has no upload tool, a token in an env var. Azure DevOps uses `AZURE_DEVOPS_EXT_PAT` (or your `az` login), and Jira uses `JIRA_EMAIL` and `JIRA_API_TOKEN`. Change the names with `attachment_auth`.
 
 ## Use
 
@@ -57,7 +61,7 @@ Answers go to `.claude/qa-tester-policy.json`. It holds no secrets, so you can c
 
    It writes `docs/qa/<id>/test-plan.md` with the shared data set, every case, exploratory charters and the cleanup plan.
 4. **Preflight:** checks the environment is reachable, logs in each role, confirms the PR is in the deployed build (or flags that it couldn't), and checks that the seed data exists.
-5. **Execute:** runs every case without stopping. For each case it asserts from the page, checks console and network, captures screenshots on failure, and re-runs failures to separate flakes from real defects. It then runs time-boxed exploratory charters and cleans up the test data.
+5. **Execute:** runs every case without stopping. For each case it asserts from the page, checks console and network, captures screenshots on failure, and re-runs failures to separate flakes from real defects. It then runs time-boxed exploratory charters. Test data stays in place until step 7.
 6. **Report:** writes `docs/qa/<id>/test-report.md`, which contains:
    - the verdict;
    - an AC → case → result matrix;
@@ -66,8 +70,8 @@ Answers go to `.claude/qa-tester-policy.json`. It holds no secrets, so you can c
    - not-testable cases and what would unblock them;
    - the test data ledger;
    - open questions.
-7. **Ask:** one end-of-run card, then re-runs the cases your answers unblock.
-8. **Tracker:** posts a results comment on the ticket and files one Bug per defect through `bug-reporter`, linked to the ticket. Each goes through its own diff-and-confirm gate.
+7. **Ask, record, clean up:** one end-of-run card holds the open questions plus two decisions: whether to record the defects, and whether to delete the test data. On production, when every case passed, the data is deleted without asking. It re-runs the cases your answers unblock, records an mp4 of each chosen defect, then cleans up as decided.
+8. **Tracker:** posts a results comment on the ticket and files one Bug per defect through `bug-reporter`, linked to the ticket. Each goes through its own diff-and-confirm gate. Once a bug is created, its video, screenshots and logs are attached automatically. The gate lists them first.
 
 ## Configure
 
@@ -91,7 +95,10 @@ Answers go to `.claude/qa-tester-policy.json`. It holds no secrets, so you can c
   "rerun_failures": 1,
   "exploratory_minutes": 10,
   "test_data_prefix": "qa-{id}-",
-  "cleanup_test_data": true,
+  "cleanup_test_data": "ask",
+  "record_failures": "ask",
+  "attach_evidence": true,
+  "attachment_auth": { "azure_devops": { "pat_env": "AZURE_DEVOPS_EXT_PAT" } },
   "post_results_comment": "ask",
   "file_bugs": "ask"
 }
@@ -109,7 +116,10 @@ Answers go to `.claude/qa-tester-policy.json`. It holds no secrets, so you can c
 | `rerun_failures` | `1` | Re-runs before a failure counts as a defect. |
 | `exploratory_minutes` | `10` | `0` turns the exploratory pass off. |
 | `test_data_prefix` | `qa-{id}-` | Every created record starts with this. |
-| `cleanup_test_data` | `true` | Removes created records at the end. |
+| `cleanup_test_data` | `ask` | `ask`: non-production asks before deleting; production deletes automatically when every case passed and asks otherwise. `never` keeps everything. |
+| `record_failures` | `ask` | `always` or `never` to skip the question. Videos go to `evidence/BUG-n.mp4`. |
+| `attach_evidence` | `true` | Attaches the video, screenshots and logs to each bug it files. |
+| `attachment_auth` | `{}` | Env var **names** for the REST upload fallback: `azure_devops.pat_env`, `jira.email_env`, `jira.token_env`. |
 | `post_results_comment` / `file_bugs` | `ask` | `never` turns that write path off. `ask` still gates every write. |
 
 ## What's inside
@@ -118,8 +128,9 @@ Answers go to `.claude/qa-tester-policy.json`. It holds no secrets, so you can c
 - **Skills:**
   - `source-reconciler`: gathers and cross-links sources, normalizes ACs, and lists discrepancies;
   - `test-case-designer`: the UI heuristics, the minimal shared data set, and executable cases;
-  - `browser-test-executor`: provider detection, preflight, execution, evidence and cleanup;
-  - `test-report-writer`: the plan, report, comment and bug text.
+  - `browser-test-executor`: provider detection, preflight, execution, evidence, defect recording and cleanup;
+  - `test-report-writer`: the plan, report, comment and bug text;
+  - `evidence-attacher`: uploads videos, screenshots and logs to filed bugs (Azure DevOps, Jira).
 - **Reuses:**
   - `issuekit:tracker-adapter`, including its `getPullRequest` verb;
   - `acceptance-test-generator:acceptance-analyzer`;
@@ -131,7 +142,9 @@ Answers go to `.claude/qa-tester-policy.json`. It holds no secrets, so you can c
 - It never writes credentials anywhere and never screenshots a filled password field.
 - It never mutates data on an environment that doesn't allow it.
 - It never bypasses captcha, MFA or rate limits, and never enters real payment or personal data.
-- It only deletes records it created and recorded under the run's prefix.
+- It only deletes records it created and recorded under the run's prefix, and only after you agree (or, on production, when every case passed).
+- It never records a login; recordings start after sign-in.
+- Attachment tokens are read from env vars and never printed or written.
 - Every tracker write passes through a gate.
 
 ## See also
