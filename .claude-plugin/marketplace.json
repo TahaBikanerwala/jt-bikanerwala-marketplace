@@ -7,6 +7,11 @@
   },
   "plugins": [
     {
+      "name": "jtb",
+      "source": "./plugins/jtb",
+      "description": "One entry point for the whole marketplace. Type /jtb with a ticket, a pull request, pasted notes, or nothing at all; it works out which agents fit, asks what you want done (test it, triage it, clean it up, write acceptance tests, report a bug, ...), runs the matching plugin command, then offers the step that naturally follows and keeps going until you say done. Never does an agent's work or writes to the tracker itself; every write still passes through the gate of the agent that owns it. Auto-installs every other plugin in the marketplace."
+    },
+    {
       "name": "issuekit",
       "source": "./plugins/issuekit",
       "description": "Shared adapter layer for issue-tracker plugins. Auto-detects the active MCP (Azure DevOps, Jira) and exposes an abstract verb surface (getIssue, createIssue, addComment, transition, linkIssue, getPullRequest, getSprintItems, ...). Auto-installed as a dependency of postmortem-generator, issue-triager, sprint-status-reporter, story-drafter, bug-reporter, acceptance-test-generator, ticket-summarizer, and qa-tester. Bring your own MCPs; no .mcp.json bundled."
