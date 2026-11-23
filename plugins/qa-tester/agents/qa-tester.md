@@ -43,6 +43,7 @@ This plugin's own config. Do not put these keys into issuekit's `.claude/tracker
 | `output_dir` | `"docs/qa"` | plans, reports and evidence go under `<output_dir>/<ticket-or-pr-id>/` |
 | `pause_before_execution` | `false` | when true, one approve card between the plan and execution |
 | `rerun_failures` | `1` | how many times a failed case is re-run to separate flakes from defects |
+| `cross_check_provider_artifacts` | `true` | when a Claude in Chrome failure looks like it may come from Claude in Chrome itself (a missed click, an input the app did not register, a blocked request from an extension), re-run the case on chrome-devtools before calling it a defect |
 | `exploratory_minutes` | `10` | time box for the exploratory pass after scripted cases (`0` turns it off) |
 | `test_data_prefix` | `"qa-{id}-"` | prefix on every record the agent creates; `{id}` is the ticket or PR id |
 | `cleanup_test_data` | `"ask"` | `"ask"` \| `"never"`. `ask`: on a non-production environment, ask before deleting anything the run created; on a `production: true` environment, delete automatically when every case passed and ask when any defect was found. `never` keeps everything and lists it in the report. Legacy `true` reads as `"ask"`, legacy `false` as `"never"` |
@@ -78,6 +79,7 @@ Calling-context convention for every `Skill` call: the first line is `Calling co
 | `policy` | 0 | loaded or freshly written policy |
 | `env` | 0 | the resolved environment object plus its name |
 | `provider` | 0 | `chrome-devtools` \| `claude-in-chrome` \| `none` |
+| `cross_check_provider` | 0 | `chrome-devtools` when Claude in Chrome is the provider and chrome-devtools is also connected, else `none` |
 | `bug_reporter_available` | 0 | whether `bug-reporter:run` is in the available skill list |
 | `run_id` | 0 | the primary ticket id, else the PR id; names the output folder |
 | `sources` | 1 | `{ tickets: [...], prs: [...], links: [...] }` from `source-reconciler` |
@@ -87,7 +89,8 @@ Calling-context convention for every `Skill` call: the first line is `Calling co
 | `test_plan` | 3 | cases, data set, execution order, exploratory charters |
 | `data_ledger` | 5 | every record the agent created: `{ ref, kind, identifier, created_in, status: in-place \| cleaned \| kept (user choice) \| left behind, note }` |
 | `results` | 5 | per case: status, actual, evidence paths, console and network findings, attempts |
-| `defects` | 5 | confirmed failures with repro, expected, actual, severity, priority |
+| `defects` | 5 | confirmed failures with repro, expected, actual, severity, priority, and the chrome-devtools cross-check result when one ran |
+| `provider_artifacts` | 5 | Claude in Chrome failures that passed on chrome-devtools; reported, never filed |
 | `questions` | 3 to 6 | every open question, ranked |
 | `answers` | 7 | end-of-run answers |
 | `recordings` | 7 | per defect: `{ bug, path, note }` |
@@ -117,7 +120,7 @@ Calling-context convention for every `Skill` call: the first line is `Calling co
 1. Invoke `issuekit:tracker-adapter` with `Calling context: phase=bootstrap.` Cache the 4-tuple and announce `Detected: tracker=<value>`. `tracker == none` is fine when the input is a GitHub PR or pasted text; it is a hard stop only when the input is a tracker reference.
 2. Read `.claude/qa-tester-policy.json`. If it is absent, or `mode=setup`, run **Setup** below. Otherwise validate it.
 3. Resolve `env`: `--env <name>` if given, else `default_env`. An unknown name is a hard stop that lists the configured names.
-4. Detect the browser provider by invoking `browser-test-executor` with `Calling context: phase=detect.` It uses `ToolSearch` to load the tools and returns `provider`. When `provider == none` and `mode=run`, say so once and continue: the run becomes plan plus a manual checklist, and every case is reported `Not executed (no browser)`. Never a silent pass.
+4. Detect the browser provider by invoking `browser-test-executor` with `Calling context: phase=detect.` It uses `ToolSearch` to load the tools and returns `provider` and `cross_check_provider`. When `provider == none` and `mode=run`, say so once and continue: the run becomes plan plus a manual checklist, and every case is reported `Not executed (no browser)`. Never a silent pass.
 5. Set `bug_reporter_available` by checking whether `bug-reporter:run` appears in your available skills.
 
 **Setup.** One `AskUserQuestion` card with four questions. Pre-fill what the repo already tells you: scan `package.json` scripts, `vite.config.*`, `next.config.*`, `angular.json`, `launchSettings.json`, `.env.example`, `docker-compose*.yml` for a local URL and port, and offer it as the first option.
@@ -160,13 +163,13 @@ If the deployed build cannot be confirmed to contain the PR, do not stop. Record
 
 ### Phase 5: Execute
 
-Invoke `browser-test-executor` with `Calling context: phase=execute, provider=<provider>, env=<env name>.` and the plan. It runs every case in plan order, maintains `data_ledger`, re-runs failures `rerun_failures` times, records evidence under `<output_dir>/<run_id>/evidence/`, and returns `results` and `defects`. Then it runs the exploratory charters for `exploratory_minutes`, logging any new finding as an extra case `EX-n`. It does **not** clean up. The data stays in place until Phase 7 decides what happens to it, so defects can be recorded on the same records.
+Invoke `browser-test-executor` with `Calling context: phase=execute, provider=<provider>, env=<env name>.` and the plan. It runs every case in plan order, maintains `data_ledger`, re-runs failures `rerun_failures` times, cross-checks suspected Claude in Chrome artifacts on chrome-devtools, records evidence under `<output_dir>/<run_id>/evidence/`, and returns `results` and `defects`. Then it runs the exploratory charters for `exploratory_minutes`, logging any new finding as an extra case `EX-n`. It does **not** clean up. The data stays in place until Phase 7 decides what happens to it, so defects can be recorded on the same records.
 
 The executor never pauses. If the browser session dies, it reconnects once; if that fails, the remaining cases become `Blocked (browser session lost)` and the run moves on to the report.
 
 ### Phase 6: Report
 
-Invoke `test-report-writer` with `Calling context: phase=report.` and everything gathered. It writes `<output_dir>/<run_id>/test-report.md`, runs `issuekit:prose-style` on its prose, and returns the inline summary. Print that summary: the verdict (`Go` / `Go with risks` / `No-go`), the pass/fail/blocked/not-testable/skipped counts, each defect in one line, the discrepancy count, the test data still in place, and the report path.
+Invoke `test-report-writer` with `Calling context: phase=report.` and everything gathered. It writes `<output_dir>/<run_id>/test-report.md`, runs `issuekit:prose-style` on its prose, and returns the inline summary. Print that summary: the verdict (`Go` / `Go with risks` / `No-go`), the pass/fail/blocked/not-testable/skipped counts, each defect in one line, the discrepancy count, the number of Claude in Chrome artifacts that passed on chrome-devtools, the test data still in place, and the report path.
 
 ### Phase 7: End-of-run questions, recording and cleanup
 

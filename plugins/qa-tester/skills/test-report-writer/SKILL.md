@@ -34,6 +34,8 @@ Render the tracker comment from the comment template: verdict, counts, defects (
 
 Render one defect as a single self-contained text block for `bug-reporter:run`, using the bug template. It must answer everything bug-reporter asks for so its clarification card is skipped: summary, environment (URL, build, browser, viewport, role), preconditions, numbered steps, expected (quoting the AC and naming the ticket), actual, frequency (`reproduced n of n`), impact, evidence paths, regression status if known, workaround if one was found, and a fix-verification line (the case id to re-run). Omit anything you do not know; do not write placeholders.
 
+When the defect carries a `cross_check` result, add it to the bug text as `Verified on: Claude in Chrome and chrome-devtools`, or as the caveat when the check could not run.
+
 Add the **Attachments** line listing, by file name, every file the agent will attach once the bug is created: the defect's `.mp4` recording when one exists, then its screenshots, then its console and network files. This line is how the bug-reporter gate shows the reporter what will be attached. Omit the line when `attach_evidence` is false or there are no files.
 
 When the agent rewrites the report after recording or cleanup, update each defect's Video line and the Test data section in place.

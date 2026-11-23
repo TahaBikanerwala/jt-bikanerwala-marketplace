@@ -82,6 +82,13 @@ Placeholders are in `<angle brackets>`. Drop any section that would be empty, ex
 - Video: <evidence/BUG-1.mp4 | "not recorded: <reason>"> <"did not reproduce on recording replay", if so>
 - Console / network: <excerpt>
 - Caveat: <deployment unverified, if so>
+- Cross-check: <confirmed on chrome-devtools | possible Claude in Chrome artifact, not cross-checked: <why>>
+
+## Claude in Chrome artifacts (not filed)
+Cases that failed on Claude in Chrome but passed when re-run on chrome-devtools. They are not defects. They are listed so a reviewer can see what was discounted.
+
+| Case | Sign | Claude in Chrome result | chrome-devtools result |
+|---|---|---|---|
 
 ## Ticket vs PR discrepancies
 | ID | Class | Ticket says | PR says | What shipped (tested) |

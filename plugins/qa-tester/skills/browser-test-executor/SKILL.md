@@ -21,6 +21,7 @@ Load `references/browser-providers.md` first; it maps every abstract action belo
    - Claude in Chrome available → Claude in Chrome.
    - Neither → `none`.
 3. Return `provider` and the list of capabilities missing on it (Claude in Chrome has no Lighthouse and no network throttling, for example), so the designer and the report can mark those cases `Not testable`.
+4. Return `cross_check_provider`: `chrome-devtools` when the chosen provider is Claude in Chrome and chrome-devtools also loaded, else `none`. Execution uses it to re-check failures that may be caused by Claude in Chrome itself.
 
 ## phase=preflight
 
@@ -58,7 +59,15 @@ Run the cases in `order`. **Never pause, never ask.** For each case:
    - `Not testable`: the step needs something the browser run cannot do (email or SMS delivery, a third-party payment, a scheduled job, a captcha, a file the run lacks, a capability the provider lacks), or the AC is too vague to judge the outcome. Always record the reason and the question that would make it testable.
    - `Skipped`: mutation guard, or excluded by the plan.
 9. **On Fail:** reload and re-run the case up to `rerun_failures` times from its preconditions, reusing its data where possible. Fails every time → `Fail (reproducible)` and a defect. Passes on a retry → `Pass (flaky: failed n of m)` and a low-severity flakiness note, not a defect. Then decide whether later cases depend on this one; if they do, they will be `Blocked` by the gate check.
-10. **Defect record** for each reproducible failure: title (symptom, not cause), environment and build, role, viewport, browser, preconditions, numbered repro steps, expected (quoting the AC), actual, frequency, evidence paths, console and network excerpts, severity, priority, the AC it violates, and the deployment caveat if unverified. Severity: `S1` crash, data loss, security or privacy exposure, or a P1 flow fully blocked with no workaround; `S2` a P1 or P2 AC fails or a workaround is painful; `S3` a P3 case fails or a workaround is easy; `S4` cosmetic. Priority follows severity unless the failing behavior is outside every AC (`extra-in-pr` region), where it drops one level.
+   **Cross-check on chrome-devtools.** This applies when `provider == claude-in-chrome`, the case failed reproducibly, the policy's `cross_check_provider_artifacts` is true, and the failure shows at least one sign of a Claude in Chrome artifact. The signs are listed in `references/browser-providers.md`, "Claude in Chrome artifacts". A failure with no such sign (a 5xx from the server, a wrong value the app itself rendered, an uncaught app exception) is a defect as it stands, and is not cross-checked.
+   1. If `cross_check_provider == none`, keep the defect and add the caveat `possible Claude in Chrome artifact (<sign>); not cross-checked, chrome-devtools MCP not connected`. Add a question for the end-of-run card asking for a manual re-check, with the case id.
+   2. Otherwise, open a new chrome-devtools page and sign in per `auth.method`. chrome-devtools runs its own browser profile, so with `browser-session` the user's Chrome login is not there. If you cannot sign in without asking, treat the cross-check as not possible: keep the defect with the caveat `possible Claude in Chrome artifact (<sign>); cross-check blocked: chrome-devtools not signed in`.
+   3. Replay the case from its preconditions on chrome-devtools, using uid-based clicks and `fill`, never coordinates. Reuse the same records, and add any new record to `data_ledger`. Capture the same evidence, with a `-devtools` suffix on the file names.
+   4. **Fails on chrome-devtools too:** it is a real defect. Set `cross_check: confirmed on chrome-devtools` on the defect and keep the devtools evidence; it is usually the cleaner evidence.
+   5. **Passes on chrome-devtools** (every expected item observed, health clean): it is not a defect. Status `Pass (chrome-devtools; failed only on Claude in Chrome)`. Record the sign and the Claude in Chrome evidence under `provider_artifacts`, so the report can show it without filing a bug.
+   6. **Fails differently on chrome-devtools:** keep the devtools failure as the defect, and note the Claude in Chrome difference in `cross_check`.
+   Close the devtools page and return to the Claude in Chrome tab. Cross-checks never pause the run and never ask.
+10. **Defect record** for each reproducible failure: title (symptom, not cause), environment and build, role, viewport, browser, preconditions, numbered repro steps, expected (quoting the AC), actual, frequency, evidence paths, console and network excerpts, severity, priority, the AC it violates, the deployment caveat if unverified, and the `cross_check` result when one ran or was skipped. Severity: `S1` crash, data loss, security or privacy exposure, or a P1 flow fully blocked with no workaround; `S2` a P1 or P2 AC fails or a workaround is painful; `S3` a P3 case fails or a workaround is easy; `S4` cosmetic. Priority follows severity unless the failing behavior is outside every AC (`extra-in-pr` region), where it drops one level.
 
 Keep going until every case has a status.
 
@@ -77,6 +86,8 @@ After the scripted cases, run each charter within the overall `exploratory_minut
 ## phase=record
 
 Input: the selected defects. Record one video per defect, saved as `<output_dir>/<run_id>/evidence/<BUG-n>.mp4`. Never pause and never ask.
+
+**Pick the recorder.** When a defect was confirmed on chrome-devtools by a cross-check, record it there (native mp4, and no Claude in Chrome artifacts in the video). Otherwise record on `provider`.
 
 1. **Check the format path once.** On chrome-devtools, `screencast_start` writes `.mp4` directly. On Claude in Chrome, `gif_creator` exports only GIF, so check for ffmpeg (`ffmpeg -version`) before the first defect. Without ffmpeg, still record, keep `<BUG-n>.gif`, and set the note `mp4 conversion skipped: ffmpeg not installed`.
 2. **Mutation check.** If replaying a defect's steps would create or change data and the environment's `allow_mutations` is false, do not record it. Note `not recorded: replay would mutate data`. Replays reuse the shared records where they still exist. Any new record goes into `data_ledger` like any other.
@@ -107,7 +118,8 @@ Close the tab you opened.
 ```
 preflight: { reachable, roles: [{role, signed_in, note}], deployment: verified|unverified, deployment_note, seed: [...] }
 results:   [{ id, status, rows?: [...], actual, evidence: [...], console: [...], network: [...], attempts, note }]
-defects:   [{ id: BUG-n, case, title, severity, priority, ac, env, build, role, viewport, browser, preconditions, steps, expected, actual, frequency, evidence, console, network, caveat? }]
+defects:   [{ id: BUG-n, case, title, severity, priority, ac, env, build, role, viewport, browser, preconditions, steps, expected, actual, frequency, evidence, console, network, caveat?, cross_check? }]
+provider_artifacts: [{ case, sign, claude_in_chrome_evidence, devtools_result }]
 data_ledger: [{ ref, kind, identifier, created_in, status: in-place|cleaned|kept (user choice)|left behind, note }]
 questions: [{ text, unblocks: [...], kind }]
 recordings: [{ bug, path | null, note }]      # phase=record only

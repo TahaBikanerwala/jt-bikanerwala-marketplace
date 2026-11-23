@@ -11,6 +11,7 @@ Hand it a ticket or a pull request and it tests the change in a real browser the
 - **Minimal test data.** It designs one small shared data set and tests many things on the same records. For example, one order is created, read, edited, moved through its states, and deleted by the last case, so cleanup is close to free. Every created record is prefixed (`qa-<id>-`) and tracked.
 - **It asks before deleting test data.** On non-production environments it asks in the end-of-run card whether to delete, keep, or keep only the records tied to defects. On production it deletes automatically when every case passed, and asks when it found a bug. Whatever is kept is listed in the report.
 - **Video of every bug, if you want it.** When it finds defects, it asks whether to record them. It then replays each reproduction while recording and saves `evidence/BUG-n.mp4`. When you approve a bug for filing, the video, screenshots and console and network logs are attached to it automatically.
+- **It double-checks suspicious failures.** When it tests through Claude in Chrome and a failure looks like it could come from Claude in Chrome itself (a click that missed, typed text the app never registered, a request blocked by one of your extensions), it re-runs that case on chrome-devtools. A real bug fails on both. One that passes on chrome-devtools is listed in the report as a Claude in Chrome artifact and is never filed. Without chrome-devtools connected, the bug is kept and flagged for a manual re-check.
 - **No pass without evidence.** It also fails a case on uncaught console errors or unexpected 4xx/5xx responses, even when the page looks right.
 
 ## Install
@@ -93,6 +94,7 @@ Answers go to `.claude/qa-tester-policy.json`. It holds no secrets, so you can c
   "output_dir": "docs/qa",
   "pause_before_execution": false,
   "rerun_failures": 1,
+  "cross_check_provider_artifacts": true,
   "exploratory_minutes": 10,
   "test_data_prefix": "qa-{id}-",
   "cleanup_test_data": "ask",
@@ -114,6 +116,7 @@ Answers go to `.claude/qa-tester-policy.json`. It holds no secrets, so you can c
 | `browser_provider` | `auto` | `chrome-devtools` or `claude-in-chrome` to force one. |
 | `pause_before_execution` | `false` | `true` adds one approve card between plan and execution. |
 | `rerun_failures` | `1` | Re-runs before a failure counts as a defect. |
+| `cross_check_provider_artifacts` | `true` | Re-runs suspected Claude in Chrome artifacts on chrome-devtools before filing them. |
 | `exploratory_minutes` | `10` | `0` turns the exploratory pass off. |
 | `test_data_prefix` | `qa-{id}-` | Every created record starts with this. |
 | `cleanup_test_data` | `ask` | `ask`: non-production asks before deleting; production deletes automatically when every case passed and asks otherwise. `never` keeps everything. |

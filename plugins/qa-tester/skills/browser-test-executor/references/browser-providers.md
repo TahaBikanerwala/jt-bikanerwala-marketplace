@@ -55,6 +55,23 @@ Call `tabs_context_mcp` first in every session, then create a new tab. Never reu
 
 **Never trigger a native dialog without stubbing it first.** A blocking `alert` or `confirm` freezes the extension; if it happens, the remaining cases become `Blocked (browser dialog)` and the report asks the user to dismiss it.
 
+## Claude in Chrome artifacts
+
+Claude in Chrome drives the user's real Chrome through an extension, using screenshots and coordinates. Some failures come from that, not from the app. When a Claude in Chrome failure shows one of these signs, the executor re-runs the case on chrome-devtools before calling it a defect.
+
+| Sign | What it looks like |
+|---|---|
+| Missed or misplaced click | a `computer` click had no effect, hit a neighbouring element, or landed under a sticky header, overlay, cookie banner or scroll offset |
+| Input not registered | a field shows the text but the app did not take it (a submit sees it empty, a validation does not fire). Typical of `form_input` or fast `type` on React, Vue or Angular controlled inputs that need real `input`/`change` events. Also dropped or reordered characters, or autofill and autocomplete overwriting typed values |
+| Focus or background tab | timers, animations, `visibilitychange`, focus or blur handlers misbehave because the tab was not focused or the browser window was in the background |
+| Dialog stub side effect | the failure follows a step where `window.confirm`/`alert` was stubbed through `javascript_tool` |
+| Real profile interference | requests failing with `ERR_BLOCKED_BY_CLIENT` (an ad or privacy extension), a stale cached bundle, leftover cookies or local storage, a different signed-in account, or another extension's injected DOM |
+| Observation gap | the assertion failed because the content was outside the screenshot or not yet lazy-loaded, rather than missing from the DOM |
+| Viewport mismatch | a layout failure at a size `resize_window` did not set exactly (browser chrome, zoom level, or a minimum window size) |
+| Timing | the step ran before the page settled, and the failure goes away with a longer wait |
+
+**Not artifacts** (never cross-checked, they are defects as they stand): server 4xx/5xx responses the app made, uncaught exceptions thrown by app code, wrong values or text the app rendered, and failures that also show in the app's own network responses.
+
 ## Recording
 
 | | chrome-devtools | Claude in Chrome |
