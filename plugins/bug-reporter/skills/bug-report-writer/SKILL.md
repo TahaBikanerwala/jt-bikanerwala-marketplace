@@ -41,7 +41,8 @@ The caller passes, after `Calling context: phase=<n>, mode=<mode>, submode=<subm
 ## Steps
 
 1. **Inventory the facts.** List every distinct fact across `raw_input`, `reporter_answers`, and the
-   existing description, its comments, and its history. For each one, record where it came from. A
+   existing description, the existing Repro Steps and System Info field values (carried in
+   `raw_input` and `issue_payload.customFields` on Azure DevOps), its comments, and its history. For each one, record where it came from. A
    fact with no source is not a fact and does not enter the report.
 2. **Separate known from missing.** Every component in the template is either answered by the
    inventory or it is a Missing Information line. There is no third option, and no component gets
@@ -89,7 +90,7 @@ Shape: `<area>: <observable symptom> <when the condition holds>`.
 
 Emit labelled blocks so the caller can map each to a tracker field. Use these exact labels.
 
-Without field routing (Jira, or Azure DevOps with the policy keys set to `null`):
+Without field routing (Jira, or Azure DevOps with both `field_routing` entries `null`):
 
 ```
 === BUG: <title> ===
@@ -98,7 +99,7 @@ Without field routing (Jira, or Azure DevOps with the policy keys set to `null`)
 <markdown: every template section, in template order>
 ```
 
-With field routing (Azure DevOps, both policy keys set):
+With field routing (Azure DevOps; shown with both entries set):
 
 ```
 === BUG: <title> ===
@@ -114,6 +115,10 @@ Frequency and Reproducibility>
 --- SYSTEM INFO (<field name>) ---
 <markdown: Environment>
 ```
+
+Each `field_routing` entry routes independently. With only `repro_steps` set, emit the REPRO
+STEPS block and keep Environment in the description; with only `system_info` set, emit the SYSTEM
+INFO block and keep the reproduction sections in the description.
 
 When routing applies, the routed sections appear in **exactly one** block. Do not repeat them in the
 description, and do not leave an empty heading behind where they were.
@@ -136,7 +141,7 @@ top heading after conversion.
 
 The rules that matter more than the structure:
 
-- **Never invent a reproduction step.** Steps come from the reporter or from a verified investigation.
+- **Never invent a reproduction step.** Steps come from the reporter's input.
   A plausible sequence that nobody performed is the single most expensive thing this skill could
   produce, because an engineer will follow it, fail to reproduce, and close the bug as not-a-bug.
 - **Never invent environment, versions, browsers, devices, regions, tenants, counts, or timestamps.**

@@ -11,7 +11,7 @@ Load `references/browser-providers.md` first; it maps every abstract action belo
 
 ## phase=detect
 
-1. One `ToolSearch` per provider, loading the full set listed in `browser-providers.md` in a single call each:
+1. One `ToolSearch` per provider, loading the full set listed in `browser-providers.md` in a single call each. `ToolSearch` returns only a handful of matches by default, so pass `max_results: 40` on a keyword query, then `select:` the resolved names for any tool still missing:
    - chrome-devtools: query `chrome-devtools navigate_page take_snapshot` (tool names end in `__navigate_page`, `__take_snapshot`, ...; the prefix varies by install, e.g. `mcp__plugin_anthara_chrome-devtools__` or `mcp__chrome-devtools__`).
    - Claude in Chrome: `select:` the `mcp__claude-in-chrome__*` tools listed in the reference.
 2. Choose:
@@ -40,7 +40,7 @@ Run in order. Record each result for the report.
 
 ## phase=execute
 
-Run the cases in `order`. **Never pause, never ask.** For each case:
+Run the cases in `order`. **Never pause, never ask.** Optional input `only: [case ids]` (the agent's scoped re-run after the end-of-run answers): run just those cases, skip the exploratory pass, and start like preflight (new tab, signed-in check). For each case:
 
 1. **Gate checks.**
    - `planned_status` already set (e.g. `Not testable`, `Skipped (mutation guard)`) → record it and move on.
@@ -48,7 +48,7 @@ Run the cases in `order`. **Never pause, never ask.** For each case:
    - A precondition depends on an earlier case that did not pass, or a record that does not exist → `Blocked (precondition: <which>)`.
 2. **Set up.** Switch role or viewport if needed. Clear console and network buffers (or note the current position) so findings are attributable to this case.
 3. **Drive the steps** using the provider mapping. Prefer accessibility-tree or snapshot targeting by visible label, role and `data-testid` over coordinates. After each navigation or submit, wait for the page to settle (a visible element or text from the expected state; never a fixed sleep longer than 2 seconds).
-4. **Create data** only as the plan says, with the planned prefixed names. Append every created record to `data_ledger` immediately with its identifier (name, id from the URL or page), so cleanup works even if the run dies.
+4. **Create data** only as the plan says, with the planned prefixed names. Append every created record to `data_ledger` immediately with its identifier (name, id from the URL or page) and status `in-place`, so cleanup works even if the run dies. When a case deletes a ledger record, set that entry's status to `deleted by case (<TC-id>)`.
 5. **Assert** each `expected` item by reading the page (snapshot text, element state, URL, field value after reload). For data-table cases, run and report each row.
 6. **Health.** Read console messages and network requests for this case. Uncaught errors or unexpected 4xx/5xx fail the case even if the UI looked right; expected errors the case provokes on purpose (a 422 on invalid input) do not.
 7. **Evidence.** Screenshot on every failure and at the final state of each P1 case, saved to `<output_dir>/<run_id>/evidence/<case-id>[-<row>].png`. On failure also save the console errors and failed request summaries (method, URL, status, short response body with tokens and personal data removed) to `<case-id>-console.txt` / `<case-id>-network.txt`. Do not record video during execution. Videos are made afterward, in `phase=record`, only for the defects the user chooses.
@@ -65,7 +65,7 @@ Run the cases in `order`. **Never pause, never ask.** For each case:
    3. Replay the case from its preconditions on chrome-devtools, using uid-based clicks and `fill`, never coordinates. Reuse the same records, and add any new record to `data_ledger`. Capture the same evidence, with a `-devtools` suffix on the file names.
    4. **Fails on chrome-devtools too:** it is a real defect. Set `cross_check: confirmed on chrome-devtools` on the defect and keep the devtools evidence; it is usually the cleaner evidence.
    5. **Passes on chrome-devtools** (every expected item observed, health clean): it is not a defect. Status `Pass (chrome-devtools; failed only on Claude in Chrome)`. Record the sign and the Claude in Chrome evidence under `provider_artifacts`, so the report can show it without filing a bug.
-   6. **Fails differently on chrome-devtools:** keep the devtools failure as the defect, and note the Claude in Chrome difference in `cross_check`.
+   6. **Fails differently on chrome-devtools:** keep the devtools failure as the defect, and set `cross_check: fails differently on chrome-devtools (<the Claude in Chrome difference>)`.
    Close the devtools page and return to the Claude in Chrome tab. Cross-checks never pause the run and never ask.
 10. **Defect record** for each reproducible failure: title (symptom, not cause), environment and build, role, viewport, browser, preconditions, numbered repro steps, expected (quoting the AC), actual, frequency, evidence paths, console and network excerpts, severity, priority, the AC it violates, the deployment caveat if unverified, and the `cross_check` result when one ran or was skipped. Severity: `S1` crash, data loss, security or privacy exposure, or a P1 flow fully blocked with no workaround; `S2` a P1 or P2 AC fails or a workaround is painful; `S3` a P3 case fails or a workaround is easy; `S4` cosmetic. Priority follows severity unless the failing behavior is outside every AC (`extra-in-pr` region), where it drops one level.
 
@@ -81,7 +81,7 @@ After the scripted cases, run each charter within the overall `exploratory_minut
 
 **No cleanup here.** Leave every record in place and close the tab you opened. The agent decides in its end-of-run card whether to record defects and whether to delete data, then calls `phase=record` and `phase=cleanup`.
 
-**Reopening for record and cleanup.** The agent may wait on the user between execution and these phases, so each of them starts like preflight: open a new dedicated tab, navigate to the environment, and confirm the signed-in state, logging in again per `auth.method` if the session expired. Close that tab at the end of the phase.
+**Reopening for a scoped re-run, record and cleanup.** The agent may wait on the user between execution and these phases, so each of them starts like preflight: open a new dedicated tab, navigate to the environment, and confirm the signed-in state, logging in again per `auth.method` if the session expired. Close that tab at the end of the phase.
 
 ## phase=record
 
@@ -109,7 +109,7 @@ Output: `recordings: [{ bug, path | null, note }]`.
 
 Input: `data_ledger` and the set of refs to keep. The agent only calls this once the user agreed, or on production when every case passed.
 
-Walk `data_ledger` newest first and remove each record that is not in the keep set and was not already deleted by a case, using the plan's cleanup action. Mark each entry `cleaned`, `kept (user choice)`, or `left behind (<why>)`. Never delete a record that is not in the ledger, and never delete anything whose name lacks the run's prefix. Before a delete raises a native confirm, follow the Dialogs rule above.
+Walk `data_ledger` newest first and remove each `in-place` record that is not in the keep set (an entry marked `deleted by case` is already gone), using the plan's cleanup action. Mark each entry `cleaned`, `kept (user choice)`, or `left behind (<why>)`. Never delete a record that is not in the ledger, and never delete anything whose name lacks the run's prefix. Before a delete raises a native confirm, follow the Dialogs rule above.
 
 Close the tab you opened.
 
@@ -120,7 +120,8 @@ preflight: { reachable, roles: [{role, signed_in, note}], deployment: verified|u
 results:   [{ id, status, rows?: [...], actual, evidence: [...], console: [...], network: [...], attempts, note }]
 defects:   [{ id: BUG-n, case, title, severity, priority, ac, env, build, role, viewport, browser, preconditions, steps, expected, actual, frequency, evidence, console, network, caveat?, cross_check? }]
 provider_artifacts: [{ case, sign, claude_in_chrome_evidence, devtools_result }]
-data_ledger: [{ ref, kind, identifier, created_in, status: in-place|cleaned|kept (user choice)|left behind, note }]
+data_ledger: [{ ref, kind, identifier, created_in, status: in-place|deleted by case (<TC-id>)|cleaned|kept (user choice)|left behind, note }]
+missing_capabilities: [...]                   # phase=detect only
 questions: [{ text, unblocks: [...], kind }]
 recordings: [{ bug, path | null, note }]      # phase=record only
 ```

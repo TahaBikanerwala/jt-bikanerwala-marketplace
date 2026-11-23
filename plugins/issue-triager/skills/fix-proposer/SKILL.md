@@ -129,8 +129,8 @@ Never do any of these:
 - **Never write the replacement code.** No diffs, no patches, no "change it to" snippets. A triage
   comment is not a pull request, and a fixer who reads a suggested patch stops thinking. Describe the
   change.
-- **Never call it the root cause** unless it is `[VERIFIED]`, and even then prefer naming the
-  confirming check alongside it.
+- **Never call it the root cause.** Even a `[VERIFIED]` proposal is a proposal: name the check
+  that would confirm it alongside it.
 - **Never claim you ran, built, tested, or reproduced anything.** This skill only reads.
 - **Never propose a refactor, a cleanup, or an unrelated improvement** you noticed on the way. Out of
   scope for the defect.

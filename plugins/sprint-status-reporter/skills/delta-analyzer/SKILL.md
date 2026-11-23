@@ -33,7 +33,7 @@ The caller passes a JSON payload:
   },
   "policy":  { "state_categories", "blocked_indicators", "stale_after_days" },
   "today":   "YYYY-MM-DD",
-  "baseline_source": "snapshot" | "history" | "none"
+  "baseline_source": "snapshot" | "history"
 }
 ```
 
@@ -57,7 +57,7 @@ Return a single JSON object (the delta model). Do not write files. Do not add pr
   "window": {
     "from": "<baseline.generatedAt>",
     "to":   "<current.generatedAt>",
-    "baseline_source": "snapshot" | "history" | "none"
+    "baseline_source": "snapshot" | "history"
   },
   "headline": {
     "pct_by_count":     { "from": <0..100>, "to": <0..100>, "delta": <int> },

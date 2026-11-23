@@ -34,7 +34,7 @@ When both a Jira pattern (`*__getJiraIssue`) and an AzDO pattern (`*__wit_get_wo
 2. **Key shape inference** (when only a bare key is provided, no URL):
    - Matches `^[A-Z][A-Z0-9_]+-\d+$` (e.g. `PROJ-123`, `RLI-42`) → `tracker=jira`
    - Pure numeric (`12345`) with no URL → ambiguous; fall through.
-3. **One-time ask.** When still ambiguous, call `AskUserQuestion` with options "azure-devops" / "jira". Cache for the session only — do not persist to `.claude/tracker-policy.json`. The next session may have a different intent.
+3. **One-time ask.** When still ambiguous, or when the flow has no issue reference at all (a create flow such as drafting stories or filing a new bug), call `AskUserQuestion` with options "azure-devops" / "jira". Cache for the session only — do not persist to `.claude/tracker-policy.json`. The next session may have a different intent.
 
 ## Single-tracker case
 
@@ -66,7 +66,9 @@ Resolve by checking in this order and taking the first one whose tools are prese
 2. `mcp__ado__*`
 3. `mcp__plugin_<name>__*` (first match in tool-list order)
 
-Cache the winning literal prefix alongside `tracker=azure-devops`. If a later verb call needs a tool the winning prefix doesn't expose (a partial install), fall through this same order to find a prefix that does expose it, complete the call, and keep the original prefix as the default for everything else — do not fail the verb just because the primary prefix is missing one tool.
+Cache the winning literal prefix alongside `tracker=azure-devops`. If a later **read** verb needs a tool the winning prefix doesn't expose (a partial install), fall through this same order to find a prefix that does expose it, complete that one call, warn once naming the fallback prefix, and keep the original prefix as the default for everything else.
+
+**Never fall through for a write verb.** A second prefix may point at a different AzDO organization, and the diff-and-confirm gate showed the user a change against the first one. When the winning prefix lacks a tool a write needs, return an error naming the missing tool and stop the batch.
 
 ### Resolving which tool-name shape to call
 

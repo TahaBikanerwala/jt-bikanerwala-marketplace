@@ -29,6 +29,11 @@ Two calls:
 2. Find the entry where `transition.name == policy.states.<abstractStateName>`. If not found, fall back to a case-insensitive substring match. If still not found, lazy-prompt with the available transitions.
 3. `transitionJiraIssue(issueIdOrKey: <id>, transitionId: "<id>")`.
 
+Steps 1 and 2 are reads and run **while the batch is being built**, before the
+diff-and-confirm gate, along with any required transition fields (see `states.md`). The
+gate's After cell shows the resolved transition name and field values. Only step 3 runs
+at replay, so nothing is asked after the user confirmed.
+
 The transition itself may move the issue through multiple states (Jira workflows can have hidden intermediate states). The adapter does not enforce any pre-conditions; the server validates.
 
 ## `updateFields(id, { title?, body?, severity?, dueDate?, sprint?, storyPoints?, customFields? })`
@@ -41,7 +46,7 @@ One `editJiraIssue` call with all supplied fields:
 | `body` | `fields.description` | markdown; pass `contentFormat: "markdown"` |
 | `severity` | depends on schema: `customfield_xxxxx` for "Severity" / "Severity Level" / "Bug Severity", or `fields.priority.name` as fallback | project `severity_label_map[<abstractTier>]`; for object-shaped fields use `{ value: "<label>" }` or `{ name: "<label>" }` per the schema |
 | `dueDate` | `fields.duedate` | `yyyy-MM-dd` |
-| `sprint` | `customfield_xxxxx` (sprint field; discover via `getJiraIssueTypeMetaWithFields`) | numeric sprint ID |
+| `sprint` | `customfield_xxxxx` (sprint field; discover via `getJiraIssueTypeMetaWithFields`) | the numeric `sprint.id` of the `Sprint` object passed |
 | `storyPoints` | `customfield_xxxxx` (story points field) | numeric |
 | `customFields[<id-or-name>]` | as documented in the schema | as-is |
 
@@ -67,7 +72,7 @@ createJiraIssue(
 |---|---|---|
 | `title` | `summary` | as-is, plain text |
 | `body` | `description` | markdown; `contentFormat: "markdown"` |
-| `acceptanceCriteria` | folded into `description` under an `## ✅ Acceptance Criteria` heading, unless `policy.acceptance_criteria_field` names a custom field | markdown |
+| `acceptanceCriteria` | folded into `description` under an `## Acceptance Criteria` heading, unless `policy.acceptance_criteria_field` names a custom field | markdown |
 | `labels` | `fields.labels` | array of strings |
 | `priority` | `fields.priority.name` | map `P0/P1/P2` through `policy.priority_label_map` (default `P0 → Highest`, `P1 → High`, `P2 → Medium`) |
 | `severity` | same field `updateFields` resolves: `customfield_xxxxx` for "Severity" / "Severity Level" / "Bug Severity", else `fields.priority.name` | project `severity_label_map[<abstractTier>]`; object-shaped fields take `{ value: "<label>" }` or `{ name: "<label>" }` per the schema |

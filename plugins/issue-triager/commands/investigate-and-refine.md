@@ -21,13 +21,13 @@ Dispatches to the `issue-triager` agent with `mode=investigate-and-refine`. The 
 
 1. **Phase 0** — Identify the issue, detect archetype.
 2. **Phase 1** — Investigate (Bug/Incident or Story/Feature/Task/Spike).
-3. **Phase 2a** — Search Datadog (Bug/Incident only).
-4. **Phase 3** — Diff-and-confirm gate. The batch contains only the title and description writes from Phase 5. Severity, transitions, comments, links, labels are **not** in this batch.
-5. **Phase 5** — Refine title and description on confirmation.
+3. **Phase 3** — Diff-and-confirm gate. The batch contains only the title and description writes from Phase 5. Severity, transitions, comments, links, labels are **not** in this batch.
+4. **Phase 5** — Refine title and description on confirmation, then a short inline summary with any warnings.
 
 What this command **does not** do:
 
 - No Phase 2b codebase dig. `fix-proposer` does not run, so there is no suspected area and no proposed fix. That step is the most expensive thing the agent does, and this command exists to be cheap. Use `/issue-triager:run` when you want the defect localized.
+- No Datadog search (its only reader is the assessment comment, which this command does not post).
 - No assignment changes.
 - No state transitions.
 - No assessment comments.

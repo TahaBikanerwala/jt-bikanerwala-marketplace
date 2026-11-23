@@ -30,7 +30,6 @@ For `transition(id, abstractStateName)`:
 | `investigating` | `Under Investigation`, `Triaging`, `In Progress`, `Start Progress`, `Begin Triage` |
 | `waiting_reply` | `Waiting for Reply`, `Need Info`, `Awaiting Customer`, `Customer Reply Required` |
 | `backlog` | `Backlog`, `To Do`, `Open`, `Reopen` |
-| `done` | `Done`, `Closed`, `Resolve`, `Complete` |
 
 These are common defaults, not guaranteed. The policy file must specify the exact transition name the team uses.
 
@@ -54,7 +53,7 @@ Two issues in the same project can have different available transitions if they'
 
 Some Jira transitions require setting fields as part of the transition (e.g., a "Resolution" field on the `Resolve` transition). The MCP exposes this via the transition's `fields` array. The adapter:
 
-- If the transition has required fields and the verb did not provide them, lazy-prompt the user to supply each.
+- If the transition has required fields and the verb did not provide them, lazy-prompt the user to supply each. Do this while the batch is being built, before the diff-and-confirm gate, so the confirmed table already shows the values.
 - Pass the values in the `fields` parameter of `transitionJiraIssue`.
 
 If the transition's `fields` array is empty, no extra fields are sent.

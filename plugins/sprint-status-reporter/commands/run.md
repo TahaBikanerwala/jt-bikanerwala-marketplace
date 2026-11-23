@@ -47,7 +47,7 @@ the history a delta needs.
 ## Configuration
 
 Reads `.claude/tracker-policy.json` if present (shared with the rest of the suite).
-Lazy-prompts for any missing key it actually needs — typically `output_directory`, and
-only rarely `state_categories` (when a sprint contains a state the vendor category can't
-classify). Keys it uses: `state_categories`, `blocked_indicators`, `stale_after_days`,
+Missing keys fall back to defaults without prompting: `output_directory` defaults to
+`./sprint-reports/`, and a state the vendor category can't classify is counted as To Do with a
+warning that names `state_categories`. Keys it uses: `state_categories`, `blocked_indicators`, `stale_after_days`,
 `points_field_name`, `output_directory`.

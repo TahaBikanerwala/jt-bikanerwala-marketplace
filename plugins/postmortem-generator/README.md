@@ -22,10 +22,9 @@ You also need at least one tracker MCP:
 Optional MCPs the agent uses opportunistically:
 
 - A chat MCP for incident threads — Slack or Teams.
-- A docs MCP for runbooks — Confluence or Azure Wiki.
 - The Datadog MCP for log search.
 
-If a backend isn't installed, the agent skips that gathering step and notes the gap once in the final summary.
+If a backend isn't installed, the agent skips that gathering step and notes the gap once in its terminal summary. The generated postmortem never mentions a backend that returned nothing.
 
 ## Use
 

@@ -5,6 +5,20 @@ lists the classic tool first, then the consolidated equivalent — resolved once
 detection time (see `references/detection.md` § Resolving which tool-name shape to
 call); never call both in the same session.
 
+## `findSprint(nameOrId, team?)`
+
+List every iteration for the team, with no `timeframe` filter:
+
+- Classic: `work_list_team_iterations(team)`.
+- Consolidated: `work(action: "list_team_iterations", team)`.
+
+Match `nameOrId` case-insensitively against each iteration's `id`, `path` and `name`
+(a name also matches the last segment of a path). Return the match as
+`Sprint = { id, name, start: attributes.startDate, end: attributes.finishDate }`, or
+`null` when nothing matches. When more than one iteration shares the name, prefer the one
+whose date range contains today, then the most recent. `team` is required on AzDO: with
+no team (argument or `defaultTeam`), return an error asking for one.
+
 ## `getSprintItems(sprint?, team?)`
 
 ### Steps

@@ -104,9 +104,9 @@ Output a markdown table with these exact columns (in this order):
 | Time (UTC) | Event | Source | Tag |
 |------------|-------|--------|-----|
 
-Lead the output with a one-line preamble naming the in-scope window and any pools that came back empty:
+Lead the output with a one-line preamble naming the in-scope window. When a pool came back empty, say which kinds of source the timeline rests on, without naming the vendor that returned nothing (the preamble is inserted into the postmortem):
 
-> Timeline for incident `WI #12345` (`14:32 UTC` to `16:08 UTC`). Datadog returned no results; the timeline is built from chat, tracker, and merged PRs only.
+> Timeline for incident `WI #12345` (`14:32 UTC` to `16:08 UTC`). Built from chat, tracker, and merged PRs.
 
 Append a one-line summary after the table when more than one event ran in parallel (same minute, different sources):
 
@@ -134,7 +134,7 @@ Examples of well-formed entries (mixed AzDO and Jira to show portability):
 
 These adjust the output without changing the column layout.
 
-- **Long incidents (more than 50 events):** the table is unwieldy. Truncate the output to the first 25 events and the last 10 events with a row in between reading `... (15 events omitted; see source links for full sequence) ...`. The truncated section preserves chronological order on both sides of the omission.
+- **Long incidents (more than 50 events):** return every row. The postmortem keeps the full timeline; shortening it for display (the agent's Phase 3 preview shows the first 10) is the caller's job.
 - **Sparse incidents (fewer than 5 events across all sources):** add a one-paragraph note after the table flagging that the timeline may be incomplete and suggesting which source pools could be re-gathered with broader queries.
 - **Multi-day incidents:** events on different calendar dates use the form `YYYY-MM-DD HH:MM` instead of `HH:MM` so the day is unambiguous. Include a date-change row between days: `--- 2026-04-30 ---`.
 - **Out-of-window events:** keep them in the table, sorted chronologically with the rest, but append `(out-of-window)` to the description.

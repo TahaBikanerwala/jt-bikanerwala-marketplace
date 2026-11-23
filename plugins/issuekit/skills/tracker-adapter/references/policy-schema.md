@@ -7,9 +7,9 @@ Path: `.claude/tracker-policy.json` (project-root). Optional. When absent, the a
 ```json
 {
   "states": {
-    "investigating": "In Progress",
-    "waiting_reply": "Waiting for Reply",
-    "backlog": "Backlog"
+    "investigating": null,
+    "waiting_reply": null,
+    "backlog": null
   },
   "severity_scheme": {
     "sev1": { "due_offset_days": 1,  "escalate_immediately": true },
@@ -61,11 +61,18 @@ Path: `.claude/tracker-policy.json` (project-root). Optional. When absent, the a
   "bug_repro_steps_field": "Microsoft.VSTS.TCM.ReproSteps",
   "bug_system_info_field": "Microsoft.VSTS.TCM.SystemInfo",
   "default_project": null,
-  "default_team": null
+  "default_team": null,
+  "postmortem_template": "google-sre",
+  "incident_identifier": { "tag": "incident", "work_item_types": ["Issue", "Bug", "Incident"] },
+  "datadog_default_service": null,
+  "include_action_items": true,
+  "include_timeline_evidence_links": true
 }
 ```
 
-All keys are optional. Missing keys fall back to defaults.
+All keys are optional. Missing keys fall back to defaults. A `null` default means "no
+shipped value": the key is lazy-prompted when a verb first needs it (`states.*`), or the
+feature it configures is skipped (`escalation.*`), as each key's section says.
 
 ## Key reference
 
@@ -81,7 +88,7 @@ The adapter looks the value up on the live state graph:
 - **Jira:** calls `getTransitionsForJiraIssue` and finds the transition by name.
 - **AzDO:** matches against the issue type's state list from `wit_get_work_item_type` (or `wit_work_item` action `"get_type"` on the consolidated tool shape — see `references/detection.md`); for `investigating`, the adapter also sets `System.Reason` based on a `Reason: "<value>"` suffix in the state string if present (e.g. `"Active; Reason: Investigating"`).
 
-**Default if unset:** lazy-prompt. The adapter presents the list of valid transitions / states from the live schema and asks the user to pick.
+**Default if unset:** `null`, which means lazy-prompt. State names differ per process and workflow, so there is no safe shipped value: the adapter presents the list of valid transitions / states from the live schema and asks the user to pick. Typical answers are `"Active"` or `"In Progress"` for `investigating`, `"Waiting for Reply"` for `waiting_reply`, and `"New"` or `"Backlog"` for `backlog`.
 
 ### `severity_scheme` (object)
 
@@ -141,7 +148,7 @@ Signals that a sprint item is blocked. Match is OR across the three signals:
 
 - **`labels`** — an item carrying any of these labels/tags is blocked.
 - **`states`** — an item in any of these states is blocked.
-- **`board_column`** — a board-column name that means blocked. Honored only where the tracker exposes board columns to the MCP; ignored otherwise.
+- **`board_column`** — a board-column name that means blocked. Reserved: `SprintItem` carries no board column today, so it is never evaluated, and a consumer that sees it set warns once.
 
 **Default if unset:** `{ labels: ["blocked", "impediment"], states: ["Blocked"], board_column: null }`.
 
@@ -160,7 +167,7 @@ Used by `createIssue` (the `story-drafter` plugin) to choose which work-item typ
 - **`azure-devops`** — depends on the process template: `"User Story"` (Agile), `"Product Backlog Item"` (Scrum), `"Issue"` (Basic).
 - **`jira`** — usually `"Story"`.
 
-**Default if unset:** `{ "azure-devops": "User Story", "jira": "Story" }`. If the value is not a valid type on the project (checked against `getIssueTypeSchema`), the adapter lazy-prompts with the live type list.
+**Default if unset:** `{ "azure-devops": "User Story", "jira": "Story" }`. The caller validates the value while building its write batch, before the gate: it calls `getIssueTypeSchema(<type>)`, and an error or an empty field list means the type does not exist on the project. It then lazy-prompts for the type name as free text (offering the names listed above) and re-checks the answer the same way. There is no verb that lists a project's types.
 
 ### `feature_work_item_type` (object)
 
@@ -191,7 +198,7 @@ Jira-only. Maps the abstract priority tiers (`P0`/`P1`/`P2`) to the vendor prior
 
 ### `acceptance_criteria_field` (string)
 
-Jira-only override naming a custom field that holds acceptance criteria. When unset, `createIssue` folds acceptance criteria into the description body under an `## Acceptance Criteria` heading (Jira has no standard AC field). AzDO always uses the standard `Microsoft.VSTS.Common.AcceptanceCriteria` field and ignores this key. **Default:** `null` (fold into description).
+Jira-only override naming a custom field that holds acceptance criteria. When unset, `createIssue` folds acceptance criteria into the description body under an `## Acceptance Criteria` heading (Jira has no standard AC field), and `Issue.acceptanceCriteria` reads as `null`. AzDO ignores this key: it uses the standard `Microsoft.VSTS.Common.AcceptanceCriteria` field when the target type has it, and folds into the description the same way when it does not. **Default:** `null` (fold into description).
 
 ### `bug_work_item_type` (object)
 
@@ -200,7 +207,7 @@ Used by `createIssue` (the `bug-reporter` plugin) to choose which work-item type
 - **`azure-devops`** — `"Bug"` in the Agile, Scrum, and CMMI templates; `"Issue"` in Basic (which has no Bug type).
 - **`jira`** — usually `"Bug"`.
 
-**Default if unset:** `{ "azure-devops": "Bug", "jira": "Bug" }`. If the value is not a valid type on the project (checked against `getIssueTypeSchema`), the adapter lazy-prompts with the live type list.
+**Default if unset:** `{ "azure-devops": "Bug", "jira": "Bug" }`. Validated the same way as `story_work_item_type`: `getIssueTypeSchema(<type>)` while building the batch, then a free-text lazy-prompt when the type does not exist.
 
 ### `reported_label` (string)
 
@@ -224,9 +231,10 @@ full precedence — this key is checked first, ahead of the AzDO MCP server's ow
 `ado_mcp_project` config and the single-project auto-resolve). Works on both
 trackers: the AzDO project name, or the Jira project key.
 
-**Default if unset:** resolved live per the precedence in `verbs.md` (server config,
-then single-project auto-resolve, then lazy-prompt). The lazy-prompt path writes its
-answer here so the question is never asked twice.
+**Default if unset:** resolved live per the precedence in `verbs.md`. AzDO: server
+config, then single-project auto-resolve, then lazy-prompt. Jira: the project prefix of
+the issue key in hand, then lazy-prompt. The lazy-prompt path writes its answer here so
+the question is never asked twice.
 
 ### `default_team` (string)
 
@@ -234,7 +242,25 @@ Same role as `default_project`, for the team used by sprint/capacity reads
 (`getCurrentSprint`, `getSprintItems`, `getTeamCapacity`). AzDO-only in practice —
 Jira has no first-class team concept in this adapter (see `adapters/jira/sprint.md`).
 
-**Default if unset:** resolved live alongside `default_project`, same precedence.
+**Default if unset:** `ado_mcp_team` from the AzDO MCP server config when present, else
+`null`. It is never lazy-prompted (a project can have several teams and no obvious
+default); a sprint caller that finds it `null` on AzDO stops and asks for `--team` or
+this key.
+
+### Postmortem keys
+
+Read only by `postmortem-generator`.
+
+- **`postmortem_template`** (string) — the document template. Only `"google-sre"` is
+  implemented; any other value warns and falls back to it. **Default:** `"google-sre"`.
+- **`incident_identifier`** (object) — how an incident is recognized:
+  `{ tag: string, work_item_types: string[] }`. **Default:**
+  `{ "tag": "incident", "work_item_types": ["Issue", "Bug", "Incident"] }`.
+- **`datadog_default_service`** (string) — the service name used to scope log searches
+  when the incident does not name one. **Default:** `null` (unscoped).
+- **`include_action_items`** (boolean) — include the Action Items section. **Default:** `true`.
+- **`include_timeline_evidence_links`** (boolean) — include the Source column in the
+  timeline. **Default:** `true`.
 
 ## Lazy-prompt question text
 
@@ -244,6 +270,7 @@ When a missing key is encountered, ask via `AskUserQuestion` using these questio
 |---|---|---|
 | `states.investigating` | "Which state means 'investigation is underway' on this tracker?" | live list from schema |
 | `states.waiting_reply` | "Which state means 'waiting on reporter for more info'?" | live list from schema |
+| `states.backlog` | "Which state means 'not being worked on yet'?" | live list from schema |
 | `severity_scheme.<tier>` | "How many days should sev-<n> have until due date, and does it escalate immediately?" | numeric + yes/no |
 | `severity_label_map.<tier>` | "Which vendor label corresponds to sev-<n>?" | schema enum |
 | `escalation.channel` | "Which chat channel should receive escalations? (Leave blank to skip.)" | free text or skip |
@@ -252,16 +279,16 @@ When a missing key is encountered, ask via `AskUserQuestion` using these questio
 | `state_categories.<bucket>` | "The sprint has a state '<state>' I couldn't classify. Is it Done, In Progress, or To Do?" | Done / In Progress / To Do |
 | `stale_after_days` | "After how many days with no update should an in-progress item be flagged at-risk?" | numeric, default 3 |
 | `points_field_name` | "Which Jira field holds story points? (Leave blank to auto-detect.)" | free text or skip |
-| `bug_work_item_type` | "Which work-item type should filed bugs be created as?" | live type list from schema |
+| `bug_work_item_type` | "'<type>' is not a work-item type on this project. Which type should filed bugs be created as?" | free text; offer `Bug`, `Issue` |
+| `story_work_item_type` | "'<type>' is not a work-item type on this project. Which type should new stories be created as?" | free text; offer `User Story`, `Product Backlog Item`, `Issue`, `Story` |
 | `reported_label` | "What label should mark a bug as reported but not yet triaged? (Leave blank for none.)" | free text, default "needs-triage" |
-| `default_project` | "Which project should this session default to?" | live list from `core_list_projects` (AzDO) or accessible resources (Jira) |
-| `default_team` | "Which team should this session default to?" | live team list for the resolved `default_project` |
+| `default_project` | "Which project should this session default to?" | live list from `core_list_projects` (AzDO) or `getVisibleJiraProjects` (Jira; free text when absent) |
 
 After every answer, offer:
 
 > Save this to `.claude/tracker-policy.json` so I don't ask again? (yes/no)
 
-On yes, write the file (creating it if absent) with the new key merged in. On no, keep the answer in session memory only.
+On yes, write the file (creating it if absent) with the new key merged in. On no, keep the answer in session memory only. When the calling agent has no file-write tool, skip the offer and print the JSON fragment for the user to paste into `.claude/tracker-policy.json` instead.
 
 ## Schema validation
 

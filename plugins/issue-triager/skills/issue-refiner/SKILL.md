@@ -3,7 +3,7 @@ name: issue-refiner
 description: "Restructures a poorly written tracker issue into a clear, self-contained document a stranger can open cold and act on. Works on any archetype (Bug, Incident, Story, Feature, Task, Spike) and any supported tracker (Azure DevOps, Jira). Returns the refined title and markdown body; the caller owns the write (issuekit:tracker-adapter projects markdown to the vendor's format)."
 metadata:
   author: Taha Bikanerwala
-tools: AskUserQuestion, Read
+tools: AskUserQuestion, Read, Skill
 ---
 
 # Issue Refiner
@@ -25,7 +25,7 @@ The skill works two ways. When a user pastes an issue and asks to refine it, the
 
 ## Workflow
 
-Six ordered steps. Steps 1, 4, and 5 require reading the corresponding reference file when you reach that step. Do not pre-load the references at the start of the run.
+Six ordered steps. Steps 1, 3, and 6 require reading the corresponding reference file when you reach that step. Do not pre-load the references at the start of the run.
 
 1. **Fetch** the issue (fields, comments, history when relevant, linked issues). Skip when the caller already provides the payload.
 2. **Classify** the archetype (Bug / Incident / Story / Feature / Task / Spike). The archetype picks which sections appear in the refined description.
@@ -56,6 +56,8 @@ When the caller (the `issue-triager` agent) has already fetched the issue and ex
 If a direct invocation: call `getIssue(id)` and `getIssueComments(id)` via `issuekit:tracker-adapter`. The adapter normalizes the body to markdown regardless of source format.
 
 ### Step 2: Classify the archetype
+
+When the caller passes `Calling context: archetype=<value>` (the `issue-triager` agent always does, having already decided it from the type, the labels and the child links), use that value and skip classification. Classify only on a direct invocation.
 
 Use the table below. The archetype is the single most important variable in the rewrite because it picks which template sections appear in the final description.
 

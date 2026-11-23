@@ -16,7 +16,7 @@ This skill investigates. It does not solve, post, or modify anything.
 
 ## Calling convention
 
-This skill runs without user interaction. The constraints below let it work cleanly inside the `issue-triager` and `postmortem-generator` agents (which own their own confirmation gates) and standalone.
+This skill runs without user interaction. The constraints below let it work cleanly inside the `issue-triager` agent (which owns its own confirmation gate) and standalone.
 
 - **Non-interactive.** Never ask the user a question. Inputs are inferred from the issue and search results.
 - **Predictable structure.** Same six section headers every run, in the same order, with one allowed reorder for production incidents (see Adaptation Rules).
@@ -30,7 +30,7 @@ All tracker calls go through the `issuekit:tracker-adapter` skill. Use the abstr
 
 - `getIssue(id)` — issue payload, body in markdown
 - `getIssueComments(id)` — comment thread
-- `searchIssues({ keywords, scope, types, states, dateWindow })` — related issues
+- `searchIssues({ keywords, scope, types, states, excludeStates, dateWindow })` — related issues
 - `linkedPullRequests(id)` — PRs that reference this issue
 
 Do not name vendor-specific MCP tools (`wit_get_work_item`, `getJiraIssue`, etc.) in the skill body. The adapter resolves them.
@@ -45,7 +45,7 @@ Before running the levels, fetch the issue once and cache it for the rest of the
 
 1. Identify the issue ID from the invocation context (e.g., `12345`, `PROJ-1234`, or extracted from a pasted URL). If the calling agent has already fetched the issue and exposed the payload, reuse that payload; do not re-fetch.
 2. If no payload is available, call `getIssue(id)`. The returned `Issue` shape is normalized regardless of tracker.
-3. Cache the response as "the issue payload" throughout the skill — reference `title`, `body`, `created`, `relations` (the `Issue.parent`, `Issue.customFields.linkedIssues` or similar), `reporter`, etc.
+3. Cache the response as "the issue payload" throughout the skill — reference `title`, `body`, `created`, `parent`, `links`, `reporter`, etc.
 
 If `getIssue` fails, stop and tell the caller which call failed. Do not proceed without issue data.
 
@@ -76,10 +76,12 @@ Read the issue payload (cached in Setup) carefully. Signals are easy to miss on 
 Then search:
 
 - **Related issues** via `searchIssues`. Common queries:
-  - `{ keywords: "<error string>", states: ["!Closed"], dateWindow: { from: <issue.created - 30d> } }`
-  - `{ keywords: "<feature area>", states: ["!Closed"] }`
+  - `{ keywords: "<error string>", excludeStates: <policy.state_categories.done>, dateWindow: { from: <issue.created - 30d> } }`
+  - `{ keywords: "<feature area>", excludeStates: <policy.state_categories.done> }`
+  `states` and `excludeStates` take literal state names; there is no `!` negation.
   - `{ scope: "<component or area>", types: ["Bug", "Incident"] }`
-- **Linked issues.** Walk every entry in the issue's `customFields.linkedIssues` (or the equivalent `relations` array for AzDO, `issuelinks` for Jira — both surfaced via the adapter). Read the linked issue's title, state, and the most relevant scope statement.
+- **Linked issues.** Walk `Issue.parent` and every entry in `Issue.links` (the adapter normalizes both trackers' link shapes into it). Fetch them with `getIssuesBatch` and read each one's title, state, and the most relevant scope statement.
+- **Linked pull requests** via `linkedPullRequests(id)`. Record each PR's URL, title, state and merge date under the report's related-work evidence, so the caller can link them.
 - **Docs** via the doc backend's `searchPages` (Confluence: `searchConfluenceUsingCql`; Azure Wiki: `wiki_search` or `search_wiki`). Look for runbooks, architecture pages, known-issues pages, onboarding docs. Use the feature area, system name, or entity type as the search term. Skip if `doc == none`.
 
 For each related issue, record: ID, title, state, assignee, the most relevant finding from description or comments.

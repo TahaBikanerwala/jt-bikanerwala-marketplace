@@ -8,7 +8,7 @@ tools: Read, AskUserQuestion
 
 # Tracker Adapter
 
-A verb dispatcher that lets `postmortem-generator` and `issue-triager` work against any supported issue tracker without naming a specific MCP tool in their agent prompts.
+A verb dispatcher that lets every verb-plugin in this marketplace work against any supported issue tracker without naming a specific MCP tool in their agent prompts.
 
 ## Setup (run once per session)
 
@@ -24,16 +24,18 @@ Before serving any verb call, the caller must run the bootstrap sequence below a
 2. **Resolve multi-tracker ambiguity.** If two trackers are detected, inspect the issue URL or key the caller passed in:
    - URL containing `dev.azure.com` or `visualstudio.com` → azure-devops
    - Key matching `[A-Z][A-Z0-9_]+-\d+` (e.g. `PROJ-123`) → jira
-   - Numeric-only ID with no URL → ask once via `AskUserQuestion`, cache for the session only (do not persist).
+   - Numeric-only ID with no URL, or no issue reference at all (a create flow) → ask once via `AskUserQuestion`, cache for the session only (do not persist).
 3. **Load policy.** Read `.claude/tracker-policy.json` if it exists. Merge with shipped defaults from `references/policy-schema.md`. Track which keys are unset; do not lazy-prompt yet. Runs before step 4: `policy.default_project`/`policy.default_team` is the first precedence tier in that step's `defaultProject`/`defaultTeam` resolution.
 4. **Bootstrap identity.** Call `whoAmI()` (see `references/verbs.md`). The adapter implementations are in `adapters/<tracker>/`. Cache `{trackerUser, defaultProject, defaultTeam, email}`. On AzDO, `defaultProject`/`defaultTeam` are not a bare tool-call result — resolve them per `references/verbs.md`'s "Resolving AzDO's `defaultProject`/`defaultTeam`" precedence (policy override from step 3, then the AzDO MCP server's own `ado_mcp_project`/`ado_mcp_team` config in `.mcp.json`, then single-project auto-resolve, then lazy-prompt). If a chat backend was detected and `email` is non-null, call `resolveChatUser({ email })` (see `references/verbs.md`'s "Chat" section) and cache the result as the running user's chat identity — `null` if the lookup misses. This is the default `sendMessage` target for a caller that wants to message "yourself"; when `email` is `null` or the lookup misses, that default is unavailable for the session.
-5. **Legacy config migration warning.** If any of the legacy paths exists, read forward once and print a one-time warning:
+5. **Legacy config migration warning.** If any of the legacy paths exists and no `.claude/tracker-policy.json` is present, read it forward once and print a one-time warning:
    - `.claude/azure-incident-postmortem.config.json`
    - `.claude/azure-issue-triage.config.json`
    - `.claude/jira-issue-triage.config.json`
    - `.claude/jira-bug-triage.config.json`
 
    Warning: "Found legacy config at `<path>`. Read for this session. To stop this warning, translate the values into `.claude/tracker-policy.json` and delete the legacy file. Lazy prompts will offer to persist any missing keys."
+
+Callers start this sequence by invoking the skill with `Calling context: phase=bootstrap.`; a verb call made before bootstrap runs it first.
 
 If `tracker == none`, stop and tell the caller. The caller cannot proceed without a tracker MCP.
 
@@ -48,18 +50,20 @@ tracker=<tracker> chat=<chat> doc=<doc> log=<log>
 The caller invokes verbs by name; this skill routes the call to the resolved adapter.
 
 - Verb contracts live in `references/verbs.md`. Each verb declares input, output, and which adapter file implements it.
-- Adapter implementations live in `adapters/<tracker>/{tools, search, writes, body-format, states, mentions}.md`. The adapter file names map 1:1 to the verb categories.
+- Adapter implementations live in `adapters/<tracker>/{tools, search, sprint, writes, body-format, states, mentions}.md`. The adapter file names map 1:1 to the verb categories.
 - Reads chain freely. Writes must pass through the diff-and-confirm gate (see below).
 - Markdown body input is normalized through `references/body-format.md` and the per-adapter `body-format.md` before any write call.
 
 ## Lazy-prompt rule
 
-When a verb needs a policy value (state name, severity scheme, escalation contact, skip-labels, triaged-label, output_directory, archetype_assignment_after_triage, state_categories, blocked_indicators, stale_after_days, points_field_name) and the value is unset:
+When a verb needs a policy value that has no shipped default (any key in `references/policy-schema.md` whose section says it is lazy-prompted: the `states.*` names, a `severity_label_map` tier the live schema does not contain, a work-item type that does not exist on the project, `default_project`) and the value is unset:
 
 1. Read the question text from `references/policy-schema.md` for that key.
 2. Call `AskUserQuestion` with the question and the documented option set.
 3. Cache the answer in session memory.
-4. Offer to persist by appending to `.claude/tracker-policy.json`. If the user accepts, write the file with two-space indent and sorted top-level keys. If they decline, keep the answer in session memory only.
+4. Offer to persist by appending to `.claude/tracker-policy.json`. If the user accepts, write the file with two-space indent and sorted top-level keys. If they decline, keep the answer in session memory only. If the calling agent has no file-write tool, skip the offer and print the JSON fragment for the user to paste.
+
+Resolve every lazy-prompt a write needs **while building the batch**, before the diff-and-confirm gate renders, so the table shows the final values and nothing is asked after the user confirmed.
 
 Never ask the same policy question twice in a session.
 
@@ -80,7 +84,7 @@ The gate is a hard boundary. Writes cannot bypass it, even for "small" updates l
 
 See `references/verbs.md` for the full schemas. Quick reference:
 
-**Reads:** `getIssue`, `getIssueHistory`, `getIssueComments`, `getIssuesBatch`, `searchIssues`, `getIssueTypeSchema`, `linkedPullRequests`, `getPullRequest`, `getCurrentSprint`, `getSprintItems`, `getTeamCapacity`, `whoAmI`, `resolveUser`, `mention`.
+**Reads:** `getIssue`, `getIssueHistory`, `getIssueComments`, `getIssuesBatch`, `searchIssues`, `getIssueTypeSchema`, `linkedPullRequests`, `getPullRequest`, `getCurrentSprint`, `findSprint`, `getSprintItems`, `getTeamCapacity`, `whoAmI`, `resolveUser`, `mention`.
 
 **Writes:** `createIssue`, `assign`, `transition`, `updateFields`, `addComment`, `addLabel`, `removeLabel`, `linkIssue`, `linkPullRequest`.
 

@@ -19,13 +19,13 @@ Run these once at the start of the session and cache the results.
 1. Invoke `issuekit:tracker-adapter` with `Calling context: phase=bootstrap.` Cache the resulting `{ tracker, chat, doc, log }` 4-tuple.
 2. Announce the detection: `Detected: tracker=<value> chat=<value> doc=<value> log=<value>`.
 3. If `tracker == none`, stop and tell the user that no tracker MCP is detected. Suggest the official `@azure-devops/mcp` or the Atlassian MCP.
-4. The adapter calls `whoAmI()` during bootstrap and caches `{ trackerUser, defaultProject, defaultTeam }`. Use `trackerUser` as the Author for the postmortem header when no override is provided.
+4. The adapter calls `whoAmI()` during bootstrap and caches `{ trackerUser, defaultProject, defaultTeam }`. Use `trackerUser`'s display name as the Author for the postmortem header; Phase 4 passes it to the writer as `incident.author`.
 
 ### Configuration
 
-1. Look for `.claude/tracker-policy.json` in the project root. If present, parse it and merge with the defaults below. Only the keys this agent uses (`output_directory`, `postmortem_template`, `incident_identifier`, optional `datadog_default_service`) are read; other keys are ignored silently.
+1. Look for `.claude/tracker-policy.json` in the project root. If present, parse it and merge with the defaults below. Only the keys this agent uses (`output_directory`, `postmortem_template`, `incident_identifier`, `include_action_items`, `include_timeline_evidence_links`, optional `datadog_default_service`) are read; other keys are ignored silently. All six are defined in issuekit's policy schema.
 2. **Legacy fallback.** If `.claude/tracker-policy.json` is absent but `.claude/azure-incident-postmortem.config.json` exists, read it forward for this session and print one warning: `Found legacy config at .claude/azure-incident-postmortem.config.json. Read for this session. Translate the values into .claude/tracker-policy.json (shape in issuekit/skills/tracker-adapter/references/policy-schema.md) and delete the legacy file to stop this warning.`
-3. If neither exists, proceed with defaults silently. The shipped defaults are sensible for most teams. The agent lazy-prompts for any missing key it actually needs and offers to persist the answer to `.claude/tracker-policy.json`.
+3. If neither exists, proceed with defaults silently. The shipped defaults are sensible for most teams, and every key this agent reads has one, so it never prompts for a policy value.
 
 The default config:
 
@@ -96,7 +96,7 @@ The agent tracks a small set of named caches across phases.
 - Never fabricate timestamps. Events without a verifiable timestamp are flagged `[UNKNOWN]`.
 - Never present unverified analysis as confirmed root cause. Root Cause is reserved for `[VERIFIED]` claims; everything else lives in Contributing Factors.
 - Never blame an individual. The template is blameless; actors are named when they take an action, never as the cause.
-- Never mention an integration in any output if its API returned errors or no results.
+- Never mention an integration in the generated postmortem if its API returned errors or no results. The run's own terminal output (the Phase 3 gathering line and the Phase 5 summary) is the one place a skipped or failed backend is named, once, so the user knows what was not searched.
 - Never auto-create action-item issues; this is not implemented. The Action Items table ships with placeholder rows for the user to fill in.
 
 ## Workflow
@@ -105,7 +105,7 @@ For each incident the user pastes, execute these phases in order. The agent paus
 
 **Stops (halt the run until the user explicitly continues or overrides):**
 
-- **Phase 0 unsupported issue type:** when the issue type does not match `incident_identifier.work_item_types` AND the issue does not carry the `incident_identifier.tag` (as a label or tag), halt and ask the user: "This is a `{type}` with labels/tags `{labels}`. The incident_identifier config expects `{expected}`. Generate the postmortem anyway?" Yes/No/Cancel.
+- **Phase 0 unsupported issue type:** when the issue type does not match `incident_identifier.work_item_types` AND the issue does not carry the `incident_identifier.tag` (as a label or tag), halt and ask the user: "This is a `{type}` with labels/tags `{labels}`. The incident_identifier config expects `{expected}`. Generate the postmortem anyway?" `Generate anyway` / `Cancel`. Cancel exits with nothing written.
 
 **Pauses (the agent is waiting on a user answer to continue):**
 
@@ -122,8 +122,8 @@ For each incident the user pastes, execute these phases in order. The agent paus
 3. Fetch comments via `getIssueComments(id)`. Merge into `incident_payload.comments`.
 4. Fetch history via `getIssueHistory(id)` (returns the revision/state-change events for AzDO; may be empty on Jira — that's fine). Merge into `incident_payload.history`.
 5. **Validate the issue type.** Compare `incident_payload.type` against `incident_identifier.work_item_types`. Compare `incident_payload.labels` against `incident_identifier.tag`. If neither matches, halt per the Stops list above.
-6. **Compute the incident window.** The window is `incident_payload.created` to whichever exists first: `incident_payload.resolved`, the latest state-change to a terminal state in `incident_payload.history`, or the current time. Cache as `incident_window = { start: ISO, end: ISO }`.
-7. **Determine the responder list.** The responders are: the current and historical assignees (from `incident_payload.assignee` and history), the running user (from `whoAmI` cached at bootstrap), and any unique authors of `incident_payload.comments` during the window. Cache the list (deduplicated, name + email/identity) for use in Phase 4 (Header Author/Responders fields).
+6. **Compute the incident window.** The window is `incident_payload.created` to whichever exists first: `incident_payload.resolved`, `incident_payload.closed`, the latest state-change to a terminal state in `incident_payload.history`, or the current time. Cache as `incident_window = { start: ISO, end: ISO }`, and cache `incident_resolved = true` unless the end fell back to the current time. When `incident_resolved` is false, say so now in one line (`Incident is not resolved; the postmortem will be marked ongoing.`): the current time bounds the search window but is never reported as a resolution time.
+7. **Determine the responder list.** The responders are: the current and historical assignees (from `incident_payload.assignee` and history) and any unique authors of `incident_payload.comments` during the window. Cache the list (deduplicated, name + email/identity) for use in Phase 4 (Header Author/Responders fields).
 
 ---
 
@@ -139,21 +139,22 @@ Run the four gathering steps in parallel where the verb dispatcher allows it. Ea
 
 **1b. Related issues and tracker history.** Always run.
 
-- Call `searchIssues({ scope: incident_payload.scope, dateWindow: incident_window, limit: 100 })` for related issues in the same area path / component / label scope.
-- For each result, capture state changes and the most relevant description excerpt.
-- Walk `incident_payload.history` to capture state changes on the incident itself.
+- Call `searchIssues({ keywords: <the title's most distinctive phrase>, dateWindow: { from: incident_window.start, to: incident_window.end }, limit: 100 })` for issues raised during the incident. `Issue` carries no area path or component, so do not pass a `scope` unless the incident text names one. `searchIssues` returns summaries only (`{ id, url, title, state, type }`).
+- For the ten most relevant results, fetch detail with `getIssuesBatch(ids, ["title", "body", "state"])` and state changes with `getIssueHistory(id)`. Map each `Revision` whose `field` is `state` to a tracker event: `{ id, url, title, state_change: "<from> -> <to>", changed_at: at, changed_by: by }`.
+- Walk `incident_payload.history` the same way to capture state changes on the incident itself.
 
 **1c. Datadog logs.** Skip entirely if `log == none`.
 
 - Determine the service to query: prefer a service name extracted from the incident's title or description; fall back to `config.datadog_default_service`. If neither resolves, append a warning ("Datadog: could not infer service from incident description; configure `datadog_default_service` for cleaner queries") and skip.
 - Call `search_datadog_logs` with `query: "service:<service> status:error"`, `from: window.start`, `to: window.end`, `limit: 100`.
 - Capture each log as `{ timestamp, service, level, message, logs_url }`.
-- **Suppression rule:** if Datadog returns any error (auth, 403/404, timeout, rate limit, empty results), append a warning and treat Datadog as unavailable for this run. Never mention Datadog in any output if its call failed.
+- **Suppression rule:** if Datadog returns any error (auth, 403/404, timeout, rate limit, empty results), append a warning and treat Datadog as unavailable for this run. Never mention Datadog in the generated postmortem if its call failed.
 
 **1d. Merged pull requests (deploy candidates).** Always run.
 
-- Call `linkedPullRequests(incident_payload.id, { window: incident_window })`. Extend the window backward by 4 hours to catch deploy candidates that may have caused the incident.
-- For each PR, capture `{ id, url, title, merged_at, merged_by, repo, source_branch }`. Cap at 30 PRs.
+- Call `linkedPullRequests(incident_payload.id, { from: <incident_window.start minus 4 hours>, to: incident_window.end })`. The window is the verb's second argument, a `{ from, to }` object. The 4 hours catch a deploy that may have caused the incident.
+- For each `PRRef` (`{ url, title, state, mergedAt }`), call `getPullRequest(url)` for detail and capture `{ id, url, title, merged_at: mergedAt, merged_by: author, repo: <parsed from the url>, source_branch: sourceBranch }`. On Jira `getPullRequest` returns null: keep `{ url, title, merged_at }` and omit the rest. Cap at 30 PRs.
+- This finds only pull requests linked to the incident issue. A deploy nobody linked is not gathered; say so in the Phase 3 gathering summary when the list is empty.
 
 After all four gathering steps complete, log a one-line summary inline (not as user-facing output yet — Phase 3 surfaces this): "Gathered: {N} chat messages, {N} related issues + history events, {N} Datadog logs, {N} merged PRs."
 
@@ -174,7 +175,7 @@ Build the chronological timeline for this incident.
     "url": "<url>",
     "title": "<title>",
     "created_at": "<window.start>",
-    "resolved_at": "<window.end>",
+    "resolved_at": "<window.end when incident_resolved, else null>",
     "severity": "<severity>"
   },
   "chat_messages":  <gathered_evidence.chat_messages>,
@@ -184,7 +185,7 @@ Build the chronological timeline for this incident.
 }
 ```
 
-Cache the returned markdown table as `timeline_markdown`. The skill always returns a single markdown table with four columns (Time / Event / Source / Tag), ascending by timestamp.
+Cache the returned markdown table as `timeline_markdown`. The skill returns a one-line preamble, a single markdown table with four columns (Time / Event / Source / Tag) ascending by timestamp, and sometimes a trailing note for sparse evidence.
 
 **Fallback (when `incident-timeline-builder` is not installed):** assemble the timeline inline. For each event in `gathered_evidence` across the four pools, build one row with normalized UTC timestamp, a one-sentence description, a source citation (URL), and an evidence tag (`[VERIFIED]`/`[OBSERVED]`/`[INFERRED]`/`[UNKNOWN]`). Sort ascending by timestamp; within the same timestamp, sort by source priority (tracker events > PR merges > chat > Datadog). Render as a four-column markdown table.
 
@@ -197,7 +198,7 @@ Warn the user once at the start of Phase 3 if the fallback was used.
 Present findings to the user. Show:
 
 - The detected incident summary: title, URL, time window (formatted as `start UTC to end UTC (duration)`), severity, responders.
-- The gathering summary: a one-line per-source count plus any warnings from `gathering_warnings`. Skip Datadog and chat lines entirely when those gatherings were silently suppressed (per the Do Not Rules).
+- The gathering summary: a one-line per-source count plus any warnings from `gathering_warnings`, naming each backend that was skipped or failed once.
 - The proposed timeline: render `timeline_markdown` truncated to the first 10 events with a `... (N more events; full timeline will be in the postmortem) ...` row when truncation applies.
 
 Ask the user via `AskUserQuestion`:
@@ -206,14 +207,14 @@ Ask the user via `AskUserQuestion`:
 
 Options:
 - `Yes, generate it` — proceeds to Phase 4.
-- `Adjust scope first` — opens the revision loop. The "Other" channel collects the user's free-text scope edits ("drop the 14:32 chat message; add a 14:45 entry for the manual restart"; "exclude the Datadog logs from the auth-service, they're noise").
+- `Adjust scope first` — opens the revision loop. If it is picked with no free text, ask in plain text what to change. The "Other" channel collects the user's free-text scope edits ("drop the 14:32 chat message; add a 14:45 entry for the manual restart"; "exclude the Datadog logs from the auth-service, they're noise").
 - `Cancel` — exits cleanly without writing anything.
 
 Cache the boolean answer as `approved_to_generate`. Cache any free-text feedback as `scope_change_request`.
 
 **Revision loop (when the user's free-text "Other" channels request changes):** if `scope_change_request` is non-empty, apply the user's edits to the cached `gathered_evidence` (drop, add, or annotate events as instructed), re-invoke `incident-timeline-builder` to rebuild `timeline_markdown`, and re-present this gate with the updated timeline. Cap the loop at 3 revision rounds. After the third round, present a final two-option `AskUserQuestion`: `Approve as-is` or `Abort this run`.
 
-If the user picks `Cancel` or `Abort`, exit cleanly. Phase 5 prints a one-line "Postmortem generation cancelled at Phase 3" message and stops.
+If the user picks `Cancel` or `Abort`, print `Postmortem generation cancelled at Phase 3. Nothing was written.` and stop; skip Phases 4 and 5.
 
 ---
 
@@ -231,7 +232,7 @@ Calling context: (none).
 Generate the full postmortem markdown.
 
 {
-  "incident": <incident_payload subset: id, url, title, created_at, resolved_at, severity, reporter, responders, customer_impact_summary>,
+  "incident": <incident_payload subset: id, url, title, created_at, resolved_at (null when the incident is not resolved), severity, reporter, responders, author (the running user's display name)>,
   "timeline_markdown": <timeline_markdown>,
   "source_materials": <gathered_evidence>,
   "config": {
@@ -297,7 +298,7 @@ These apply to every phase.
 - **Never assign action items in the generated document.** The Action Items table ships with placeholder rows; the user fills in Owner and Target after team review.
 - **Never present a partial postmortem as final.** When `gathered_evidence` is sparse (fewer than 5 events across all sources), Phase 5's final summary explicitly flags this: "Postmortem generated from sparse evidence; review carefully and re-gather with broader queries if needed."
 - **Never paste source content verbatim into the postmortem.** Quote (with quotation marks) the parts that ground a claim; paraphrase the rest. The full source URLs go in the References section.
-- **Never mention Datadog or chat** in any output if their gathering steps were silently suppressed.
+- **Never mention Datadog or chat** in the generated postmortem if their gathering steps were suppressed. The terminal summary still names them once.
 
 ## Writing rules (always active)
 

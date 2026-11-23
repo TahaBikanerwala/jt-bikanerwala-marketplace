@@ -25,6 +25,7 @@ switch shapes mid-session.
 | `linkedPullRequests` | `__repo_list_pull_requests_by_repo_or_project`, plus walk `relations[]` from `__wit_get_work_item` | `__repo_pull_request` (`action: "list"`), plus walk `relations[]` from `__wit_work_item` (`action: "get"`) | combine both sources |
 | `getPullRequest` | `__repo_get_pull_request_by_id`, `__repo_list_pull_request_changes`, `__repo_list_pull_request_threads` | `__repo_pull_request` (`action: "get"`, `action: "list_changes"`, `action: "list_threads"`) | request work-item refs on the get call (`includeWorkItemRefs: true`); drop system threads (vote/policy updates) |
 | `getCurrentSprint` | `__work_list_team_iterations` | `__work` (`action: "list_team_iterations"`) | `timeframe: "current"` on both |
+| `findSprint` | `__work_list_team_iterations` | `__work` (`action: "list_team_iterations"`) | no `timeframe`; match id, path or name. See `sprint.md` |
 | `getSprintItems` | `__wit_get_work_items_for_iteration`, `__wit_get_work_items_batch_by_ids`, `__wit_get_work_item_type` | `__wit_work_item` (`action: "list_for_iteration"`), `__wit_work_item` (`action: "get_batch"`), `__wit_work_item` (`action: "get_type"`) | iteration ids → batch details; type lookup for `stateCategory`. See `sprint.md` |
 | `getTeamCapacity` | `__work_get_team_capacity`, `__work_get_iteration_capacities` | `__work` (`action: "get_team_capacity"`), `__work` (`action: "get_iteration_capacities"`) | returns zeros when unset; `null` only if the tools are absent |
 | `resolveUser` | `__core_get_identity_ids` | `__core_get_identity_ids` | same tool name in both shapes; best-effort, returns the AzDO descriptor |
@@ -66,7 +67,9 @@ regardless of what was requested.
 | `resolved` | `Microsoft.VSTS.Common.ResolvedDate` |
 | `closed` | `Microsoft.VSTS.Common.ClosedDate` |
 | `labels` | `System.Tags` |
+| `acceptanceCriteria` | `Microsoft.VSTS.Common.AcceptanceCriteria` (null when the type has no such field) |
 | `parent` | derived from `relations[]` (`System.LinkTypes.Hierarchy-Reverse`), not a plain field |
+| `links` | derived from `relations[]` work-item links: `Related` → `related`, `Duplicate-Forward`/`Duplicate-Reverse` → `duplicate`, `Hierarchy-Forward` → `child`, anything else → `other`. Not a plain field; needs the relations expand |
 
 `severity` and `customFields` have no fixed mapping (severity's field name varies by
 process template; `customFields` is a catch-all). Requesting either falls back to a
@@ -87,7 +90,7 @@ The same tool surfaces under different prefixes depending on how the user regist
 - `mcp__ado__*`
 - `mcp__plugin_<user-installed-name>__*`
 
-Never hardcode the prefix in a verb-plugin prompt. The dispatcher resolves it once at detection time (see `references/detection.md` § Resolving which prefix to call — `azure_devops` preferred, `ado` as fallback, then any other registered name) and reuses that same literal prefix for every verb call in the session. If the resolved prefix doesn't expose a specific tool a verb needs, the dispatcher falls back to the next prefix in that order for that one call so the action still completes, instead of failing the verb.
+Never hardcode the prefix in a verb-plugin prompt. The dispatcher resolves it once at detection time (see `references/detection.md` § Resolving which prefix to call — `azure_devops` preferred, `ado` as fallback, then any other registered name) and reuses that same literal prefix for every verb call in the session. If the resolved prefix doesn't expose a specific tool a **read** verb needs, the dispatcher falls back to the next prefix in that order for that one call and warns once. It never falls back for a write verb, since another prefix may be a different organization: the write fails with an error naming the missing tool.
 
 Prefix and tool-name shape (Classic vs Consolidated, above) are resolved
 separately and vary independently — a prefix match says nothing about which

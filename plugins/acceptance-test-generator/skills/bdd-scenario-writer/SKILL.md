@@ -12,12 +12,12 @@ Take the coverage model and write it as Gherkin a machine can run and a human ca
 
 ## Input
 
-`Calling context: phase=4, tracker=<tracker>, framework=<framework>.` plus a payload of: the selected slice of the coverage model, `blocking_answers`, `extra_notes` (**authoritative** — overrides the model on conflict), relevant `code_refs` (concrete hooks, existing style, terminology — reference only), the numbered `acceptance_criteria` (for `@AC-<n>` tags), and config (`scenario_granularity`, `traceability_tags`, `test_output_dir`).
+`Calling context: phase=4, tracker=<tracker>, framework=<framework>.` plus a payload of: the selected slice of the coverage model, `blocking_answers`, `extra_notes` (**authoritative** — overrides the model on conflict), relevant `code_refs` (concrete hooks, existing style, terminology — reference only), the numbered `acceptance_criteria` (for `@AC-<n>` tags), `source_label` (cited in each Test Case body), `create_test_cases` (boolean), and config (`scenario_granularity`, `traceability_tags`, `test_output_dir`, `feature_file_extension`, `test_label`).
 
 ## Output
 
 1. One or more Gherkin `.feature` files (content + target path), matching any existing project convention `code_refs` reported.
-2. When the agent will create tracker Test Cases, a rendered payload per scenario (see `references/tracker-test-cases.md`).
+2. When `create_test_cases` is true, a rendered payload per scenario, returned as that scenario's `testCase: { body, acceptanceCriteria, stepsXml? }` (see `references/tracker-test-cases.md`; `stepsXml` on Azure DevOps only). Omit `testCase` when it is false.
 
 Full syntax and style rules are in `references/gherkin-style.md` — load it. The essentials:
 

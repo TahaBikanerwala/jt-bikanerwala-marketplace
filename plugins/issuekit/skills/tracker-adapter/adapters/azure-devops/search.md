@@ -6,9 +6,9 @@ resolution) — only the call that carries it differs:
 
 - **Classic shape:** `wit_query_by_wiql(wiql: "<wiql>")`.
 - **Consolidated shape:** `wit_query(action: "wiql", wiql: "<wiql>", project: "<project>",
-  top: <limit>)`. Always pass `top` explicitly — its default is `50`, well under this
-  adapter's `limit: 100` default, so an omitted `top` would silently truncate a
-  query-mode search. `project` narrows the search server-side in addition to the
+  top: <limit>)`. Always pass `top: <limit>` explicitly. The verb's own default `limit`
+  is 25, callers such as `ticket-summarizer` pass 100, and the tool's default is 50, so an
+  omitted `top` would silently truncate any `limit` above 50. `project` narrows the search server-side in addition to the
   `[System.TeamProject]` conjunct already in the WIQL; passing both is harmless.
 
 ## Skeleton
@@ -30,6 +30,7 @@ ORDER BY [System.CreatedDate] DESC
 | `scope` (area path) | `AND [System.AreaPath] UNDER '<scope>'` |
 | `types` | `AND [System.WorkItemType] IN ('Bug','Issue',...)` |
 | `states` | `AND [System.State] IN ('Active','New',...)` |
+| `excludeStates` | `AND [System.State] NOT IN ('Closed','Done',...)` |
 | `dateWindow.from` | `AND [System.CreatedDate] >= '<iso-date>'` |
 | `dateWindow.to` | `AND [System.CreatedDate] <= '<iso-date>'` |
 | `limit` | append `ORDER BY [System.CreatedDate] DESC` (WIQL has no row limit; trim client-side after the result returns) |

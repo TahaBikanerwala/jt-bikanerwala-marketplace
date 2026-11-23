@@ -140,7 +140,7 @@ Optional `.claude/tracker-policy.json`, shared with the other tracker plugins (s
 | `severity_label_map` | `sev1: ["1 - Critical", ...]` | Abstract tier (resolved against the hardcoded sev1..sev4 evidence table in Phase 3 of `agents/bug-reporter.md`) to the vendor's label. |
 | `priority_label_map` | `{ P0: Highest, P1: High, P2: Medium }` | Jira only: abstract priority to vendor priority name. |
 
-Missing keys are lazy-prompted at the moment they are needed and can be persisted.
+A key with no shipped default is lazy-prompted at the moment it is needed; the agent prints the JSON fragment to paste into the policy file, since it has no file-write tool.
 
 ## Bundled skills
 

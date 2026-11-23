@@ -56,8 +56,9 @@ Follow `references/delta-template.md` exactly for structure. Key rules:
   `delta.headline.pct_by_points != null`.
 - **What shipped** is the headline section: render `delta.shipped` as bulleted detail lines,
   one per item, ordered as delivered value. This is the slide people read first.
-- Item lists (What shipped, Newly started, Scope change, regressed) render as **bulleted
-  detail lines**, one per item:
+- Item lists (What shipped, Newly started, Added) render as **bulleted detail lines**, one
+  per item. Removed and Regressed rows carry no `blurb` (and Regressed no owner or points),
+  so they follow the template's shorter lines instead:
   `- **#<id> <title>** (<owner>[, <pts> pts]). <blurb>`
   Omit empty parenthetical parts; omit the trailing `. <blurb>` when `blurb` is `""`. For
   What shipped and Newly started, append the transition: `... _(<from_state> → <to_state>)_`.

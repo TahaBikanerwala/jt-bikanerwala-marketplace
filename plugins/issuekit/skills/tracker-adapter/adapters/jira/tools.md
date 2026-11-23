@@ -15,7 +15,9 @@ The adapter calls the tools below. Suffix-match against the available tool surfa
 | `getIssueTypeSchema` | `__getJiraIssueTypeMetaWithFields` | used for severity auto-discovery |
 | `linkedPullRequests` | walk `issuelinks` + smart-link metadata from `__getJiraIssue` | no separate call; the Atlassian MCP does not always expose dev-status |
 | `getPullRequest` | none | returns `null`; Jira hosts no PRs. Callers read GitHub/Bitbucket PRs with that host's CLI or MCP |
-| `getCurrentSprint` | `__searchJiraIssuesUsingJql` with `sprint in openSprints() AND project = <key>` | extract sprint name from first hit |
+| `whoAmI` (`defaultProject` lazy-prompt) | `__getVisibleJiraProjects` | optional; supplies the project keys offered when no `policy.default_project` and no issue key is in hand. Free-text prompt when absent |
+| `getCurrentSprint` | `__searchJiraIssuesUsingJql` with `sprint in openSprints() AND project = <key>` | read the sprint field on the first hit: the active entry's `id`, `name`, `startDate`, `endDate` |
+| `findSprint` | `__searchJiraIssuesUsingJql` with `sprint = "<name>"` (or the bare numeric id) `AND project = <key>` | one result; read the matching sprint-field entry. See `sprint.md` |
 | `getSprintItems` | `__searchJiraIssuesUsingJql` with `sprint = <id>` / `sprint in openSprints()`, plus `__getJiraIssueTypeMetaWithFields` for points-field discovery | see `sprint.md` |
 | `getTeamCapacity` | none | no capacity concept in core Jira; returns `null` |
 | `resolveUser` | `__lookupJiraAccountId` | returns `accountId`; cache per session |
@@ -52,7 +54,9 @@ are always present regardless of what was requested.
 | `resolved` | `resolutiondate` |
 | `closed` | no mapping; always absent (see below) |
 | `labels` | `labels` |
+| `acceptanceCriteria` | the custom field named by `policy.acceptance_criteria_field`; null when that key is unset |
 | `parent` | `parent` |
+| `links` | `issuelinks`: `Relates` → `related`, `Duplicate`/`Cloners` → `duplicate`, anything else → `other`; plus `subtasks` → `child` |
 
 `severity` has no fixed field name (see `getIssueTypeSchema`'s auto-discovery order:
 `Severity Level` → `Severity` → `Bug Severity` → `priority`) and `customFields` is a

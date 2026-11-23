@@ -25,7 +25,7 @@ Optional MCPs the agent uses opportunistically:
 - A docs MCP for runbooks — Confluence or Azure Wiki.
 - The Datadog MCP for log search (Bug and Incident only).
 
-If a backend isn't installed, the agent skips the corresponding step and notes the gap once in the final summary.
+If a backend isn't installed, the agent skips the corresponding step and notes the gap once in the final terminal summary. It never mentions a missing or empty backend in a tracker comment, the refined description or a chat post.
 
 ## Use
 
@@ -99,7 +99,7 @@ Phases 4–9 run only on Phase 3 confirmation. They execute as a batch through t
 | Archetype | AzDO types it matches | Jira types it matches |
 |---|---|---|
 | Bug | `Bug` | `Bug`, `Defect` |
-| Incident | `Issue` (Agile) / `Impediment` (Scrum); with `incident` tag/label | `Incident`, `Outage`, anything tagged `incident` or `Sev-` |
+| Incident | `Issue` (Agile) / `Impediment` (Scrum); with `incident` tag/label | `Incident`, `Outage`, anything tagged `incident` |
 | Story | `User Story` (Agile), `Product Backlog Item` (Scrum), `Requirement` (CMMI); `Feature` when leaf-level (no linked children) | `Story`, `Feature`, `Enhancement`, `New Feature` when leaf-level (no linked children) |
 | Feature | `User Story` (Agile), `Product Backlog Item` (Scrum), `Requirement` (CMMI), `Feature` when epic-level (has one or more linked child work items) | `Story`, `Feature`, `Enhancement`, `New Feature` when epic-level (has one or more linked child work items) |
 | Task | `Task` | `Task`, `Sub-task`, `Chore`, `Tech Debt` |

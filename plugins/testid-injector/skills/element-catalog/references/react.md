@@ -10,10 +10,10 @@ Add the attribute literally. Match the surrounding quote style.
 // before
 <input type="email" name="email" />
 // after
-<input type="email" name="email" data-testid="login-email-input" />
+<input type="email" name="email" data-testid="email-input" />
 
 <button onClick={submit}>Sign in</button>
-<button onClick={submit} data-testid="login-submit-button">Sign in</button>
+<button onClick={submit} data-testid="sign-in-button">Sign in</button>
 
 <a href="/pricing">Pricing</a>
 <a href="/pricing" data-testid="nav-pricing-link">Pricing</a>
@@ -75,7 +75,7 @@ When a library needs a non-attribute form (`inputProps`, `components`), record `
 
 ## Spread props on the usage site
 
-If the element already has `{...props}` or `{...rest}`, it may already receive a `data-testid` from the parent. Add the attribute **after** the spread so an explicit value wins, but flag it: the parent might already pass one. `<input {...field} data-testid="x-input" />`.
+If the element already has `{...props}` or `{...rest}`, it may already receive a `data-testid` from the parent. Insert the attribute **before** the spread, so an id the parent passes still wins and nothing that works today changes: `<input data-testid="x-input" {...field} />`. Flag it as low-confidence in the diff, since the parent might already pass one.
 
 ## Edit mechanics
 

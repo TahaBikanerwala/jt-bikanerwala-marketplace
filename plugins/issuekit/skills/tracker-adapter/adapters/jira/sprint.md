@@ -2,6 +2,20 @@
 
 Implements the two sprint-read verbs from `references/verbs.md`.
 
+## `Sprint` on Jira
+
+Jira exposes sprints through the sprint custom field on an issue (discover the field with
+`getJiraIssueTypeMetaWithFields`; it is the same field `updateFields.sprint` writes). Each
+entry carries `id` (numeric), `name`, `state`, `startDate`, `endDate`.
+
+- **`getCurrentSprint`**: run `sprint in openSprints() AND project = "<projectKey>"` with one
+  result and take the entry whose `state` is `active`. No result → `null`.
+- **`findSprint(nameOrId)`**: run `sprint = "<name>" AND project = "<projectKey>"` (the bare
+  number, unquoted, for a numeric id) with one result and take the entry whose `id` or `name`
+  matches. No result → `null`. A sprint that holds no issues cannot be found this way.
+
+Both return `Sprint = { id, name, start: startDate, end: endDate }`.
+
 ## `getSprintItems(sprint?, team?)`
 
 ### Steps

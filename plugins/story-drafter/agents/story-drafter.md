@@ -37,7 +37,7 @@ The keys this agent reads:
 | `priority_label_map` | `{ P0: Highest, P1: High, P2: Medium }` (Jira only) | Phase 6 |
 | `acceptance_criteria_field` | `null` (AzDO uses the standard AC field; Jira folds into the body) | Phase 6 |
 
-If `story_work_item_type` for the active tracker is not a valid type on `target_project`, the adapter lazy-prompts with the live type list when `createIssue` runs.
+`story_work_item_type` is validated in Phase 6 while the batch is built, before the gate: call `getIssueTypeSchema(<type>)`. An error or an empty field list means the type does not exist on `target_project` (a Scrum project has `Product Backlog Item`, a Basic one `Issue`); lazy-prompt for the type name as free text and re-check the answer the same way.
 
 ## Sibling skills
 
@@ -85,12 +85,13 @@ Unknown keys are ignored.
 - **Never fabricate an answer in the codebase probe.** The probe answers only what the code actually shows, tagged by evidence; everything else stays an Open Question.
 - **Never link a created story to a parent or related item.** These stories are standalone (there is no source work item).
 - **Never tag people who do not appear in the input.**
-- **Never post to chat by any means other than the tracker adapter.** This agent has no direct chat-send channel; the final summary is inline.
+- **Never post to chat.** The final summary is inline. The adapter's `sendMessage` is not part of this flow.
 
 ## Workflow
 
 **Pauses (halt until the user answers):**
 
+0. **Phase 0** — only when the input is empty or too thin to brainstorm: one plain request for more.
 1. **Phase 2** — the blocking-gaps clarification card (skipped when nothing blocks).
 2. **Phase 3** — the story-selection card (multi-select + free-form notes).
 3. **Phase 6** — the diff-and-confirm gate.
@@ -109,7 +110,7 @@ Unknown keys are ignored.
 2. **If it is a file path** (it resolves to a readable file), `Read` it. For a `.vtt` transcript, ignore the `WEBVTT` header, the numeric cue indices, and the `00:00:00.000 --> ...` timestamp lines; keep the spoken text. Set `source_label` to `transcript <filename>` or `notes <filename>`.
 3. **If it is pasted text**, use it directly. Set `source_label` to `pasted notes`.
 4. **If it is empty**, ask the user once (plain prompt) to paste the requirements or give a file path. If they provide nothing usable, stop.
-5. Cache the cleaned text as `requirements_text`. If it is only a sentence or two and clearly too thin to brainstorm, tell the user what is missing and ask for more before continuing.
+5. Cache the cleaned text as `requirements_text`. If it is only a sentence or two and clearly too thin to brainstorm, tell the user what is missing and ask once for more before continuing. If nothing more arrives, stop.
 
 ### Phase 1: Brainstorm the requirements
 
@@ -147,7 +148,7 @@ In Phase 5, a question the probe answered `[VERIFIED]` or `[OBSERVED]` is folded
 
 ### Phase 5: Write the selected stories
 
-For each `selected` story, invoke `story-writer` with `Calling context: phase=5, tracker=<tracker>.` and a payload carrying: the candidate, the relevant slice of the `brainstorm`, `blocking_answers`, `extra_notes` (**authoritative** — it overrides the brainstorm wherever they conflict), and the matching `probe_findings`. The skill returns each story in the fixed template.
+For each `selected` story, invoke `story-writer` with `Calling context: phase=5, tracker=<tracker>.` and a payload carrying: `source_label` (cited in the story's Background), the candidate, the relevant slice of the `brainstorm`, `blocking_answers`, `extra_notes` (**authoritative** — it overrides the brainstorm wherever they conflict), and the matching `probe_findings`. The skill returns each story in the fixed template.
 
 Then run `issuekit:prose-style` on each drafted body and acceptance-criteria block to clean the text before it reaches the gate. Cache the finished set as `drafts`, each `{ candidate, title, bodyMarkdown, acMarkdown, priority }`.
 

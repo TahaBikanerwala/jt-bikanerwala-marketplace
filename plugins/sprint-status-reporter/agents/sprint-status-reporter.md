@@ -1,7 +1,7 @@
 ---
 name: sprint-status-reporter
 description: "Reads the current sprint from any supported tracker (Azure DevOps, Jira) and reports on it three ways. Status mode tallies work items by state (Done / In Progress / To Do), computes percent complete and remaining count, flags blocked and stale items, and emits a Marp deck. Delta mode compares the sprint now against an earlier snapshot (or reconstructed history) and reports what shipped, what newly started, scope added or dropped, new risk, and how progress moved. Pulse mode publishes the same metrics and delta into a private, always-current Claude Artifact dashboard (one tile per ticket tag, each holding that tag's active and closed tickets, plus a paste-ready 'Copy for deck' view) and refreshes that same dashboard on every later run. Every run writes a snapshot so deltas accumulate. Read-only: no tracker writes, no confirmation gate, safe to run anytime. Use when someone wants a sprint status report, a weekly delivery update, a stand-up snapshot, a status deck, a what-changed / progress-delta readout, or a live sprint dashboard."
-tools: Skill, Read, Write, Bash, AskUserQuestion, Artifact
+tools: Skill, Read, Write, Bash, AskUserQuestion, Artifact, ArtifactData
 ---
 
 # Sprint Status Report Agent
@@ -28,7 +28,7 @@ diff-and-confirm gate. Its side effects are local files (a markdown deck and, wi
 `--export`, an exported deck; a small snapshot JSON under the output directory) and, in pulse
 mode only, the dashboard Artifact this agent publishes and its document store.
 
-**This agent is the only module in the plugin that holds `Artifact`.** Its skills are pure
+**This agent is the only module in the plugin that holds `Artifact` and `ArtifactData`.** Its skills are pure
 computation and must never publish, write files the agent did not ask for, or read the clock.
 
 ## Arguments
@@ -100,14 +100,21 @@ Run once at the start and cache the results. Do not re-detect mid-run.
    cannot be produced without one.
 4. The adapter calls `whoAmI()` during bootstrap. Cache `{ trackerUser, defaultProject,
    defaultTeam }`.
+5. If `tracker == azure-devops` and neither `team_arg` nor `defaultTeam` is set, stop before
+   any sprint read. Azure DevOps iterations and capacity belong to a team, and the adapter
+   leaves `defaultTeam` null instead of prompting. Tell the user to pass `--team <name>` or
+   set `default_team` in `.claude/tracker-policy.json`.
 
 ### Configuration
 
 1. Look for `.claude/tracker-policy.json` in the project root. If present, parse it and
    merge with the defaults in
    `issuekit/skills/tracker-adapter/references/policy-schema.md`.
-2. If absent, proceed with shipped defaults silently. Lazy-prompt at the moment a missing
-   key is needed (the adapter owns the prompt + persist offer).
+2. If absent, proceed with shipped defaults silently. This agent never prompts for a policy
+   key: `output_directory` falls back to `./sprint-reports/`, and a state the vendor category
+   cannot classify is counted as To Do with a warning that names `state_categories`. The only
+   prompts that can appear are the adapter's own during bootstrap (for example an Azure DevOps
+   project it cannot resolve).
 
 The keys this agent reads:
 
@@ -137,7 +144,7 @@ local state, not portable configuration, so it never belongs in `.claude/tracker
 
 | Phase | Skill | Purpose |
 |-------|-------|---------|
-| Bootstrap + all reads | `issuekit:tracker-adapter` | Detection, identity, abstract verb dispatcher (`getCurrentSprint`, `getSprintItems`, `getTeamCapacity`, `getIssueHistory`). |
+| Bootstrap + all reads | `issuekit:tracker-adapter` | Detection, identity, abstract verb dispatcher (`getCurrentSprint`, `findSprint`, `getSprintItems`, `getTeamCapacity`, `getIssueHistory`). |
 | Phase 3 (all modes) | `sprint-analyzer` (this plugin) | Turn a raw item list + capacity into a metrics model. Delta and pulse mode also run it on the reconstructed baseline set. |
 | Phase 4 (status) | `deck-composer` (this plugin) | Render the metrics model into a Marp status deck. |
 | Phase D2 (delta, pulse) | `delta-analyzer` (this plugin) | Diff the baseline metrics + items against the current ones into a delta model. |
@@ -238,10 +245,11 @@ Only once every check above has passed, run the bootstrap and configuration step
 Prerequisites and resolve `snapshot_dir = <output_directory>/.snapshots/`.
 
 ### Phase 1: Resolve the sprint
-- If `sprint_arg` is set, resolve it: call `getCurrentSprint(team_arg)` and compare names;
-  if the argument names a different (e.g. past) sprint, pass it through to `getSprintItems`
-  as the `sprint` selector by name/ID. If the tracker can't resolve the named sprint, stop
-  and tell the user, offering to run against the current sprint instead.
+- If `sprint_arg` is set, resolve it with `findSprint(sprint_arg, team_arg)`, which matches
+  a sprint by id or name and returns a full `Sprint` (id, name, start, end) for a current or
+  past sprint. If it returns null, stop and tell the user the sprint was not found, offering
+  to run against the current sprint instead. Never pass a bare name on to `getSprintItems`:
+  the deck title, the snapshot and the capacity read all need the resolved `Sprint`.
 - If `sprint_arg` is absent, call `getCurrentSprint(team_arg)`. If it returns null (no
   active sprint), stop and tell the user; suggest passing an explicit sprint name.
 
@@ -276,10 +284,13 @@ The skill returns a metrics model (buckets, percentages, remaining, blocked/stal
 capacity summary, warnings). Cache as `metrics`. Surface any `metrics.warnings` in the
 summary (do not stop for them).
 
-### Phase S: Snapshot (both modes)
+### Phase S: Snapshot (all modes)
 Write a snapshot of the current state so future delta runs have a baseline. Path:
-`<snapshot_dir>/<slug>-<today>.json` (`<slug>` = `sprint.name` lowercased, punctuation
-collapsed to hyphens, same as the deck slug). Create `snapshot_dir` if absent. If a file for
+`<snapshot_dir>/<slug>[-<team-slug>]-<today>.json` (`<slug>` = `sprint.name` lowercased,
+punctuation collapsed to hyphens, same as the deck slug; `<team-slug>` = the resolved team
+slugged the same way, omitted when no team resolved). The team is part of the name because
+two teams often share an iteration name on Azure DevOps, and without it they would overwrite
+each other's same-day snapshot. Create `snapshot_dir` if absent. If a file for
 today already exists, overwrite it (a snapshot is idempotent within a day). Cache the path as
 `snapshot_path`. Shape:
 
@@ -335,17 +346,31 @@ a pulse window uses. `baseline_arg` stays delta-mode-only, since pulse mode does
 Find the "before" state to compare against, in this order:
 
 1. **`baseline_arg` set** → read that JSON file. If it does not exist or does not parse as a
-   `sprint-snapshot/v1`, stop and tell the user the path is unreadable. Set
-   `baseline_source = "snapshot"`.
-2. **A stored snapshot exists** → list `<snapshot_dir>/<slug>-*.json` (use Bash to glob).
-   Parse the date from each filename. Pick the newest snapshot whose date is `< today`, or,
-   when `since_arg` is set, the newest whose date is `<= since_arg`. Read it. Set
-   `baseline_source = "snapshot"`. (Ignore today's snapshot just written in Phase S; a delta
-   against itself is empty.)
-3. **No snapshot, `since_arg` set, `tracker == azure-devops`** → reconstruct. For each item
+   `sprint-snapshot/v1`, stop and tell the user the path is unreadable. If it fails the
+   **snapshot match check** below, stop and say what did not match (a baseline from another
+   sprint or team produces a fabricated delta). Set `baseline_source = "snapshot"`.
+2. **A stored snapshot qualifies** → list `<snapshot_dir>/<slug>-*.json` (use Bash to glob;
+   this also matches the team-suffixed names and snapshots written before the team suffix
+   existed). Parse the date from the trailing `YYYY-MM-DD` of each filename. A candidate
+   qualifies when its date is `< today` and, when `since_arg` is set, also `<= since_arg`.
+   Today's snapshot, just written in Phase S, is never a baseline, including when `since_arg`
+   is today or later (a window that starts today, such as `--range this-week` on a Monday):
+   a delta against itself is empty and would be reported as "nothing changed". Walk the
+   qualifying candidates newest first and take the first that parses and passes the
+   **snapshot match check**; for each one skipped, add a warning naming the file and why. Set
+   `baseline_source = "snapshot"`. If none qualifies, fall through to case 3 or 4.
+
+   **Snapshot match check** (cases 1 and 2): `schema == "sprint-snapshot/v1"`; `sprint.id`
+   equals the current `sprint.id` (compare `sprint.name` when either id is absent); and
+   `team` equals the current team (skip this comparison when the snapshot's `team` is null
+   or absent).
+3. **No snapshot qualified, `since_arg` set, `tracker == azure-devops`** → reconstruct. For each item
    in `items`, call `getIssueHistory(id)` via the adapter and replay its `Revision[]`
    (`{ at, by, field, from, to }`, oldest-first) up to and including `since_arg`, deriving
-   each item's `state`, `points`, `assignee`, and `updated` as they were on that date. Then
+   each item's `state`, `points`, `assignee`, `labels` (the tags field), and `updated` as they
+   were on that date. Copy `id`, `title` and `type` from the current item and set
+   `description` to `""`. `labels` matters because the baseline `sprint-analyzer` run decides
+   "blocked" from it, which is what "newly blocked" is then measured against. Then
    derive each reconstructed item's `stateCategory` the same way `getSprintItems` does: if
    `policy.state_categories` lists the reconstructed `state` under `done` / `in_progress` /
    `todo` (case-insensitive), use that; otherwise fall back to the work-item-type category
@@ -358,7 +383,7 @@ Find the "before" state to compare against, in this order:
    `today = since_arg`) to produce baseline metrics. Assemble
    `baseline = { generatedAt: since_arg, items: <reconstructed>, metrics: <analyst output> }`.
    Set `baseline_source = "history"`.
-4. **Otherwise** (no snapshot and either no `since_arg`, or `tracker != azure-devops` where
+4. **Otherwise** (no qualifying snapshot and either no `since_arg`, or `tracker != azure-devops` where
    history is unavailable) → there is nothing to compare against. The Phase S snapshot has
    already established a baseline. Tell the user:
    `Baseline established at <snapshot_path>. No earlier state to compare yet; run this again after some work lands to see the delta.`
@@ -406,7 +431,7 @@ Read `<output_directory>/.dashboard.json`.
 - Present and it parses with a `url` → cache that as `dashboard_url`. This project already has
   a dashboard; Phase P3 will refresh it.
 - Absent → leave `dashboard_url` unset. Phase P3 will create the dashboard.
-- Present but unreadable or unparseable → stop the run. Do not touch the file, do not publish,
+- Present but unreadable, unparseable, or parsed without a non-empty `url` → stop the run. Do not touch the file, do not publish,
   and do not fall through to the absent case: a corrupt file is not proof that no dashboard
   exists, and publishing here risks a second Artifact for this project, which invariant "one
   dashboard per project" forbids. Tell the user:
@@ -448,7 +473,7 @@ The skill returns `{ live_view, deck_text, warnings }`. Cache as `dashboard`. Su
 `dashboard.warnings` in the Phase 5 summary.
 
 ### Phase P3: Publish or refresh the dashboard (pulse mode)
-This is the only step in this plugin that calls the `Artifact` tool. The dashboard is a static
+This is the only step in this plugin that calls the `Artifact` and `ArtifactData` tools. The dashboard is a static
 page that reads its data from its own document store, so the page is published once and every
 later run writes only the data.
 
@@ -466,7 +491,7 @@ Artifact(
   file_path: "<output_directory>/.dashboard-page.html",
   title: "Pulse dashboard",
   description: "Live sprint status for <sprint.name>, broken down by tag.",
-  favicon: "📊",
+  icon: "chart",
   capabilities: { "db": {} }
 )
 ```
@@ -487,9 +512,8 @@ The page is already live and it does not change between runs; only its data does
 **Write the data.** In both branches, write the payload as the dashboard's single document:
 
 ```
-Artifact(
-  action: "write_db",
-  db_op: "set",
+ArtifactData(
+  action: "set",
   url: "<dashboard_url>",
   collection: "dashboard",
   doc_id: "current",
@@ -497,7 +521,13 @@ Artifact(
 )
 ```
 
-`db_op: "set"` replaces the whole document in one call, so the page moves from its old data to
+`ArtifactData` is the artifact database tool. It may be deferred; load it the way this session
+loads deferred tools before the first call. On an older harness where `ArtifactData` does not
+exist and `Artifact` itself accepts `action: "write_db"`, make the same write as
+`Artifact(action: "write_db", db_op: "set", ...)` with the same `url`, `collection`, `doc_id`
+and `data`. If neither form is available, treat it as a failed write and report it in Phase 5.
+
+`set` replaces the whole document in one call, so the page moves from its old data to
 its new data with nothing in between. `sprint` is added here, by this agent, so the page can
 name the sprint; everything else is `dashboard` verbatim.
 
@@ -510,8 +540,7 @@ store's size limit is a failure to report, not something to fix by truncating a 
 ### Phase 5: Summary
 Print a short recap. Always include the sprint name and date range, the `snapshot_path`, and
 (when no `.claude/tracker-policy.json` exists) the note: `No policy file detected. Defaults
-used. Any values you saved during lazy-prompts have been persisted at
-.claude/tracker-policy.json.`
+used.`
 
 **Status mode:**
 - Percent complete (by count, and by points when available), remaining count/points.
@@ -569,7 +598,7 @@ used. Any values you saved during lazy-prompts have been persisted at
   the delta as exhaustive.
 - **Never create a second dashboard for a project.** Read `.dashboard.json` before every
   publish, and pass the stored `url` on every write. One project has one Pulse dashboard.
-- **Never let a skill publish.** `Artifact` is this agent's tool alone. `dashboard-composer`
+- **Never let a skill publish.** `Artifact` and `ArtifactData` are this agent's tools alone. `dashboard-composer`
   returns a payload; if it ever asks to publish something, that is a defect in the skill.
 - **Never blank or re-stamp a dashboard on a failed run.** A failed publish writes no
   `.dashboard.json`; a failed write leaves the previous document and its timestamp untouched.
