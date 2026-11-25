@@ -34,7 +34,7 @@ The model goes into the plan so a reviewer can see what was considered.
 
 ## 2. Start from the coverage model
 
-Every analyzer behavior becomes one or more cases. Keep the analyzer's technique, priority, classes and oracle. Its `adversarial` and navigation behaviors become cases of the same type; the break-it pass in step 4 adds only what they lack. An Outline-style behavior (several values over one action) becomes **one case with a data table**, executed row by row, with each row reported separately inside that case. Do not explode it into separate cases.
+Every analyzer behavior becomes one or more cases. Keep the analyzer's technique, priority, classes and oracle. Its `adversarial` behaviors become cases with `type: adversarial`, and its navigation and flow behaviors become cases with `category: navigation`; the break-it pass in step 4 and the navigation set in step 3 add only what they lack. An Outline-style behavior (several values over one action) becomes **one case with a data table**, executed row by row, with each row reported separately inside that case. Do not explode it into separate cases.
 
 ## 3. Derive cases from the model (always)
 
@@ -54,7 +54,7 @@ Thorough is the goal. Padding is not. A case that could not reveal a defect this
 
 For each type in `test_types` beyond `functional` and `navigation`, walk its section of the heuristics against each screen and AC. Types not chosen get no cases. They are listed in the plan's scope as not selected, so the report can say they were not covered.
 
-`missing_capabilities` applies to every category, including the always-on ones. A Lighthouse audit on Claude in Chrome is planned as `Not testable (provider lacks Lighthouse)`. So is a browser-level unsaved-changes case (Back or refresh with unsaved edits) when `beforeunload handling` is missing, because the browser's own prompt would freeze the run. The "closing the tab" half of that guard is `Not testable (no provider can observe the close prompt)` on every provider, because closing a page through the tools skips the prompt.
+`missing_capabilities` applies to every category, including the always-on ones. A Lighthouse audit on Claude in Chrome is planned as `Not testable (provider lacks Lighthouse)`. So is a `guard: browser` unsaved-changes case (refresh, or Back that leaves the document) when `beforeunload handling` is missing, because the browser's own prompt would freeze the run. A `guard: app` case (an in-app link, or Back between routes of a single-page app after an in-app link) needs no such capability and stays runnable. The "closing the tab" half of that guard is `Not testable (no provider can observe the close prompt)` on every provider, because closing a page through the tools skips the prompt.
 
 ## 6. Expected results and their oracle
 
@@ -96,7 +96,7 @@ Every case is executable by someone who has never seen the app:
 - `trace`: `AC-n` (or `AC-n, AC-m`), plus the control rule when there is one (`AC-2, CR-3`), or `REG`, `NFR`, or `D-n` for a discrepancy check.
 - `category`: functional | navigation | ui | accessibility | security | responsive | performance | permissions | resilience | regression.
 - `type`: positive | negative | boundary | state | data-variety | adversarial.
-- `priority`: P1 (smoke, blocks release) | P2 (high) | P3 (regression) | P4 (edge). A control rule's "turns back off" case on a P1 flow is P2. An adversarial case is P3, raised to P2 when its failure would corrupt data or let an action run in an invalid state. Security cases are P2.
+- `priority`: P1 (smoke, blocks release) | P2 (high) | P3 (regression) | P4 (edge). A control rule's "turns back off" case on a P1 flow is P2. An adversarial case is P3, raised to P2 when its failure would corrupt data or let an action run in an invalid state. A security case is P2 whatever its type; this rule wins over the adversarial one.
 - `technique`: EP, BVA, decision table, state transition, error guessing, and so on.
 - `oracle`: ac | implied (AC-n) | convention (named).
 - `role` and `viewport`.
@@ -107,9 +107,14 @@ Every case is executable by someone who has never seen the app:
 - `must_not_change`: what the action must leave untouched (other fields, other records, the previous page's state), when that is part of the risk.
 - `mutates`: none | reversible | irreversible.
 - `automatable`: yes | partial (needs a human step, e.g. email) | no (with the reason). A `no` here is planned now as `Not testable` with its reason and question, so execution does not discover it late.
-- `ends_session`: true for a case that signs the user out (the heuristics lines marked *(ends the session)*).
+- `ends_session`: true for a case that signs the user out (the heuristics lines marked *(ends the session)*), and for a signed-out case run in the main session (see below).
+- `guard`: `app` or `browser`, for unsaved-changes guard cases only (see the heuristics' Unsaved-changes guard line).
 
-**Session-ending cases.** With `auth.method` `env-accounts`, they run last within their role group, and the executor signs in again afterward. With `browser-session` or `manual`, the run cannot sign back in, and logging out would end the user's real session. A case that only needs a signed-out visitor (a deep link, a protected URL) runs in a chrome-devtools isolated context when chrome-devtools is connected. Any other session-ending case is planned as `Not testable (ends the session; cannot sign in again under <method>)`, with a question offering test accounts in environment variables.
+**Signed-out and session-ending cases.** Signed-out cases (a deep link or protected URL opened signed out) run in an isolated session when one is available: chrome-devtools itself, or chrome-devtools as `cross_check_provider` alongside Claude in Chrome. Then, by `auth.method`:
+
+- `env-accounts`: session-ending cases run last within their role group, and the executor signs in again afterward. With no isolated session available, a signed-out case runs in the main session as `ends_session: true` (log out, test, sign in again) instead of being planned `Not testable`. The "return to the target after sign-in" half of a deep-link case signs in with the test account and runs normally.
+- `browser-session` or `manual`: the run cannot sign back in, and logging out would end the user's real session. The "redirects to login" half of a signed-out case runs in the isolated session when there is one, and is `Not testable (no isolated session)` otherwise. The "returns to the target after sign-in" half is `Not testable (cannot sign in under <method>)`, oracle `convention`. Any other session-ending case is `Not testable (ends the session; cannot sign in again under <method>)`. Each adds a question offering test accounts in environment variables.
+- `none`: the app has no login, so signed-out cases do not apply. List them under `skipped`.
 
 Keep each case failing for exactly one reason. Do not chain unrelated behaviors to save data; reuse the **record**, not the **case**.
 
@@ -139,7 +144,7 @@ test_plan:
                rules: [{ id: CR-n, control, rule, oracle, source }],
                states: [...], transitions: [{ from, to, trigger }] }
   data_set:  [{ ref: R1, kind, name, created_by: TC-xx|existing, used_by: [TC...], end_state, cleanup: "deleted by TC-14" | "deleted in cleanup via <action>" | "cannot delete: <why>", reason_for_separate_record? }]
-  cases:     [{ id, title, trace, category, type, priority, technique, oracle, role, viewport, data, preconditions, steps, expected, must_not_change?, mutates, automatable, ends_session?, planned_status?, added_after_recon? }]
+  cases:     [{ id, title, trace, category, type, priority, technique, oracle, role, viewport, data, preconditions, steps, expected, must_not_change?, mutates, automatable, ends_session?, guard?, planned_status?, added_after_recon? }]
   charters:  [{ id: EX-n, mission, area, data, look_for }]
   order:     [TC-01, TC-02, ...]
   cleanup:   [{ ref, action }]
@@ -151,9 +156,9 @@ test_plan:
 
 ## phase=refine
 
-Input: the `test_plan` and `recon: { screens: [{ url, title, controls: [{ role, name, state }], text: [...], navigation: [...] }], not_reached: [...], console: [...] }`.
+Input: the `test_plan` and `recon: { screens: [{ url, title, controls: [{ role, name, state }], text: [...], navigation: [...] }], not_reached: [...], console: [...], notes: [...] }`, plus the design inputs listed at the top.
 
-1. Compare each recon screen and control with the model. Add whatever is missing to the model, then design for it with the same rules as above. A new control gets its rules and both-direction cases. A new route, tab or dialog gets the navigation set. A control whose observed state seems to contradict an AC gets a case that tests it. Recon is not a verdict; the case is.
+1. Compare each recon screen and control with the model. Add whatever is missing to the model, then design for it with the same rules as above. A new control gets its rules per step 1, part 2: an `implied` rule and both-direction cases when an AC implies one; otherwise a question asking what should enable it, and cases for its conventions only. A new route, tab or dialog gets the navigation set. A control whose observed state seems to contradict an AC gets a case that tests it. Recon is not a verdict; the case is.
 2. Text the ticket quotes that is missing or different on screen becomes a `ui` case when `ui` is selected, and a question otherwise.
 3. Fit the new cases into the existing data set and order. Add a record only when rule 6 of step 7 requires it. Every new case that uses a record is added to that record's `used_by`, placed before the record's delete case, and added to the delete case's preconditions, so a reproducible failure still blocks the delete and keeps the record for recording. New ids continue after the highest existing one, carry `added_after_recon: true`, and are placed by `order`. Never renumber existing cases.
 4. Re-run the gap review (step 10) on the new parts.

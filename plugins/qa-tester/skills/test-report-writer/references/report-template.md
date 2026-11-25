@@ -166,6 +166,7 @@ Always include this section. Status is `in-place` (the report was written before
 
 ## Not covered
 - Test types not selected for this run: <types>
+- Planned limits, not counted against the verdict: <case>: <reason (environment, login method or provider)>
 - <anything in the ACs or NFRs this run did not cover and why: tooling, environment, provider capability>
 - <screens recon could not reach, and why>
 ```
@@ -191,7 +192,7 @@ Tested: functional, navigation, <chosen types>
 **Not tested**
 - <case>: <reason>
 
-Full report: `<output_dir>/<run_id>/test-report.md`
+Full report: `<report_path>`
 ```
 
 ## Bug text for bug-reporter
@@ -216,5 +217,5 @@ Frequency: reproduced <n> of <n> attempts.
 Impact: <who is affected and how; P1 flow blocked or not; workaround or "no workaround found">
 Evidence: <paths>; console: "<error excerpt>"; network: <METHOD URL status>.
 Attachments (added automatically once this bug is created): <the files that exist, by name: BUG-n.mp4 or BUG-n.gif (reproduction video), <case-id>.png, <case-id>-console.txt, <case-id>-network.txt>
-Fix verification: re-run qa-tester case <TC-id> from <test-plan path>.
+Fix verification: <for a TC case: re-run qa-tester case <TC-id> from <plan_path>. For an OB-n observation: re-run case <the scripted case it was seen in> from <plan_path> and watch for <the symptom>. For an EX-n.k finding: repeat these steps, found under charter EX-n in <plan_path>.>
 ```

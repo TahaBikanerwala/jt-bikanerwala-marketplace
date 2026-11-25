@@ -131,7 +131,7 @@ Answers go to `.claude/qa-tester-policy.json`. It holds no secrets, so you can c
 | `recon_minutes` | `5` | Read-only look at the real screens before execution. `0` turns it off. |
 | `exploratory_minutes` | `10` | `0` turns the exploratory pass off. |
 | `test_data_prefix` | `qa-{id}-` | Every created record starts with this. |
-| `cleanup_test_data` | `ask` | `ask`: non-production asks before deleting; production deletes automatically when every case passed cleanly and asks otherwise (any defect, or any blocked, not-testable or flaky case). `never` keeps everything. |
+| `cleanup_test_data` | `ask` | `ask`: non-production asks before deleting; production deletes automatically when every case passed cleanly and asks otherwise (any defect, or any blocked, flaky or unplanned not-testable case). Cases skipped by the mutation guard, and not-testable cases the plan set up front because of the environment, login or browser, are ignored. `never` keeps everything. |
 | `record_failures` | `ask` | `always` or `never` to skip the question. Videos go to `evidence/BUG-n.mp4`. |
 | `attach_evidence` | `true` | Attaches the video, screenshots and logs to each bug it files. |
 | `attachment_auth` | `{}` | Env var **names** for the REST upload fallback: `azure_devops.pat_env`, `jira.email_env`, `jira.token_env`. |
