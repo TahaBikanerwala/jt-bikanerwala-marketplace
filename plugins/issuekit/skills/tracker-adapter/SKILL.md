@@ -1,6 +1,6 @@
 ---
 name: tracker-adapter
-description: "Auto-detects the active issue-tracker MCP and exposes an abstract verb surface that works across Azure DevOps and Jira. Routes reads (getIssue, searchIssues, ...) and writes (addComment, transition, updateFields, ...) through the vendor adapter resolved at session start. Loads policy from .claude/tracker-policy.json with lazy-prompt fallback. Owns the diff-and-confirm gate that every write batch must pass."
+description: "Tracker-agnostic verb surface over the active Azure DevOps or Jira MCP: detection, policy, reads, writes and the diff-and-confirm gate every write batch passes. Invoked by the tracker-backed agents in this marketplace."
 metadata:
   author: Taha Bikanerwala
 tools: Read, AskUserQuestion
@@ -25,7 +25,7 @@ Before serving any verb call, the caller must run the bootstrap sequence below a
    - URL containing `dev.azure.com` or `visualstudio.com` → azure-devops
    - Key matching `[A-Z][A-Z0-9_]+-\d+` (e.g. `PROJ-123`) → jira
    - Numeric-only ID with no URL, or no issue reference at all (a create flow) → ask once via `AskUserQuestion`, cache for the session only (do not persist).
-3. **Load policy.** Read `.claude/tracker-policy.json` if it exists. Merge with shipped defaults from `references/policy-schema.md`. Track which keys are unset; do not lazy-prompt yet. Runs before step 4: `policy.default_project`/`policy.default_team` is the first precedence tier in that step's `defaultProject`/`defaultTeam` resolution.
+3. **Load policy.** Read `.claude/tracker-policy.json` if it exists. Merge with shipped defaults from `references/policy-defaults.json` (a `null` means no shipped value). Do not read `references/policy-schema.md` at bootstrap; open it only when a key needs its full rules (a lazy prompt, validation, or legacy migration). Track which keys are unset; do not lazy-prompt yet. Runs before step 4: `policy.default_project`/`policy.default_team` is the first precedence tier in that step's `defaultProject`/`defaultTeam` resolution.
 4. **Bootstrap identity.** Call `whoAmI()` (see `references/verbs.md`). The adapter implementations are in `adapters/<tracker>/`. Cache `{trackerUser, defaultProject, defaultTeam, email}`. On AzDO, `defaultProject`/`defaultTeam` are not a bare tool-call result — resolve them per `references/verbs.md`'s "Resolving AzDO's `defaultProject`/`defaultTeam`" precedence (policy override from step 3, then the AzDO MCP server's own `ado_mcp_project`/`ado_mcp_team` config in `.mcp.json`, then single-project auto-resolve, then lazy-prompt). If a chat backend was detected and `email` is non-null, call `resolveChatUser({ email })` (see `references/verbs.md`'s "Chat" section) and cache the result as the running user's chat identity — `null` if the lookup misses. This is the default `sendMessage` target for a caller that wants to message "yourself"; when `email` is `null` or the lookup misses, that default is unavailable for the session.
 5. **Legacy config migration warning.** If any of the legacy paths exists and no `.claude/tracker-policy.json` is present, read it forward once and print a one-time warning:
    - `.claude/azure-incident-postmortem.config.json`

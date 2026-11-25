@@ -1,5 +1,5 @@
 ---
-description: Read-only test-id coverage report. Lists every interactive and form element in scope, which already have a data-testid, which are missing one, and the id the injector would generate. Writes nothing.
+description: "Read-only. Report which interactive elements have or lack a data-testid and the ids the injector would generate."
 argument-hint: "[path or glob] (default: project's UI source)"
 allowed-tools: Skill, Read, Grep, Glob, Bash
 ---

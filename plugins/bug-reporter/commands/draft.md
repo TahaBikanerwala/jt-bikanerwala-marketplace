@@ -1,5 +1,5 @@
 ---
-description: Read-only. Print the complete bug report the agent would file, including the list of missing information, without creating or updating anything in the tracker.
+description: "Read-only. Print the bug report the agent would file, without touching the tracker."
 argument-hint: <one-line symptom | bug URL or id | path to a report file> (optional)
 allowed-tools: Skill
 ---

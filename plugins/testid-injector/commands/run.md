@@ -1,5 +1,5 @@
 ---
-description: Scan UI source for form controls, dropdowns, options, links, and interactive elements missing a data-testid, generate stable semantic kebab-case ids, and write them in. All edits pass through one diff-and-confirm gate.
+description: "Add missing data-testid attributes to interactive UI elements, behind one diff-and-confirm gate."
 argument-hint: "[path or glob] (default: project's UI source)"
 allowed-tools: Skill, Read, Edit, Grep, Glob, Bash, AskUserQuestion
 ---

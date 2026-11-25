@@ -1,5 +1,5 @@
 ---
-description: Generate a Google-SRE-style blameless postmortem for an incident issue. Pass the URL or ID; the agent gathers evidence, builds a timeline, asks once before generating, and produces the document.
+description: "Generate a blameless postmortem for an incident URL or ID, with one review stop after the timeline."
 argument-hint: <incident URL or ID>
 allowed-tools: Skill
 ---

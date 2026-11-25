@@ -1,5 +1,5 @@
 ---
-description: Turn ambiguous requirements into INVEST user stories and create them in the tracker tagged Draft. Brainstorms, clarifies blocking gaps, asks which stories to create, probes the codebase to self-answer open questions, then creates the selected stories through a single diff-and-confirm gate.
+description: "Turn rough requirements into INVEST user stories and create the chosen ones tagged Draft, behind one diff-and-confirm gate."
 argument-hint: <pasted requirements | path to a notes/transcript file | short brief> (optional)
 allowed-tools: Skill
 ---

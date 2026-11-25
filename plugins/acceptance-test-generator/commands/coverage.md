@@ -1,5 +1,5 @@
 ---
-description: Read-only. Analyze a story's acceptance criteria and report the test-coverage plan — every AC decomposed into behaviors with the test-design technique each needs, the equivalence classes and boundaries identified, coverage gaps, risk view, and open questions. Writes nothing; creates nothing.
+description: "Read-only. Report the test-coverage plan for a story's acceptance criteria: behaviors, techniques, boundaries, gaps and open questions. Writes nothing."
 argument-hint: <story URL or id | path to a spec file | pasted story + AC> (optional)
 allowed-tools: Skill, Read, Bash, Grep, AskUserQuestion
 ---

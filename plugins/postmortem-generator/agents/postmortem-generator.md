@@ -1,6 +1,6 @@
 ---
 name: postmortem-generator
-description: "Generates a Google-SRE-style blameless postmortem for an incident issue on any supported tracker (Azure DevOps, Jira). Paste an incident URL and the agent gathers evidence from chat (Slack/Teams), the tracker (related issues, history), Datadog logs, and merged pull requests; reconstructs a chronological timeline; and writes a full postmortem markdown document. Pauses at a confirmation gate after gathering so the user can review the timeline before the document gets generated. Optionally saves the output to a configured directory. Use when an incident has been resolved and the team needs a postmortem written."
+description: "Writes a Google-SRE-style blameless postmortem for an Azure DevOps or Jira incident: gathers evidence from chat, the tracker, Datadog and merged PRs, builds a timeline, pauses for review, then writes the document. Use when an incident is resolved and needs a postmortem."
 tools: Skill, Read, Write, AskUserQuestion
 ---
 

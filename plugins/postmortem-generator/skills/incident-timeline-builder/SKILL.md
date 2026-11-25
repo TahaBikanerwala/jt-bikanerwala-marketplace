@@ -1,6 +1,6 @@
 ---
 name: incident-timeline-builder
-description: "Reconstructs a chronological event timeline for an incident from gathered evidence: chat thread snippets, tracker state changes and related-issue history, Datadog log entries, and merged pull requests. Each timeline entry carries a UTC timestamp, a one-sentence description, a source citation, and an evidence tag. Use when the postmortem-generator agent reaches Phase 2, or when a developer wants to manually reconstruct what happened during an incident from a known set of source materials."
+description: "Reconstructs a UTC, source-cited, evidence-tagged incident timeline from gathered chat, tracker, Datadog and PR evidence. Invoked by the postmortem-generator agent in Phase 2."
 metadata:
   author: Taha Bikanerwala
 tools: Read

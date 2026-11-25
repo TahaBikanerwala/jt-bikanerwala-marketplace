@@ -1,5 +1,5 @@
 ---
-description: Set or change qa-tester's saved preferences. Asks one four-question card (environments and default, login method, whether tests may change data, extra coverage) and writes .claude/qa-tester-policy.json. Stores env var names, never credentials.
+description: "Set qa-tester preferences (environments, login method, data changes, extra coverage) in .claude/qa-tester-policy.json. Stores env var names, never credentials."
 argument-hint: (none)
 ---
 

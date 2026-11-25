@@ -1,5 +1,5 @@
 ---
-description: Write a complete Bug work item in the tracker from a single line, or refine an ambiguously written existing Bug into one. Searches for duplicates, asks only what the reporter alone can answer, and creates or updates behind a single diff-and-confirm gate. Fast by design: no codebase dig, no investigation.
+description: "Write a complete Bug work item from a single line, or refine a vague existing Bug, behind one diff-and-confirm gate. No code investigation."
 argument-hint: <one-line symptom | bug URL or id | path to a report file> (optional)
 allowed-tools: Skill
 ---

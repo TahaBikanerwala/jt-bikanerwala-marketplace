@@ -1,5 +1,5 @@
 ---
-description: Test a ticket or pull request in a real browser like a senior QA. Reads the ticket and its linked PRs (both directions), treats the ticket's acceptance criteria as the source of truth and flags where the PR differs, drafts an edge-case test plan on a minimal shared data set, executes every case via chrome-devtools MCP or Claude in Chrome, asks all questions at the end, and optionally posts results and files bugs behind gates.
+description: "Test a ticket or PR in a real browser against its acceptance criteria, with an edge-case plan, evidence, end-of-run questions and gated results and bugs."
 argument-hint: <ticket URL/key | PR URL | #PR> [--env <name>]
 ---
 

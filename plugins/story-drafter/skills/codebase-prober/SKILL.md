@@ -1,6 +1,6 @@
 ---
 name: codebase-prober
-description: "Given a set of open questions about drafted stories, reads the local codebase read-only to self-answer the ones the code already answers: how an area is built, where it lives, what patterns to follow, whether a capability already exists. Returns each answer tagged by evidence ([VERIFIED]/[OBSERVED]/[INFERRED]/[UNKNOWN]) plus a where-to-look pointer for the unresolved ones. Use as the last step before writing stories, to trim open questions the team would otherwise have to answer."
+description: "Reads the local codebase read-only to answer open questions about drafted stories, with evidence tags and where-to-look pointers. Invoked by the story-drafter agent."
 metadata:
   author: Taha Bikanerwala
 tools: Read, Bash, Grep

@@ -1,6 +1,6 @@
 ---
 name: delta-analyzer
-description: "Diffs two sprint snapshots (a baseline and the current fetch) into a progress-delta model: what shipped, what newly started, what was added or dropped from the sprint, what newly blocked or went stale, what regressed, and how percent-complete and remaining work moved between the two points in time. Pure computation, no tracker access. Invoked by the sprint-status-reporter agent in delta mode after sprint-analyzer."
+description: "Diffs a baseline and current sprint snapshot into a progress-delta model. Pure computation. Invoked by the sprint-status-reporter agent in delta mode."
 metadata:
   author: Taha Bikanerwala
 tools: Read

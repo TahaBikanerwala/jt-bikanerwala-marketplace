@@ -1,5 +1,5 @@
 ---
-description: Turn a user story and its acceptance criteria into a rigorous BDD test suite. Analyzes the ACs with senior test-design technique, clarifies blocking gaps, writes canonical Gherkin .feature files with smartly consolidated scenarios, and optionally creates them as Test Case work items linked to the story — behind diff-and-confirm gates. Tests derive only from the story/AC; code is read for reference only.
+description: "Turn a user story and its acceptance criteria into Gherkin .feature files, optionally created as linked Test Case work items behind diff-and-confirm gates."
 argument-hint: <story URL or id | path to a spec file | pasted story + AC> (optional)
 allowed-tools: Skill, Read, Write, Bash, Grep, AskUserQuestion
 ---

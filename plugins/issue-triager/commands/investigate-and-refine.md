@@ -1,5 +1,5 @@
 ---
-description: Lightweight triage. Investigate and refine the title/description only. No codebase dig, no assignment, no transition, no severity write, no escalation. Useful when you want to clean up a ticket without committing to the full triage cycle.
+description: "Lightweight triage: investigate and refine the title and description only. No code dig, assignment, transition, severity or escalation."
 argument-hint: <issue URL or ID>
 allowed-tools: Skill
 ---

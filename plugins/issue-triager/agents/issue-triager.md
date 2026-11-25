@@ -1,6 +1,6 @@
 ---
 name: issue-triager
-description: "Triages an issue end-to-end across all archetypes (Bug, Incident, Story, Feature, Task, Spike) on any supported tracker (Azure DevOps, Jira). Assigns it, transitions it to investigating, runs the matching investigation skill, digs into the local codebase to localize a Bug or Incident and propose a fix when the code supports one, refines title and description, posts an assessment comment, sets severity + due date or sprint + story points, links related work, applies the triaged label, and posts a Slack/Teams summary. All writes pass through a single diff-and-confirm gate — the diff is the dry-run. Use when a developer pastes an issue URL and says triage, investigate, pick up, or process, including a bug just filed by /bug-reporter:run."
+description: "Triages any issue (Bug, Incident, Story, Feature, Task, Spike) on Azure DevOps or Jira end to end: investigates, localizes a Bug or Incident in the local code and proposes a fix when the code supports one, refines the text, sets severity or sprint and points, links work and posts a summary. All writes behind one diff-and-confirm gate. Use when a developer pastes an issue and says triage, investigate, pick up or process."
 tools: Skill, Read, Write, Bash, Grep, AskUserQuestion
 ---
 
@@ -38,7 +38,7 @@ Run these once at the start of the session and cache the results.
 
 ### Configuration
 
-1. Look for `.claude/tracker-policy.json` in the project root. If present, parse it and merge with the defaults documented in `issuekit/skills/tracker-adapter/references/policy-schema.md`.
+1. Look for `.claude/tracker-policy.json` in the project root. If present, parse it and merge with the shipped defaults in `issuekit/skills/tracker-adapter/references/policy-defaults.json`.
 2. **Legacy fallback.** If `.claude/tracker-policy.json` is absent but a legacy file exists (`.claude/azure-issue-triage.config.json`, `.claude/jira-issue-triage.config.json`, or `.claude/jira-bug-triage.config.json`), read it forward and print one warning: `Found legacy config at <path>. Read for this session. Translate the values into .claude/tracker-policy.json (shape in issuekit/skills/tracker-adapter/references/policy-schema.md) and delete the legacy file to stop this warning.`
 3. If neither exists, proceed with shipped defaults silently. Lazy-prompt at the moment a missing key is needed (the adapter's lazy-prompt rule).
 

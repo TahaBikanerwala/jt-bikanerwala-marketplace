@@ -1,6 +1,6 @@
 ---
 name: executive-blurb-writer
-description: "Turns a fetched list of tracker work items into one plain-language, client-facing blurb per item: one short sentence stating what was delivered or changed, and a second sentence only when the ticket's own text supports a why-it-matters claim that cannot be folded into the first. Pure computation, no tracker access. Invoked by the ticket-summarizer agent."
+description: "Writes one short, client-facing blurb per fetched work item. Pure computation. Invoked by the ticket-summarizer agent."
 metadata:
   author: Taha Bikanerwala
 tools: Read

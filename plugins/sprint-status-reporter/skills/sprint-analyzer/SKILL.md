@@ -1,6 +1,6 @@
 ---
 name: sprint-analyzer
-description: "Turns a raw sprint item list plus optional team capacity into a status-report metrics model: buckets items into Done / In Progress / To Do, computes percent complete by count and by points, counts remaining work, flags blocked and stale items, picks the up-next set, and summarizes capacity. Pure computation, no tracker access. Invoked by the sprint-status-reporter agent."
+description: "Turns raw sprint items and capacity into a status metrics model (state buckets, percent complete, blocked, stale, up next). Pure computation. Invoked by the sprint-status-reporter agent."
 metadata:
   author: Taha Bikanerwala
 tools: Read

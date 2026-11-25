@@ -1,5 +1,5 @@
 ---
-description: Show what changed in a sprint between two points in time. What shipped, what newly started, scope added or dropped, new risk, and how progress moved. Emits a Marp delta deck. Read-only; safe to run anytime.
+description: "Read-only. Show what changed in the sprint between two points in time as a Marp delta deck."
 argument-hint: "[sprint name or ID] [--team <name>] [--since <YYYY-MM-DD>] [--baseline <path>] [--export pptx|pdf]"
 allowed-tools: Skill
 ---

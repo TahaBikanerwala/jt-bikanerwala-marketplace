@@ -1,6 +1,6 @@
 ---
 name: story-writer
-description: "Writes one INVEST user story from a distinct user need, in a fixed template: Problem Statement, Background, Description (As a/I want/so that), Given/When/Then acceptance criteria, In Scope / Out of Scope, Definition of Done, and an Open Questions table. Emits the description-field content and the acceptance-criteria content as separate labelled blocks so the caller can map them to the tracker's Description and Acceptance Criteria fields. Use after the team has selected which stories to create."
+description: "Writes one INVEST user story in the fixed story-drafter template, with description and acceptance criteria as separate blocks. Invoked by the story-drafter agent."
 metadata:
   author: Taha Bikanerwala
 tools: Read

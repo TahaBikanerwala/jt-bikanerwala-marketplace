@@ -1,5 +1,5 @@
 ---
-description: Read-only. Reads a ticket and its linked PRs (or a PR and its tickets), reconciles them with the ticket as source of truth, and drafts the full edge-case test plan with its minimal shared data set. Writes docs/qa/<id>/test-plan.md only; opens no browser and writes nothing to the tracker.
+description: "Read-only. Reconcile a ticket and its PRs and write the edge-case test plan to docs/qa/<id>/test-plan.md. No browser, no tracker writes."
 argument-hint: <ticket URL/key | PR URL | #PR> [--env <name>]
 ---
 

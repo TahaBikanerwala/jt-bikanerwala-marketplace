@@ -1,5 +1,5 @@
 ---
-description: Read the current sprint, tally work by state, flag blocked/stale items, and emit a Marp status deck. Read-only; safe to run anytime.
+description: "Read-only. Tally the current sprint by state, flag blocked and stale items, and emit a Marp status deck."
 argument-hint: "[sprint name or ID] [--team <name>] [--export pptx|pdf]"
 allowed-tools: Skill
 ---

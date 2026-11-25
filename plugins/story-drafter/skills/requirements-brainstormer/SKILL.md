@@ -1,6 +1,6 @@
 ---
 name: requirements-brainstormer
-description: "Reads raw, ambiguous requirements (pasted notes, a meeting transcript, a feature request) and produces an exhaustive topic-by-topic requirement analysis: what was asked and why, how it connects to the existing product, priority and timeline signals, open questions grouped as blocking vs deferrable, PM risks and alternatives, and unresolved follow-ups. Use as the first analytical step before writing user stories, when the input is unstructured and needs to be broken down before anything can be built."
+description: "Breaks raw, ambiguous requirements into a topic-by-topic analysis with blocking and deferrable open questions. Invoked by the story-drafter agent."
 metadata:
   author: Taha Bikanerwala
 tools: Read

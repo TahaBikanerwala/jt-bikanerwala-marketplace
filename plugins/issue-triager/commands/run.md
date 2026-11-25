@@ -1,5 +1,5 @@
 ---
-description: Full end-to-end issue triage. Investigates, digs into the codebase to localize a bug and propose a fix, refines title/description, sets severity/sprint, links related work, applies the triaged label, and posts a summary. All writes pass through a single diff-and-confirm gate.
+description: "Full issue triage: investigate, localize a bug in code, refine, set severity or sprint, link work and summarize, behind one diff-and-confirm gate."
 argument-hint: <issue URL or ID>
 allowed-tools: Skill
 ---

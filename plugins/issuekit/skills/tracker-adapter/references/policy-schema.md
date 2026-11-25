@@ -1,78 +1,14 @@
 # Policy schema
 
-Path: `.claude/tracker-policy.json` (project-root). Optional. When absent, the adapter uses the shipped defaults below and lazy-prompts at the moment a missing key is needed.
+Path: `.claude/tracker-policy.json` (project-root). Optional. When absent, the adapter uses the shipped defaults in `policy-defaults.json` and lazy-prompts at the moment a missing key is needed.
 
 ## Shape
 
-```json
-{
-  "states": {
-    "investigating": null,
-    "waiting_reply": null,
-    "backlog": null
-  },
-  "severity_scheme": {
-    "sev1": { "due_offset_days": 1,  "escalate_immediately": true },
-    "sev2": { "due_offset_days": 3,  "escalate_immediately": true },
-    "sev3": { "due_offset_days": 7,  "escalate_immediately": false },
-    "sev4": { "due_offset_days": 30, "escalate_immediately": false }
-  },
-  "severity_label_map": {
-    "sev1": ["1 - Critical", "Sev-1", "Critical"],
-    "sev2": ["2 - High",     "Sev-2", "High"],
-    "sev3": ["3 - Medium",   "Sev-3", "Medium"],
-    "sev4": ["4 - Low",      "Sev-4", "Low"]
-  },
-  "escalation": {
-    "channel": null,
-    "primary_contact": null,
-    "fallback_contact": null
-  },
-  "skip_labels": ["triaged"],
-  "triaged_label": "triaged",
-  "output_directory": "./docs/postmortems/",
-  "archetype_assignment_after_triage": {
-    "Bug":       "unassign",
-    "Incident":  "self",
-    "Story":     "self",
-    "Feature":   "self",
-    "Task":      "self",
-    "Spike":     "self"
-  },
-  "state_categories": {
-    "done":        ["Done", "Closed", "Resolved"],
-    "in_progress": ["Active", "Committed", "In Progress", "Doing", "In Review"],
-    "todo":        ["New", "Approved", "To Do", "Open", "Backlog"]
-  },
-  "blocked_indicators": {
-    "labels":       ["blocked", "impediment"],
-    "states":       ["Blocked"],
-    "board_column": null
-  },
-  "stale_after_days": 3,
-  "points_field_name": null,
-  "story_work_item_type": { "azure-devops": "User Story", "jira": "Story" },
-  "feature_work_item_type": { "azure-devops": "Feature" },
-  "draft_label": "Draft",
-  "priority_label_map": { "P0": "Highest", "P1": "High", "P2": "Medium" },
-  "acceptance_criteria_field": null,
-  "bug_work_item_type": { "azure-devops": "Bug", "jira": "Bug" },
-  "reported_label": "needs-triage",
-  "bug_repro_steps_field": "Microsoft.VSTS.TCM.ReproSteps",
-  "bug_system_info_field": "Microsoft.VSTS.TCM.SystemInfo",
-  "default_project": null,
-  "default_team": null,
-  "postmortem_template": "google-sre",
-  "incident_identifier": { "tag": "incident", "work_item_types": ["Issue", "Bug", "Incident"] },
-  "datadog_default_service": null,
-  "include_action_items": true,
-  "include_timeline_evidence_links": true
-}
-```
-
-All keys are optional. Missing keys fall back to defaults. A `null` default means "no
-shipped value": the key is lazy-prompted when a verb first needs it (`states.*`), or the
-feature it configures is skipped (`escalation.*`), as each key's section says.
+The shipped defaults live in `policy-defaults.json` next to this file: every key, with
+its default value. All keys are optional. Missing keys fall back to those defaults. A
+`null` default means "no shipped value": the key is lazy-prompted when a verb first needs
+it (`states.*`), or the feature it configures is skipped (`escalation.*`), as each key's
+section says.
 
 ## Key reference
 
@@ -97,13 +33,13 @@ Maps abstract severity tiers (`sev1`..`sev4`) to SLA semantics.
 - **`due_offset_days`** — number of days from today to set as the due date.
 - **`escalate_immediately`** — boolean; if true, the verb-plugin pings the escalation channel as soon as severity is determined.
 
-**Default if unset:** the shape above (1/3/7/30 days; sev1 and sev2 escalate). Lazy-prompt only the parts the user wants to override.
+**Default if unset:** the value in `policy-defaults.json` (1/3/7/30 days; sev1 and sev2 escalate). Lazy-prompt only the parts the user wants to override.
 
 ### `severity_label_map` (object)
 
 Maps abstract severity tiers to the vendor-side label values. The adapter uses this to project `severity: "sev1"` (abstract) to the vendor's actual option value (`"1 - Critical"` for AzDO Agile, `"Sev-1"` for many Jira projects).
 
-If unset, the adapter uses the default above. If the vendor schema (from `getIssueTypeSchema`) does not contain any of the listed values, it lazy-prompts the user with the schema's enum options.
+If unset, the adapter uses the value in `policy-defaults.json`. If the vendor schema (from `getIssueTypeSchema`) does not contain any of the listed values, it lazy-prompts the user with the schema's enum options.
 
 ### `escalation` (object)
 
@@ -132,7 +68,7 @@ After triage finishes, who should be assigned to the issue. Per-archetype:
 - `"unassign"` — clear the assignee.
 - `"keep"` — leave the assignee unchanged.
 
-Default: shape above. Bugs get unassigned (because triage hands off to whoever picks them up). Everything else stays with the triager.
+Default: the value in `policy-defaults.json`. Bugs get unassigned (because triage hands off to whoever picks them up). Everything else stays with the triager.
 
 ### `state_categories` (object)
 
@@ -140,7 +76,7 @@ Buckets vendor state names into the three report categories used by `getSprintIt
 
 Used only by sprint reads. When a state is not listed here, the adapter falls back to the vendor's own category signal (AzDO work-item-type `category`; Jira `statusCategory.key`). A state that matches neither becomes `stateCategory: "unknown"` and the consumer emits a one-line warning naming the unmapped state.
 
-**Default if unset:** the shape above (covers the common Agile/Scrum/Basic AzDO states and the default Jira workflow). Because the vendor-category fallback already handles most states, this key is rarely lazy-prompted; prompt only if a sprint contains an `unknown` state the user must classify.
+**Default if unset:** the value in `policy-defaults.json` (covers the common Agile/Scrum/Basic AzDO states and the default Jira workflow). Because the vendor-category fallback already handles most states, this key is rarely lazy-prompted; prompt only if a sprint contains an `unknown` state the user must classify.
 
 ### `blocked_indicators` (object)
 
@@ -309,4 +245,4 @@ The verb-plugins read these legacy paths forward for the session if they exist a
 - `.claude/jira-issue-triage.config.json`
 - `.claude/jira-bug-triage.config.json`
 
-They print one warning per session pointing at the legacy file path. To stop the warning, translate the values into `.claude/tracker-policy.json` (the shape above) and delete the legacy file. Lazy prompts will offer to persist any missing keys after that.
+They print one warning per session pointing at the legacy file path. To stop the warning, translate the values into `.claude/tracker-policy.json` (same shape as `policy-defaults.json`) and delete the legacy file. Lazy prompts will offer to persist any missing keys after that.

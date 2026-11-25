@@ -1,5 +1,5 @@
 ---
-description: Fetch Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status, and print a concise executive summary per item (one short sentence, rarely a second) for a client-update deck. Read-only; safe to run anytime.
+description: "Read-only. Print a one-line executive summary per Azure DevOps or Jira work item, from a ticket list or a date range and status."
 argument-hint: "<ticket ids/urls...> | --range this-week|last-week|this-month|last-month | --from <date> --till <date> [--status active|delivered|closed|updated[,...]] [--project <name>] [--scope <area-path-or-component>] [--tags <name>[,<name>...]] [--to <target>] [--output <path>] [--detailed] [keywords...]"
 allowed-tools: Skill
 ---

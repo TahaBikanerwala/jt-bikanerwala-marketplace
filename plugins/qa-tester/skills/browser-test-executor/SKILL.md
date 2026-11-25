@@ -1,6 +1,6 @@
 ---
 name: browser-test-executor
-description: "Runs a qa-tester test plan in a real browser. Detects the provider (chrome-devtools MCP preferred for console, network, emulation and Lighthouse; Claude in Chrome when the user's logged-in session is wanted or devtools is absent), preflights the environment, login and deployed build, then executes every case in order without pausing: drives the steps, asserts expected results from the page, captures console errors, failed requests and screenshots, re-runs failures to separate flakes, keeps a ledger of every record created, and runs exploratory charters. Assigns Pass, Fail, Blocked, Not testable or Skipped with evidence and severity. After the run, records an mp4 video of each chosen defect's reproduction (phase=record) and deletes the test data once the agent allows it (phase=cleanup). Invoked by the qa-tester agent in Phases 0, 4, 5 and 7."
+description: "Runs a qa-tester plan in a real browser (chrome-devtools MCP or Claude in Chrome): preflight, every case with console, network and screenshot evidence, defect videos (phase=record) and test-data cleanup (phase=cleanup). Invoked by the qa-tester agent in Phases 0, 4, 5 and 7."
 metadata:
   author: Taha Bikanerwala
 ---

@@ -1,6 +1,6 @@
 ---
 name: testid-injector
-description: "Adds missing data-testid attributes to web UI source. Scans a codebase or a scoped path, finds every form control, dropdown, dropdown option, link, and interactive element that lacks a test id, generates stable semantic kebab-case ids, and writes them in. Idempotent (never overwrites an existing id) and gated: every change passes through one diff-and-confirm step. Auto-detects React/JSX/TSX, plain HTML, Vue SFC, and Angular templates. Use when a developer says add test ids, inject data-testid, find untagged elements, or audit test-id coverage."
+description: "Adds missing data-testid attributes to React, HTML, Vue or Angular UI source with stable semantic kebab-case ids. Idempotent, behind one diff-and-confirm gate. Use when a developer says add test ids, inject data-testid, find untagged elements or audit test-id coverage."
 tools: Skill, Read, Edit, Write, Grep, Glob, Bash, AskUserQuestion
 ---
 

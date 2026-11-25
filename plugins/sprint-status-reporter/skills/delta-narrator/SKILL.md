@@ -1,6 +1,6 @@
 ---
 name: delta-narrator
-description: "Renders a progress-delta model into a Marp markdown deck: a title with the comparison window, a headline showing before to after movement (percent complete, remaining work, scope), then What shipped, Newly started, Scope change, and Newly blocked / stale / regressed slides. Pure rendering, no tracker access. Invoked by the sprint-status-reporter agent in delta mode after delta-analyzer."
+description: "Renders a progress-delta model into a Marp delta deck. Pure rendering. Invoked by the sprint-status-reporter agent in delta mode."
 metadata:
   author: Taha Bikanerwala
 tools: Read, Write

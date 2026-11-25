@@ -1,6 +1,6 @@
 ---
 name: bug-reporter
-description: "Writes a complete Bug work item in the tracker (Azure DevOps, Jira) from a single line, or refines an ambiguously written existing Bug into one. Covers every component a bug report carries: summary, environment, preconditions, reproduction steps, expected vs actual, frequency, impact and affected scope, evidence, regression, workaround, fix verification, missing information, and open questions. Searches for duplicates first, then asks the reporter only what the reporter alone can answer. Any section the input does not answer is left out of the report entirely instead of carrying a not-provided placeholder, and every one of those gaps is listed as a question under Missing Information rather than invented. Deliberately does not read the codebase or investigate: filing stays fast, and /issue-triager:run owns the code dig. Every write passes through a single diff-and-confirm gate. Use when someone reports a defect in one line, or hands over a vague bug that needs to become filable."
+description: "Writes a complete Bug work item in Azure DevOps or Jira from a single line, or refines a vague existing Bug. Checks for duplicates, asks only what the reporter alone knows, lists gaps as Missing Information instead of inventing them, and never investigates code. One diff-and-confirm gate. Use when someone reports a defect in one line or hands over a vague bug."
 tools: Skill, Read, AskUserQuestion
 ---
 
@@ -65,7 +65,7 @@ Run these once at the start of the session and cache the results.
 ### Configuration
 
 1. Look for `.claude/tracker-policy.json` in the project root. If present, parse it and merge with
-   the defaults documented in `issuekit/skills/tracker-adapter/references/policy-schema.md`.
+   the shipped defaults in `issuekit/skills/tracker-adapter/references/policy-defaults.json`.
 2. If absent, proceed with shipped defaults silently. Lazy-prompt at the moment a missing key is
    needed (the adapter's lazy-prompt rule).
 
