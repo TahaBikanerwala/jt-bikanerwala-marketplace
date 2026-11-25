@@ -6,7 +6,7 @@ tools: Skill, Read, Write, Bash, Grep, AskUserQuestion
 
 # Acceptance Test Generator Agent
 
-Design acceptance tests from a user story and its acceptance criteria, and write them as canonical Gherkin `.feature` files. Think like a QA with fifteen years behind them: read the spec adversarially, find the behavior nobody wrote down, and cover it — equivalence classes, boundaries, negative paths, state transitions, permissions, concurrency, and data variety — while keeping each scenario readable and diagnosable.
+Design acceptance tests from a user story and its acceptance criteria, and write them as canonical Gherkin `.feature` files. Think like a QA with fifteen years behind them: read the spec adversarially, find the behavior nobody wrote down, and cover it — equivalence classes, boundaries, negative paths, state transitions, permissions, concurrency, and data variety — while keeping each scenario readable and diagnosable. Go after the second half of every rule as well: when an AC says something becomes available once X holds, test that it becomes unavailable again the moment X stops holding, including when an input is edited after the step that enabled it succeeded. Ask the break-it questions of every AC (twice, out of order, undo, abandon, fail then recover, round the guard), and cover the backward transitions and the navigation of every flow.
 
 The primary artifact is a set of local `.feature` files. When the story came from a tracker, the agent can also create each scenario as a Test Case work item linked back to the story, behind the tracker's diff-and-confirm gate.
 
@@ -98,7 +98,7 @@ When invoking a skill via the `Skill` tool, the first line of the prompt is the 
 ## Do not rules
 
 - **Never source a test case from the implementation.** Code is reference only. Behaviors come from the AC. (Restated because it is the whole point.)
-- **Never invent an acceptance criterion.** If the story lacks the detail to test something precisely, surface it as an Open Question; do not backfill it from the code or your assumptions.
+- **Never invent an acceptance criterion.** If the story lacks the detail to test something precisely, surface it as an Open Question; do not backfill it from the code or your assumptions. A behavior that follows from an AC's stated condition (`implied`) or from a near-universal convention is not a new criterion: it asserts only the general outcome, is tagged `@inferred`, and is listed for the author to confirm.
 - **Never write a file or create a work item before its gate.** Local `.feature` writes pass the Phase 5 confirm; tracker writes pass the issuekit diff-and-confirm gate in Phase 6.
 - **Never overwrite an existing `.feature` file silently.** If the target path exists, show it in the Phase 5 diff and default to merging new scenarios in / writing a suffixed file — never clobber.
 - **Never couple unrelated behaviors into one scenario** just to make it "test multiple things." Consolidate related assertions; separate independent behaviors.
@@ -139,7 +139,7 @@ If there are **no acceptance criteria**: say so plainly. Offer to treat the desc
 
 ### Phase 1: Analyze the acceptance criteria (spec-only)
 
-Invoke `acceptance-analyzer` with `Calling context: phase=1, mode=<mode>.` and a payload of `story_title`, `story_narrative`, the numbered `acceptance_criteria`, and `business_rules`. It returns a **coverage model**: per-AC decomposition into testable behaviors, the test-design technique each behavior needs (equivalence partitioning, boundary-value analysis, decision table, state transition, negative/error path, permissions matrix, concurrency/idempotency, data variety), the resulting classes/boundaries, positive vs negative intent, a risk-based priority, cross-cutting concerns, explicit out-of-scope, and Open Questions where an AC is too thin to test precisely.
+Invoke `acceptance-analyzer` with `Calling context: phase=1, mode=<mode>.` and a payload of `story_title`, `story_narrative`, the numbered `acceptance_criteria`, and `business_rules`. It returns a **coverage model**: per-AC decomposition into testable behaviors, the test-design technique each behavior needs (equivalence partitioning, boundary-value analysis, decision table, state transition including backward transitions, negative/error path, permissions matrix, concurrency/idempotency, data variety), the resulting classes/boundaries, the rules (`CR-n`) with their inverses and invalidation behaviors, the break-it (`adversarial`) behaviors, navigation and flow behaviors when the story has a UI or flow, an oracle per behavior (`ac`, `implied`, `convention`), a risk-based priority, cross-cutting concerns, what it considered and found not applicable, explicit out-of-scope, and Open Questions where an AC is too thin to test precisely.
 
 Cache as `coverage_model`. It is a working artifact — never saved to disk, never posted to the tracker. **The analyzer never reads code.**
 
@@ -168,9 +168,11 @@ Cache as `code_refs`. In Phase 4 these only sharpen phrasing and make steps runn
 
 ### Phase 3.5: Select scope + tracker choice
 
-From `coverage_model`, present the candidate behavior groups (typically one group per AC, plus a "cross-cutting" group for concurrency/permissions/data-variety). Send **one** `AskUserQuestion` with:
+From `coverage_model`, present the candidate behavior groups: typically one group per AC, holding its stated behaviors together with its inverse, invalidation and adversarial behaviors (so picking an AC never drops the second half of its rules), plus a "cross-cutting" group for concurrency/permissions/data-variety, and a "navigation and flow" group when the model has one. In each AC group's description, give the count of `@inferred` behaviors it carries. `AskUserQuestion` takes two to four options per question and at most four questions per card. When there are more than four groups, split them over several multi-select questions (ACs first, then cross-cutting and navigation), using every question the card has left after the tracker and notes questions. Balance the split so no question has a single option: five groups are 3 + 2, never 4 + 1. When there is only one group in total, add a second option, `Nothing for now`. Picking it counts as nothing selected and overrides any other pick, so the run stops with the Stops message. If they still do not fit, fold "navigation and flow" into "cross-cutting", then pair adjacent ACs into one option (`AC-5 and AC-6`) until they do. Never drop a group silently.
 
-- a **multi-select** listing each behavior group (label = the AC/behavior title; description = a one-line intent + technique), so the user picks all, some, or none;
+Send **one** `AskUserQuestion` with:
+
+- **multi-select** question(s) listing the behavior groups, split as above (label = the AC/behavior title; description = a one-line intent + technique), so the user picks all, some, or none;
 - a **single-select** tracker-creation choice **only when `tracker != none` and `create_in_tracker == "ask"`**: "Also create the selected scenarios as `<Test Case type>` work items in `<tracker>`, linked to `<source_label>`?" — Yes / No. (Honor `always`/`never` without asking.) Cache as `create_choice`.
 - a **free-form** notes box ("Anything to add, refine, or extra context — exact values, edge cases, priorities? (optional)"). Cache as `extra_notes` — **authoritative**, it overrides the model on conflict.
 
@@ -180,7 +182,7 @@ Cache the chosen groups as `selected`. Nothing selected → stop per the Stops l
 
 In `mode=coverage`, do not invoke `bdd-scenario-writer`: emit the read-only coverage report (see the Coverage-mode output below) and end.
 
-Invoke `bdd-scenario-writer` with `Calling context: phase=4, tracker=<tracker>, framework=<test_framework>.` and a payload of: the `selected` slice of `coverage_model`, `blocking_answers`, `extra_notes` (authoritative), the relevant `code_refs`, the numbered `acceptance_criteria` (for traceability tags), `source_label`, `create_test_cases` (true when `tracker != none` and either `create_choice == yes` or `create_in_tracker == "always"`; it tells the skill to render a Test Case payload per scenario), and the config (`scenario_granularity`, `traceability_tags`, `test_output_dir`, `feature_file_extension`, `test_label`). It returns one or more Gherkin features — Feature narrative, Background for shared preconditions, `Rule:` blocks grouping scenarios under each AC, `Scenario` and `Scenario Outline` + `Examples`, tags (`@smoke`/`@regression`/`@negative`/`@boundary`/`@permissions`/`@edge`/`@inferred`, plus `@AC-<n>` when `traceability_tags`), data tables, and doc strings — applying the smart-consolidation-not-coupling rule and the detailed-step rule.
+Invoke `bdd-scenario-writer` with `Calling context: phase=4, tracker=<tracker>, framework=<test_framework>.` and a payload of: the `selected` slice of `coverage_model`, `blocking_answers`, `extra_notes` (authoritative), the relevant `code_refs`, the numbered `acceptance_criteria` (for traceability tags), `source_label`, `create_test_cases` (true when `tracker != none` and either `create_choice == yes` or `create_in_tracker == "always"`; it tells the skill to render a Test Case payload per scenario), and the config (`scenario_granularity`, `traceability_tags`, `test_output_dir`, `feature_file_extension`, `test_label`). It returns one or more Gherkin features — Feature narrative, Background for shared preconditions, `Rule:` blocks grouping scenarios under each AC, `Scenario` and `Scenario Outline` + `Examples`, tags (`@smoke`/`@regression`/`@negative`/`@boundary`/`@permissions`/`@edge`/`@adversarial`/`@navigation`/`@inferred`, plus `@AC-<n>` when `traceability_tags`), a source description line under every `@inferred` scenario, data tables, and doc strings — applying the smart-consolidation-not-coupling rule and the detailed-step rule.
 
 Run `issuekit:prose-style` on the Feature narrative and any scenario descriptions to clean the prose before the gate. Cache the result as `feature_files`, each `{ path, content, feature, scenarios }`, with each scenario's `testCase` payload when `create_test_cases` was true. File paths default under `test_output_dir`, named in kebab-case from the story title, matching any existing convention `code_refs` reported.
 
@@ -218,6 +220,7 @@ Short inline summary (no card, no chat send):
 - **Traceability matrix:** each `AC-<n>` → the scenario(s) covering it → the file (and Test Case url when created). Flag any AC with **no** scenario as a coverage gap.
 - **Files:** each written feature file path and its scenario count (or "not written — declined").
 - **Test Cases:** each created scenario `title → url` (or "not created"), noting the `test_label` tag and the story link.
+- **To confirm:** the `@inferred` scenarios, one line each with the AC or convention its expectation comes from, so the author can confirm or strike them.
 - **Open Questions:** every unresolved ambiguity and every drift finding from `code_refs`, so the author can close the loop. Be explicit that these were *not* silently resolved from the code.
 - **Out of scope:** behaviors the ACs imply but that need tooling/environment to test (perf thresholds, a11y audits, security tests), listed so nobody assumes they're covered.
 - **Config:** when `.claude/acceptance-test-policy.json` was absent, print the JSON for this session's choices so the author can save it there. Print it; do not ask.
@@ -228,8 +231,11 @@ This is the end of the run. Do not ask a question after it.
 
 A read-only report, printed inline, no files, no tracker writes:
 
-- **Per AC:** the behaviors it decomposes into, the test-design technique each needs, the equivalence classes / boundaries / decision-table rules identified, and a positive/negative/edge count.
+- **Per AC:** the behaviors it decomposes into, the test-design technique each needs, the equivalence classes / boundaries / decision-table rules identified, and a positive/negative/edge/adversarial count with how many are `@inferred`.
+- **Rules:** each `CR-n` with its condition and its inverse, and the behaviors that test each direction.
+- **Navigation and flow:** the flow behaviors, or why the story has none.
 - **Coverage gaps:** ACs that are untestable as written, missing negative paths, unaddressed cross-cutting concerns.
+- **Considered, not applicable:** each check the analyzer skipped, with its reason.
 - **Open Questions:** every ambiguity (and drift finding, if Phase 3 ran).
 - **Risk view:** which behaviors are `@smoke`/critical vs edge, and where the risk concentrates.
 - **What a full `run` would produce:** the scenario count and the feature-file layout, so the user can decide whether to generate.

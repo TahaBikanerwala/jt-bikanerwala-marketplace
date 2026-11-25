@@ -13,7 +13,7 @@ Two jobs: collect every source about the change (Phase 1), then decide what the 
 
 ### Resolve the argument
 
-Strip a `--env <name>` token first; the agent handles it. Then classify each remaining reference:
+Strip the `--env <name>` and `--types <list>` tokens first; the agent handles them. Then classify each remaining reference:
 
 | Shape | Kind | Read with |
 |---|---|---|

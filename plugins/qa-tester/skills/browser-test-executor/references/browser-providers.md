@@ -9,7 +9,8 @@ Load: query `chrome-devtools` (or `select:` the full names once known) for `new_
 | Action | Tool (suffix) | Notes |
 |---|---|---|
 | open a dedicated tab | `__new_page` | keep its page id; `__select_page` to return to it |
-| navigate, reload, back, forward | `__navigate_page` | |
+| signed-out or second-user session | `__new_page` with `isolatedContext: "<name>"` | its own cookies and storage. Use it for signed-out deep links, a second role, and two-session conflict cases |
+| navigate, reload, back, forward | `__navigate_page` | `type: url \| back \| forward \| reload`. `type: reload` is a real reload. `handleBeforeUnload: accept \| dismiss` answers the browser's unsaved-changes prompt. It defaults to `accept`, which looks the same as no prompt, so guard cases start with `dismiss` (see the executor's guard rule). The resubmit prompt on reloading a form POST result is browser UI that `__handle_dialog` cannot see; the executor never reloads such a page |
 | read the page | `__take_snapshot` | accessibility tree with element uids; use uids for interactions |
 | click | `__click` | by uid from the latest snapshot; re-snapshot after DOM changes |
 | type into one field | `__fill` | |
@@ -19,10 +20,11 @@ Load: query `chrome-devtools` (or `select:` the full names once known) for `new_
 | upload a file | `__upload_file` | only files the plan provides |
 | wait for state | `__wait_for` | wait for expected text |
 | native dialogs | `__handle_dialog` | accept or dismiss |
-| run JavaScript | `__evaluate_script` | read values, clear session cookie for expiry tests; never to fake a pass |
+| run JavaScript | `__evaluate_script` | read values and storage key names, remove `disabled` or `maxlength` for client-only security checks; never to fake a pass |
 | console | `__list_console_messages`, `__get_console_message` | |
-| network | `__list_network_requests`, `__get_network_request` | status codes and response bodies |
-| viewport | `__resize_page` or `__emulate` | `__emulate` also does network throttling and offline |
+| network | `__list_network_requests`, `__get_network_request` | status codes, headers and response bodies |
+| viewport | `__resize_page` or `__emulate` | |
+| offline, slow network | `__emulate` with `networkConditions` | `Offline`, `Slow 3G`, `Slow 4G`, ... Each call replaces every emulation setting, so pass the viewport again and clear throttling when the case ends |
 | screenshot | `__take_screenshot` | pass a file path under the evidence folder |
 | Lighthouse | `__lighthouse_audit` | accessibility, best practices, performance |
 | record video | `__screencast_start`, `__screencast_stop` | `screencast_start({ pageId, filePath: ".../evidence/<BUG-n>.mp4" })` writes mp4 directly; stop with the same `pageId`. Load both in the detect `ToolSearch` |
@@ -38,6 +40,8 @@ Call `tabs_context_mcp` first in every session, then create a new tab. Never reu
 |---|---|---|
 | open a dedicated tab | `tabs_create_mcp` | |
 | navigate | `navigate` | |
+| back, forward | `navigate` with `url: "back"` or `"forward"` | `tabId` is required |
+| reload | `javascript_tool` with `location.reload()` | a real reload. Never navigate to the current URL instead: that is a fresh GET, which never resubmits a form and keeps no history state, so refresh cases would pass falsely. When the page was reached by a native form POST, the browser shows a resubmit prompt that cannot be stubbed; the executor checks for this first and never reloads such a page |
 | read the page | `read_page`, `get_page_text`, `find` | `find` locates an element by description |
 | click, type, keys, scroll, screenshot | `computer` | actions: `left_click`, `type`, `key`, `scroll`, `screenshot` |
 | fill form fields | `form_input` | by element ref from `read_page` / `find` |
@@ -51,7 +55,7 @@ Call `tabs_context_mcp` first in every session, then create a new tab. Never reu
 
 **Evidence files on Claude in Chrome.** Take failure screenshots with the `computer` screenshot action's `save_to_disk: true` when the tool offers it, and move the returned path to `evidence/<case-id>.png`. When the tool cannot save to disk, or saving fails, record in the case result what the screenshot showed (the exact visible text, element states and URL); the report then lists that evidence as an observation instead of an image path, and no screenshot is listed for attachment. Use `gif_creator` (which exports a file) for defect videos.
 
-**Not available on Claude in Chrome:** Lighthouse, network throttling and offline emulation, performance traces. Cases needing them are `Not testable (provider lacks <capability>)` with the note that chrome-devtools MCP would cover them.
+**Not available on Claude in Chrome:** Lighthouse, network throttling and offline emulation, performance traces, an isolated session, and `beforeunload handling` (the browser's own "Leave site?" and resubmit prompts cannot be stubbed and freeze the extension). Cases needing them are `Not testable (provider lacks <capability>)` with the note that chrome-devtools MCP would cover them. When chrome-devtools is connected as `cross_check_provider`, signed-out cases run there in an isolated context, and `guard: browser` cases run there with `handleBeforeUnload` when the run can sign in there (`auth.method` `env-accounts` or `none`). With `auth.method == browser-session`, never log the user's real profile out to fake a signed-out state.
 
 **Never trigger a native dialog without stubbing it first.** A blocking `alert` or `confirm` freezes the extension; if it happens, the remaining cases become `Blocked (browser dialog)` and the report asks the user to dismiss it.
 
