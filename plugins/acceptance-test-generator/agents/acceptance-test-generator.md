@@ -168,9 +168,11 @@ Cache as `code_refs`. In Phase 4 these only sharpen phrasing and make steps runn
 
 ### Phase 3.5: Select scope + tracker choice
 
-From `coverage_model`, present the candidate behavior groups: typically one group per AC, holding its stated behaviors together with its inverse, invalidation and adversarial behaviors (so picking an AC never drops the second half of its rules), plus a "cross-cutting" group for concurrency/permissions/data-variety, and a "navigation and flow" group when the model has one. In each AC group's description, give the count of `@inferred` behaviors it carries. Send **one** `AskUserQuestion` with:
+From `coverage_model`, present the candidate behavior groups: typically one group per AC, holding its stated behaviors together with its inverse, invalidation and adversarial behaviors (so picking an AC never drops the second half of its rules), plus a "cross-cutting" group for concurrency/permissions/data-variety, and a "navigation and flow" group when the model has one. In each AC group's description, give the count of `@inferred` behaviors it carries. `AskUserQuestion` takes at most four options per question and four questions per card. When there are more than four groups, split them over several multi-select questions (ACs first, then cross-cutting and navigation), using every question the card has left after the tracker and notes questions. If they still do not fit, fold "navigation and flow" into "cross-cutting", then pair adjacent ACs into one option (`AC-5 and AC-6`) until they do. Never drop a group silently.
 
-- a **multi-select** listing each behavior group (label = the AC/behavior title; description = a one-line intent + technique), so the user picks all, some, or none;
+Send **one** `AskUserQuestion` with:
+
+- **multi-select** question(s) listing the behavior groups, split as above (label = the AC/behavior title; description = a one-line intent + technique), so the user picks all, some, or none;
 - a **single-select** tracker-creation choice **only when `tracker != none` and `create_in_tracker == "ask"`**: "Also create the selected scenarios as `<Test Case type>` work items in `<tracker>`, linked to `<source_label>`?" — Yes / No. (Honor `always`/`never` without asking.) Cache as `create_choice`.
 - a **free-form** notes box ("Anything to add, refine, or extra context — exact values, edge cases, priorities? (optional)"). Cache as `extra_notes` — **authoritative**, it overrides the model on conflict.
 

@@ -75,7 +75,7 @@ Validate on load: unknown keys produce one warning line and are ignored; a malfo
 | 6 | `issuekit:prose-style` | cleans report and comment prose |
 | 8 | `bug-reporter:run` (optional, separate plugin) | files each confirmed defect, with its own duplicate search and gate |
 
-Calling-context convention for every `Skill` call: the first line is `Calling context: <key>=<value>[, ...].`, then a blank line, then the payload. Known keys: `phase`, `mode`, `tracker`, `provider`, `env`.
+Calling-context convention for every `Skill` call: the first line is `Calling context: <key>=<value>[, ...].`, then a blank line, then the payload. Known keys: `phase`, `mode`, `tracker`, `provider`, `env`, `recon`, `rewrite`.
 
 ## Working state
 
@@ -97,7 +97,7 @@ Calling-context convention for every `Skill` call: the first line is `Calling co
 | `test_plan` | 3, 4b | feature model, cases, data set, execution order, exploratory charters, coverage grid |
 | `plan_path` | 3 | the plan file this run wrote; Phase 4b rewrites this file, never an earlier run's |
 | `recon` | 4b | the real screens' controls, text and navigation, and `recon_delta` (cases added) |
-| `data_ledger` | 5 | every record the agent created: `{ ref, kind, identifier, created_in, status: in-place \| cleaned \| kept (user choice) \| left behind, note }` |
+| `data_ledger` | 4b, 5 | every record the agent created, including anything recon created by accident: `{ ref, kind, identifier, created_in, status: in-place \| cleaned \| kept (user choice) \| left behind, note }` |
 | `results` | 5 | per case: status, actual, evidence paths, console and network findings, attempts |
 | `defects` | 5 | confirmed failures with repro, expected, actual, severity, priority, and the chrome-devtools cross-check result when one ran |
 | `provider_artifacts` | 5 | Claude in Chrome failures that passed on chrome-devtools; reported, never filed |
@@ -108,7 +108,7 @@ Calling-context convention for every `Skill` call: the first line is `Calling co
 
 ## Do-not rules
 
-- **Never take an expected result from the PR or the code.** The code is read only to aim regression and exploratory effort at what changed.
+- **Never take an expected result from the PR or the code.** The code is read only to aim regression and exploratory effort at what changed, and to list the screens, routes and controls that exist. A rule for a control no AC mentions becomes a question, never a rule read from a template.
 - **Never ask a question between preflight and the end-of-run card.** Mark, record, continue.
 - **Never write a credential, token, cookie or password to any file**, including the policy, the plan, the report and evidence. Mask secrets in screenshots by not capturing pages that display them.
 - **Never mutate data in an environment whose `allow_mutations` is false.** Those cases become `Skipped (mutation guard)`.
@@ -167,7 +167,7 @@ Same skill, `Calling context: phase=2.` Returns `acceptance_criteria`, `business
    Set `test_types` to `functional`, `navigation` and the chosen types. Never write the answer back to the policy. Announce one line: `Testing: functional, navigation, <chosen types>`.
 1. Invoke `acceptance-test-generator:acceptance-analyzer` with `Calling context: phase=1, mode=coverage.` and the payload it expects (`story_title`, `story_narrative`, the numbered `acceptance_criteria`, `business_rules`). Cache the coverage model.
 2. Invoke `test-case-designer` with `Calling context: phase=design, provider=<provider>, env=<env name>.` and a payload of the coverage model, `acceptance_criteria`, `discrepancies`, `risk_areas`, the PR's changed files from `sources`, `env` (including `allow_mutations` and `production`), `auth.roles`, `test_types`, `viewports`, `test_data_prefix`, `business_rules`, and `missing_capabilities`. It returns `test_plan`: the feature model (screens, control rules, states), the **shared test data set**, executable cases with an AC trace and an oracle each, the execution order that lets the data set flow through its lifecycle, exploratory charters, the coverage grid, what it considered and skipped, the cleanup plan, and design-time questions.
-3. Invoke `test-report-writer` with `Calling context: phase=plan.` to write `<output_dir>/<run_id>/test-plan.md`. Keep the path it wrote as `plan_path`.
+3. Invoke `test-report-writer` with `Calling context: phase=plan, recon=<planned|off>.` to write `<output_dir>/<run_id>/test-plan.md`. `recon=off` when `mode=plan`, `provider == none` or `recon_minutes` is `0`, otherwise `planned`. Keep the path it wrote as `plan_path`.
 
 `mode=plan` stops here, with no reconnaissance, so the plan says it was not checked against the live screens. Print the plan path, the test types, the case count by priority and by category, the data set summary, the discrepancies, and the open questions. With `pause_before_execution: true`, show the same digest and ask once: Execute / Edit then execute (free-form notes) / Stop.
 
@@ -182,11 +182,11 @@ If the deployed build cannot be confirmed to contain the PR, do not stop. Record
 
 ### Phase 4b: Reconnaissance
 
-Skip when `recon_minutes` is `0`. Invoke `browser-test-executor` with `Calling context: phase=recon, provider=<provider>, env=<env name>.` and the plan's `model.screens` plus the risk areas' routes. It looks at the real screens without changing anything and returns `recon`. Then invoke `test-case-designer` with `Calling context: phase=refine.`, the `test_plan` and `recon`. It adds the controls, routes and states the plan missed, and returns the updated plan with `recon_delta`. If it added cases, have `test-report-writer` (`Calling context: phase=plan, rewrite=true.`) rewrite the file at `plan_path`. Announce one line: `Recon: <n> screens, <n> controls, <n> cases added`. Ask nothing here.
+Skip when `recon_minutes` is `0`. Invoke `browser-test-executor` with `Calling context: phase=recon, provider=<provider>, env=<env name>.` and the plan's `model.screens` plus the risk areas' routes. It looks at the real screens without submitting anything and returns `recon`, plus a `data_ledger` entry for anything a click created despite that. Then invoke `test-case-designer` with `Calling context: phase=refine.`, the `test_plan` and `recon`. It adds the controls, routes and states the plan missed, and returns the updated plan with `recon_delta`. Always have `test-report-writer` (`Calling context: phase=plan, rewrite=true.`) rewrite the file at `plan_path`, even when no case was added, so its Reconnaissance section records what recon did. Announce one line: `Recon: <n> screens, <n> controls, <n> cases added`, plus anything recon created. Ask nothing here.
 
 ### Phase 5: Execute
 
-Invoke `browser-test-executor` with `Calling context: phase=execute, provider=<provider>, env=<env name>.` and the plan. It runs every case in plan order, maintains `data_ledger`, re-runs failures `rerun_failures` times, cross-checks suspected Claude in Chrome artifacts on chrome-devtools, records evidence under `<output_dir>/<run_id>/evidence/`, and returns `results` and `defects`. Then it runs the exploratory charters for `exploratory_minutes`, logging any new finding as an extra case `EX-n`. It does **not** clean up. The data stays in place until Phase 7 decides what happens to it, so defects can be recorded on the same records.
+Invoke `browser-test-executor` with `Calling context: phase=execute, provider=<provider>, env=<env name>.` and the plan. It runs every case in plan order, maintains `data_ledger`, re-runs failures `rerun_failures` times, cross-checks suspected Claude in Chrome artifacts on chrome-devtools, records evidence under `<output_dir>/<run_id>/evidence/`, and returns `results` and `defects`. Anything wrong it notices outside a case's assertions is logged as an observation `OB-n`. Then it runs the exploratory charters for `exploratory_minutes`, logging each finding under its charter as `EX-n.k`. It does **not** clean up. The data stays in place until Phase 7 decides what happens to it, so defects can be recorded on the same records.
 
 The executor never pauses. If the browser session dies, it reconnects once; if that fails, the remaining cases become `Blocked (browser session lost)` and the run moves on to the report.
 

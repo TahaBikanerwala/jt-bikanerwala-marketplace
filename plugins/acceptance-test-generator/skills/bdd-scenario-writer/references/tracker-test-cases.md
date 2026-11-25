@@ -10,7 +10,7 @@ Common fields for every tracker:
 
 - `type` = `test_case_work_item_type[<tracker>]` (default `Test Case` on Azure DevOps, `Test` on Jira).
 - `title` = the scenario name (per-feature: the Feature name).
-- `body` (markdown) = the full Gherkin scenario in a fenced ```gherkin block, preceded by a one-line trace: `Covers <source_label> — AC-<n>`.
+- `body` (markdown) = in this order: the one-line trace `Covers <source_label>, AC-<n>`; then, for an `@inferred` scenario only, its source note on its own line (`Not stated in the story; follows from AC-2's enabling condition.`); then the full Gherkin scenario in a fenced ```gherkin block. The note stays in the fenced scenario as its description too.
 - `acceptanceCriteria` (markdown) = the text of the source AC(s) this scenario verifies.
 - `labels` = `[test_label]` (default `acceptance-test`).
 - `project` = `target_project`.
@@ -53,7 +53,7 @@ Each step is `<step type="ActionStep">` with two `<parameterizedString>` cells: 
 - `step id` values start at 2 and increment (1 is reserved by the tool); `last` = the final id used. `id="0"` on the root is fixed.
 - **`Given`** → an Action step; Expected Result empty (setup, nothing to assert yet). Multiple `Given/And` may each be their own action step or be joined into one setup step — prefer one step per `Given` line for clarity.
 - **`When`** → an Action step; Expected Result empty (the trigger).
-- **A scenario description line** (the source note on an `@inferred` scenario, such as `Not stated in the story; follows from AC-2's enabling condition.`) is not a step. Put it on the first line of the Test Case body, above the fenced Gherkin, so the tester sees it before running the case.
+- **A scenario description line** (the source note on an `@inferred` scenario) is not a step. It reaches the tester through the body, as set in Common fields.
 - **`Then` (+ its `And`/`But`)** → fold into the *preceding* `When` step's Expected Result, or emit a dedicated "Verify" action step whose Expected Result lists every `Then`/`And` assertion. One `Then`-group = one expected-result cell so the tester sees all postconditions of the action together.
 - Escape `<`, `>`, `&`, `"` in cell text. Wrap each cell's content in `<DIV>…</DIV>`.
 

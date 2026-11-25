@@ -29,7 +29,7 @@ Model every interactive control on a touched screen: buttons, links, inputs, tog
 - **Both directions.** Each condition that turns it on, and each condition that turns it **back off**. Turn-off triggers include clearing the field, entering an invalid value after a valid one, editing after a successful validate, save, test or run, removing a required selection, or moving to a state where the action no longer applies.
 - **Every input path.** Typing, pasting, autofill, keyboard selection, picking from a list, a value loaded from the server, undo.
 - **Survives the round trip.** After a reload, after Cancel, after an error, and after the async action finishes, whether it succeeded or failed.
-- **Disabled means disabled.** While the control is disabled, nothing happens when you click it, press Enter or Space on it, or press Enter in a field of its form: no request in the network log and no state change.
+- **Disabled means disabled.** While the control is disabled, clicking it does nothing, and pressing Enter in a text field of its form does not trigger it: no request in the network log and no state change. Tab skips it. If it can still take focus (an `aria-disabled` control), Enter and Space on it do nothing either.
 - **In flight.** While an action runs, its trigger is disabled or ignores repeats, and conflicting actions are blocked. Afterward everything re-enables, after a failure as well as after a success. A control that stays disabled after an error is a classic defect.
 - **Hidden, disabled or read-only** per role and per state, as the ACs say. A disabled control explains why when the AC asks for that.
 
@@ -72,9 +72,9 @@ For every screen, route, tab, dialog and wizard step the change adds or touches:
 - **Refresh.** On the screen and at every step of a multi-step flow, refresh reloads to a valid state. State kept in the URL (tab, filter, page, step) survives. Unsaved input is kept or the user is warned, as the AC says.
 - **Deep links.** The screen's URL and a record's URL work in a new tab when signed in. Signed out, they go to login and then return to the same target.
 - **Bad URLs.** A record id that does not exist, was deleted or is malformed shows a not-found state. Never a crash, a blank page or someone else's record.
-- **Unsaved-changes guard.** With unsaved edits, an in-app link, browser Back, refresh and closing the tab each warn or save, as the AC says. Confirming leaves without saving. Cancelling stays, with the edits intact.
+- **Unsaved-changes guard.** With unsaved edits, an in-app link, browser Back, refresh and closing the tab each warn or save, as the AC says. Confirming leaves without saving. Cancelling stays, with the edits intact. The browser-level ones (Back, refresh, closing the tab) raise the browser's own prompt and need the provider capability `beforeunload handling`; the in-app link usually shows the app's own dialog and does not.
 - **The URL reflects state.** Where the app routes state (tabs, filters, pagination, the selected record), the URL changes with it, and pasting that URL restores the state.
-- **Links are links.** Anything that navigates opens in a new tab with a middle click, goes to the right target, and treats external links as the AC says.
+- **Links are links.** Anything that navigates is a real link (the accessibility tree shows a link with an `href`, so it can be opened in a new tab), goes to the right target, and treats external links as the AC says.
 - **Landing after an action.** After login, logout, create, save and delete, the user lands on the page the AC names. When the AC is silent, check that it is a sensible page and mark the oracle `convention`.
 
 ## UI (when `ui` is selected)
@@ -101,15 +101,15 @@ For every screen, route, tab, dialog and wizard step the change adds or touches:
 
 ## Security (when `security` is selected)
 
-Attack-shaped input and tampering run only on records the run created and only where `allow_mutations` is true. Plan these cases as `mutates: reversible` at least, so the mutation guard skips them elsewhere. Never bypass captcha, MFA, rate limits or bot protection. Never browse real users' records. Never put a token, cookie value or secret into evidence: report names and presence, never values.
+Attack-shaped input and tampering run only on records the run created and only where `allow_mutations` is true. Plan these cases as `mutates: reversible` at least, so the mutation guard skips them elsewhere. Lines marked *(ends the session)* sign the user out; plan them under the session-ending rule in the designer's step 8. Never bypass captcha, MFA, rate limits or bot protection. Never browse real users' records. Never put a token, cookie value or secret into evidence: report names and presence, never values.
 
-- **Stored and reflected script.** Put `<script>alert(1)</script>`, `<img src=x onerror=alert(1)>` and `"><svg onload=alert(1)>` into every free-text field, every URL parameter and every search box the page echoes back. Expected: shown as literal text wherever it renders (list, detail, tooltip, page title, export preview) and never executed. The executor detects execution with a flag, described in its execute phase.
+- **Stored and reflected script.** Put `<script>window.__qaXss=1</script>`, `<img src=x onerror="window.__qaXss=1">` and `"><svg onload="window.__qaXss=1">` into every free-text field, every URL parameter and every search box the page echoes back. Expected: shown as literal text wherever it renders (list, detail, tooltip, page title, export preview) and never executed. Never use payloads that call `alert`, `confirm` or `prompt`: a real native dialog freezes Claude in Chrome. The executor reads the flag on every page where the payload renders.
 - **Injection-shaped data.** `' OR 1=1 --`, `{{7*7}}` and `${7*7}` are stored and shown literally: no `49` and no server error.
 - **Client-only checks.** Use a script to remove `disabled` from a disabled control, or `maxlength` and `required` from a field, then use it. The server must still refuse: an error is shown, nothing is saved, and the response is a 4xx, not a 5xx. Do the same for a hidden action reached by its URL.
 - **Access by URL.** Signed out, every protected URL in scope redirects to login. Signed in as a second role, a record the run created under the first role is refused or not found, never shown. With a single account, try only an id that does not exist, and report anything that leaks.
-- **Session.** After logout, Back and cached URLs show no protected data, and an action from a page opened before logout fails. Logging out in one tab ends the session in the other tabs.
+- **Session** *(ends the session)*. After logout, Back and cached URLs show no protected data, and an action from a page opened before logout fails. Logging out in one tab ends the session in the other tabs.
 - **Data exposure.** No password, token or personal data appears in the URL, the page title, the console or an error message. Responses for the screen do not carry sensitive-looking fields the UI never shows (password hashes, tokens, other users' data). `localStorage` and `sessionStorage` hold no token-looking values (report key names only). Error pages show no stack traces, SQL or internal paths.
-- **Open redirect.** After login or logout, a `returnUrl`, `next` or `redirect` parameter that points off-site is not followed.
+- **Open redirect** *(ends the session)*. After login or logout, a `returnUrl`, `next` or `redirect` parameter that points off-site is not followed.
 - **Uploads,** when the feature takes files: a wrong type, a renamed extension (an `.exe` saved as `.png`), an empty file and an oversized file are each refused with a clear message. Generate these files under the evidence folder and upload nothing else.
 
 ## Responsive (when `responsive` is selected)
@@ -131,14 +131,14 @@ Attack-shaped input and tampering run only on records the run created and only w
 
 - A role by action matrix from `auth.roles` for every protected action the ACs mention. Allowed roles succeed. For the others the action is hidden or disabled as the AC says, and its direct URL is refused.
 - The signed-out case for each protected screen.
-- Role switch in the same tab: log out, log in as another role, and confirm nothing from the first session shows (cached data, menus, counts).
+- Role switch in the same tab *(ends the session)*: log out, log in as another role, and confirm nothing from the first session shows (cached data, menus, counts).
 - With fewer than two roles configured, plan only the signed-out and direct-URL cases and add a question asking for a second test account.
 
 ## Resilience (when `resilience` is selected)
 
 - Offline at the moment of a save: a clear error, no silent loss, the input is kept, and the retry works once back online.
 - Slow network on the main flow: a loading state, no double submit, and Cancel works if the UI offers it.
-- Session ended mid-form (log out in another tab of the same session), then submit: a graceful re-login, with the data not lost silently.
+- Session ended mid-form *(ends the session)*: log out in another tab of the same session, then submit: a graceful re-login, with the data not lost silently.
 - The same record in two tabs: save in one, then save stale data in the other. Expected: the conflict is detected, or last write wins only if the ticket says so. Never silent data loss.
 
 ## Health assertions on every case

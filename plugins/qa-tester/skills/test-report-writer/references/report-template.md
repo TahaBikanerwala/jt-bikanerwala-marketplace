@@ -76,7 +76,7 @@ Placeholders are in `<angle brackets>`. Drop any section that would be empty, ex
 - **<category>:** <heuristic> (<reason>); <heuristic> (<reason>)
 
 ## Reconnaissance
-<screens visited, controls found, cases added (ids); or "Not run: the plan was not checked against the live screens (plan mode, no browser, or recon_minutes is 0)">
+<after recon: screens visited, controls found, cases added (ids, or "none"), screens not reached, anything a click created. Before recon: "Runs after preflight; this section is updated then." When off: "Not run: <plan mode | no browser | recon_minutes is 0>. The plan was not checked against the live screens.">
 
 ## Open questions (design time)
 - <question> (unblocks <cases>)
@@ -142,8 +142,9 @@ Cases that failed on Claude in Chrome but passed when re-run on chrome-devtools.
 | Case | Reason | What would make it testable |
 |---|---|---|
 
-## Exploratory findings
-- **EX-1** <finding> (<defect id or question>)
+## Exploratory findings and observations
+- **EX-1.1** <finding from charter EX-1> (<defect id or question>)
+- **OB-1** <something wrong noticed during a scripted case, outside its assertions> (<case id>; <defect id or question>)
 
 ## Coverage by test type
 | Type | Cases | Pass | Fail | Other |

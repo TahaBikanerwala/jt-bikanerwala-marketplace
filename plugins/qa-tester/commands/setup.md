@@ -1,5 +1,5 @@
 ---
-description: "Set qa-tester preferences (environments, login method, data changes, extra coverage) in .claude/qa-tester-policy.json. Stores env var names, never credentials."
+description: "Set qa-tester preferences (environments, login method, data changes, the test types to recommend on each run) in .claude/qa-tester-policy.json. Stores env var names, never credentials."
 argument-hint: (none)
 ---
 

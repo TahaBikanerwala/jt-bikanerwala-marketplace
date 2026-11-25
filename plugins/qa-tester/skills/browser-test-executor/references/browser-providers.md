@@ -10,7 +10,7 @@ Load: query `chrome-devtools` (or `select:` the full names once known) for `new_
 |---|---|---|
 | open a dedicated tab | `__new_page` | keep its page id; `__select_page` to return to it |
 | signed-out or second-user session | `__new_page` with `isolatedContext: "<name>"` | its own cookies and storage. Use it for signed-out deep links, a second role, and two-session conflict cases |
-| navigate, reload, back, forward | `__navigate_page` | `type: url \| back \| forward \| reload`. `handleBeforeUnload: dismiss` tests the cancel path of an unsaved-changes guard. `initScript` runs before page scripts (the XSS flag) |
+| navigate, reload, back, forward | `__navigate_page` | `type: url \| back \| forward \| reload`. `type: reload` is a real reload. `handleBeforeUnload: accept \| dismiss` answers the browser's unsaved-changes prompt; `dismiss` tests the guard's cancel path. A form resubmission prompt on reload is answered with `__handle_dialog` |
 | read the page | `__take_snapshot` | accessibility tree with element uids; use uids for interactions |
 | click | `__click` | by uid from the latest snapshot; re-snapshot after DOM changes |
 | type into one field | `__fill` | |
@@ -41,7 +41,7 @@ Call `tabs_context_mcp` first in every session, then create a new tab. Never reu
 | open a dedicated tab | `tabs_create_mcp` | |
 | navigate | `navigate` | |
 | back, forward | `navigate` with `url: "back"` or `"forward"` | `tabId` is required |
-| reload | `navigate` to the current URL | |
+| reload | `javascript_tool` with `location.reload()` | a real reload. Never navigate to the current URL instead: that is a fresh GET, which never resubmits a form and keeps no history state, so refresh cases would pass falsely. When the page was reached by a native form POST, the browser shows a resubmit prompt that cannot be stubbed; run that case on chrome-devtools, or plan it `Not testable` |
 | read the page | `read_page`, `get_page_text`, `find` | `find` locates an element by description |
 | click, type, keys, scroll, screenshot | `computer` | actions: `left_click`, `type`, `key`, `scroll`, `screenshot` |
 | fill form fields | `form_input` | by element ref from `read_page` / `find` |
@@ -55,7 +55,7 @@ Call `tabs_context_mcp` first in every session, then create a new tab. Never reu
 
 **Evidence files on Claude in Chrome.** Take failure screenshots with the `computer` screenshot action's `save_to_disk: true` when the tool offers it, and move the returned path to `evidence/<case-id>.png`. When the tool cannot save to disk, or saving fails, record in the case result what the screenshot showed (the exact visible text, element states and URL); the report then lists that evidence as an observation instead of an image path, and no screenshot is listed for attachment. Use `gif_creator` (which exports a file) for defect videos.
 
-**Not available on Claude in Chrome:** Lighthouse, network throttling and offline emulation, performance traces, and an isolated session. Cases needing them are `Not testable (provider lacks <capability>)` with the note that chrome-devtools MCP would cover them. Signed-out and second-user cases run on chrome-devtools in an isolated context when it is connected as `cross_check_provider`. With `auth.method == browser-session`, never log the user's real profile out to fake a signed-out state.
+**Not available on Claude in Chrome:** Lighthouse, network throttling and offline emulation, performance traces, an isolated session, and `beforeunload handling` (the browser's own "Leave site?" and resubmit prompts cannot be stubbed and freeze the extension). Cases needing them are `Not testable (provider lacks <capability>)` with the note that chrome-devtools MCP would cover them. When chrome-devtools is connected as `cross_check_provider`, signed-out cases run there in an isolated context, and unsaved-changes prompt cases run there with `handleBeforeUnload`. With `auth.method == browser-session`, never log the user's real profile out to fake a signed-out state.
 
 **Never trigger a native dialog without stubbing it first.** A blocking `alert` or `confirm` freezes the extension; if it happens, the remaining cases become `Blocked (browser dialog)` and the report asks the user to dismiss it.
 

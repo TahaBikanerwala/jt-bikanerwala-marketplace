@@ -13,7 +13,9 @@ Templates are in `references/report-template.md`. Load it first. Files go under 
 
 Write `test-plan.md` from the plan template: the test scope, sources, ACs with origins, discrepancies, the feature model (screens and routes, control rules, states), the shared data set table, the cases (grouped by priority, each with category, oracle, steps and expected), charters, cleanup plan, the AC coverage table, the screen by test type grid, what was considered and skipped, and design-time questions. If the file exists from an earlier run, write `test-plan-<yyyymmdd-hhmm>.md` instead of overwriting it, and return the path you wrote.
 
-With `rewrite=true` (after reconnaissance), rewrite the file the agent passes as `plan_path` in place. Mark each case added after recon with `(added after recon)` in its heading and fill the Reconnaissance section. In `mode=plan` there is no recon, so the Reconnaissance section says the plan was not checked against the live screens.
+The Reconnaissance section follows the `recon` key in the calling context. With `recon=off`, it says recon will not run and why (plan mode, no browser, or `recon_minutes` is 0), so the plan was not checked against the live screens. With `recon=planned`, it says recon runs after preflight and this section is updated then.
+
+With `rewrite=true` (after reconnaissance), rewrite the file the agent passes as `plan_path` in place. Mark each case added after recon with `(added after recon)` in its heading. Fill the Reconnaissance section with what recon actually did: screens visited, controls found, cases added (or "none"), screens not reached, and anything a click created.
 
 ## phase=report
 

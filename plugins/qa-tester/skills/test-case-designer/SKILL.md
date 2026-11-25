@@ -26,7 +26,7 @@ Before writing any case, build a model of what the user will touch. Sources:
 Build four parts:
 
 1. **Screens and routes.** Every page, route, tab, dialog, drawer and wizard step the change adds or touches, with each way in and each way out.
-2. **Control rules.** Start from the analyzer's `Rules` (keep their `CR-n` ids and their inverse behaviors). Then, for every interactive control on those screens, add the rules the analyzer could not see: when the control is visible, enabled, read-only, selected or loading, as one-line rules numbered after the analyzer's. Where an AC states the rule, cite it (`oracle: ac`). Where it does not, write the rule the AC implies and mark it `implied`. For example, "**Run** is enabled once the query is valid" implies "**Run** is disabled whenever the query is not valid, including straight after the query is edited".
+2. **Control rules.** Start from the analyzer's `Rules` (keep their `CR-n` ids and their inverse behaviors). Then, for every interactive control on those screens, add the rules the analyzer could not see: when the control is visible, enabled, read-only, selected or loading, as one-line rules numbered after the analyzer's. Where an AC states the rule, cite it (`oracle: ac`). Where it does not, write the rule the AC implies and mark it `implied`. For example, "**Run** is enabled once the query is valid" implies "**Run** is disabled whenever the query is not valid, including straight after the query is edited". A control that no AC mentions, found only in the PR's code or in recon, has no AC to imply its rule. Record the control and its observed state, never take its rule from the code (a `disabled={...}` condition in a template is the implementation, not the expectation), and add a question asking what should enable it. Until that is answered, test only its near-universal conventions (`oracle: convention`): a disabled control cannot be triggered, it is disabled or ignores repeats while its action runs, and it re-enables after its action fails.
 3. **States and transitions.** The UI states (pristine, dirty, invalid, valid, saving, saved, stale, error) and the record's lifecycle states, with every transition between them. Include the backward transitions: editing after a save, re-entering a completed step, cancelling half way, retrying after an error.
 4. **Data flow.** Where each input goes and everywhere it shows up again (list, detail, header, other pages, exports), so every write gets a "shows up everywhere, survives a reload" check.
 
@@ -54,7 +54,7 @@ Thorough is the goal. Padding is not. A case that could not reveal a defect this
 
 For each type in `test_types` beyond `functional` and `navigation`, walk its section of the heuristics against each screen and AC. Types not chosen get no cases. They are listed in the plan's scope as not selected, so the report can say they were not covered.
 
-`missing_capabilities` still applies. A Lighthouse audit on Claude in Chrome, for example, is planned as `Not testable (provider lacks Lighthouse)`.
+`missing_capabilities` applies to every category, including the always-on ones. A Lighthouse audit on Claude in Chrome is planned as `Not testable (provider lacks Lighthouse)`. So is a browser-level unsaved-changes case (Back, refresh or closing the tab with unsaved edits) when `beforeunload handling` is missing, because the browser's own prompt would freeze the run.
 
 ## 6. Expected results and their oracle
 
@@ -66,7 +66,7 @@ Every case records where its expected result comes from:
 
 Never take an expected result from the PR or the code. When the AC is silent on the exact outcome (error text, redirect target), write the expected result at the level the AC supports ("an error explains the email is invalid and the form is not submitted") and add a non-blocking question asking for the exact text.
 
-A `convention` case runs and can fail like any other. The report files its failure as a defect one priority lower and asks whether the behavior is intended.
+A `convention` case runs and can fail like any other. The report files its failure as a defect one priority lower and asks whether the behavior is intended, except for `security` cases and S1 defects: script execution, data exposure or a server accepting what the UI forbids is never "intended", so those keep their priority and raise no question.
 
 ## 7. Design the minimal shared test data set
 
@@ -107,6 +107,9 @@ Every case is executable by someone who has never seen the app:
 - `must_not_change`: what the action must leave untouched (other fields, other records, the previous page's state), when that is part of the risk.
 - `mutates`: none | reversible | irreversible.
 - `automatable`: yes | partial (needs a human step, e.g. email) | no (with the reason). A `no` here is planned now as `Not testable` with its reason and question, so execution does not discover it late.
+- `ends_session`: true for a case that signs the user out (the heuristics lines marked *(ends the session)*).
+
+**Session-ending cases.** With `auth.method` `env-accounts`, they run last within their role group, and the executor signs in again afterward. With `browser-session` or `manual`, the run cannot sign back in, and logging out would end the user's real session. A case that only needs a signed-out visitor (a deep link, a protected URL) runs in a chrome-devtools isolated context when chrome-devtools is connected. Any other session-ending case is planned as `Not testable (ends the session; cannot sign in again under <method>)`, with a question offering test accounts in environment variables.
 
 Keep each case failing for exactly one reason. Do not chain unrelated behaviors to save data; reuse the **record**, not the **case**.
 
@@ -127,7 +130,7 @@ Record every heuristic you considered and skipped in `skipped`, one line each wi
 
 ## 11. Order and output
 
-Order: setup and data creation first, then P1 smoke, then the lifecycle chain, then the rest by priority, delete cases last, mutation-guard skips listed but not ordered. Within that, group by role to minimize logins, and by viewport to minimize resizes.
+Order: setup and data creation first, then P1 smoke, then the lifecycle chain, then the rest by priority, delete cases last, mutation-guard skips listed but not ordered. Within that, group by role to minimize logins, put session-ending cases last in their role group, and group by viewport to minimize resizes.
 
 ```
 test_plan:
@@ -136,7 +139,7 @@ test_plan:
                rules: [{ id: CR-n, control, rule, oracle, source }],
                states: [...], transitions: [{ from, to, trigger }] }
   data_set:  [{ ref: R1, kind, name, created_by: TC-xx|existing, used_by: [TC...], end_state, cleanup: "deleted by TC-14" | "deleted in cleanup via <action>" | "cannot delete: <why>", reason_for_separate_record? }]
-  cases:     [{ id, title, trace, category, type, priority, technique, oracle, role, viewport, data, preconditions, steps, expected, must_not_change?, mutates, automatable, planned_status?, added_after_recon? }]
+  cases:     [{ id, title, trace, category, type, priority, technique, oracle, role, viewport, data, preconditions, steps, expected, must_not_change?, mutates, automatable, ends_session?, planned_status?, added_after_recon? }]
   charters:  [{ id: EX-n, mission, area, data, look_for }]
   order:     [TC-01, TC-02, ...]
   cleanup:   [{ ref, action }]
@@ -152,7 +155,7 @@ Input: the `test_plan` and `recon: { screens: [{ url, title, controls: [{ role, 
 
 1. Compare each recon screen and control with the model. Add whatever is missing to the model, then design for it with the same rules as above. A new control gets its rules and both-direction cases. A new route, tab or dialog gets the navigation set. A control whose observed state seems to contradict an AC gets a case that tests it. Recon is not a verdict; the case is.
 2. Text the ticket quotes that is missing or different on screen becomes a `ui` case when `ui` is selected, and a question otherwise.
-3. Fit the new cases into the existing data set and order. Add a record only when rule 6 of step 7 requires it. New ids continue after the highest existing one, carry `added_after_recon: true`, and are placed by `order`. Never renumber existing cases.
+3. Fit the new cases into the existing data set and order. Add a record only when rule 6 of step 7 requires it. Every new case that uses a record is added to that record's `used_by`, placed before the record's delete case, and added to the delete case's preconditions, so a reproducible failure still blocks the delete and keeps the record for recording. New ids continue after the highest existing one, carry `added_after_recon: true`, and are placed by `order`. Never renumber existing cases.
 4. Re-run the gap review (step 10) on the new parts.
 
 Return the updated `test_plan` and `recon_delta: { screens, controls, added: [ids], notes }`.
