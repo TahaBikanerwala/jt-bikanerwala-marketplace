@@ -1,11 +1,15 @@
 # qa-tester
 
-Hand it a ticket or a pull request and it tests the change in a real browser the way a senior QA would. It reads the ticket and its linked PRs, works out what *should* happen from the acceptance criteria, drafts a full edge-case test plan, runs every case, and comes back with evidence, defects, and a Go / Go with risks / No-go verdict. It asks all its questions once, at the end.
+Hand it a ticket or a pull request and it tests the change in a real browser the way a senior QA would. It reads the ticket and its linked PRs, works out what *should* happen from the acceptance criteria, asks which test types to add, drafts a full edge-case test plan that tries to break the feature, runs every case, and comes back with evidence, defects, and a Go / Go with risks / No-go verdict. Apart from setup and the test-type card, it asks its questions once, at the end.
 
 ## The rules it follows
 
 - **The ticket is the source of truth.** Expected results come from the acceptance criteria, the description, and scope changes a product owner agreed in ticket comments. The PR and the code never define what's correct.
 - **Ticket and PR differences are reported, not absorbed.** Missing scope, extra scope, contradicting values, scope changed in code review, and unmerged PRs all appear as discrepancies. The disputed behavior is tested so you can see which version shipped.
+- **Functional and navigation testing always run; you pick the rest.** Each run asks which extra types to add: UI and visual, accessibility, security, responsive, roles and permissions, performance, resilience. It recommends some based on what the ticket touches. Pass `--types` to skip the question.
+- **It tries to break things.** Before writing cases it models the screens, the controls and the rules behind them, and the states the feature moves through. Every rule is tested in both directions. If editing an input after a successful run should disable **Run** again, that gets a case. Every touched screen gets Back, Forward, refresh, deep-link and bad-id checks. Every AC gets adversarial cases: twice, out of order, undo, abandon, fail and recover, extremes, getting round the guard, two tabs at once. A final gap review hunts for commonly missed cases.
+- **It looks at the real screens before running.** After signing in it takes a short, read-only look at the touched screens and adds cases for any control, route or state the plan missed.
+- **Expected results say where they come from.** An expected result is stated by an AC, implied by one, or a common convention the ticket never wrote down, such as a disabled button cannot be clicked or Back does not resubmit. A convention failure is still a defect, filed one priority lower, with a question asking whether the behavior is intended.
 - **Everything is executed.** A case that can't run in a browser (an email, a captcha, a third-party payment, a vague AC) is marked `Not testable` with the reason, and the run moves on.
 - **Questions wait until the end.** One card with the questions that matter most, and any case your answers unblock is re-run.
 - **Minimal test data.** It designs one small shared data set and tests many things on the same records. For example, one order is created, read, edited, moved through its states, and deleted by the last case, so cleanup is close to free. Every created record is prefixed (`qa-<id>-`) and tracked.
@@ -37,6 +41,7 @@ You also need:
 /qa-tester:run https://dev.azure.com/org/proj/_workitems/edit/1234 --env staging
 /qa-tester:run https://github.com/org/app/pull/321   # PR; referenced tickets are found automatically
 /qa-tester:run #321                         # PR on this repo's GitHub remote
+/qa-tester:run PROJ-456 --types ui,security # skip the test-type question
 /qa-tester:plan PROJ-456                    # draft the plan only, no browser
 /qa-tester:setup                            # change saved environments and preferences
 ```
@@ -46,7 +51,7 @@ You also need:
 1. **Environments:** `name=url` pairs and a default. It suggests the local URL it finds in your repo. Production-looking hosts are flagged.
 2. **Login:** use your logged-in Chrome session, test accounts from environment variables (only the variable names are saved), log in manually at the start of each run, or no login.
 3. **Test data:** may tests create, edit or delete data in non-production only, everywhere, or nowhere?
-4. **Extra coverage:** mobile and tablet viewports, accessibility checks, Lighthouse, and a role and permission matrix.
+4. **Test types:** the extra types to recommend on every run (UI and visual, accessibility, security, responsive; type performance, roles and permissions or resilience in Other). You can still change them on each run.
 
 Answers go to `.claude/qa-tester-policy.json`. It holds no secrets, so you can commit it for the team.
 
@@ -54,19 +59,21 @@ Answers go to `.claude/qa-tester-policy.json`. It holds no secrets, so you can c
 
 1. **Gather:** reads the ticket (AC, description, comments, parent, related items) and every linked PR (description, changed files, review threads, merge state), following links both ways.
 2. **Reconcile:** normalizes the ACs (`AC-1..n`, including agreed amendments) and lists ticket vs PR discrepancies. It also turns the PR's changed files into risk areas for regression and exploratory testing.
-3. **Plan:** formal test design on every AC (equivalence classes, boundaries, decision tables, state transitions, negative paths), then a UI layer covering:
-   - validation, navigation, refresh, back, double-submit;
-   - session expiry, permissions, data isolation;
-   - empty, one and many states, and pagination;
-   - dates and locales, slow and offline network;
-   - responsive layouts, accessibility, and regression of shared code.
+3. **Plan:** asks which test types to add (one card, skipped with `--types`). Then:
+   - formal test design on every AC (equivalence classes, boundaries, decision tables, state transitions, negative paths);
+   - a model of the screens, the control rules and the states;
+   - functional cases: every control rule in both directions, re-edit invalidation, persistence after reload, validation, lists, dates;
+   - navigation cases: ways in and out, Back and Forward, refresh, deep links, bad ids, unsaved-changes guard;
+   - break-it cases on every AC and rule;
+   - the chosen types (UI, accessibility, security, responsive, permissions, performance, resilience) and regression of shared code;
+   - a gap review against a list of commonly missed tests.
 
-   It writes `docs/qa/<id>/test-plan.md` with the shared data set, every case, exploratory charters and the cleanup plan.
-4. **Preflight:** checks the environment is reachable, logs in each role, confirms the PR is in the deployed build (or flags that it couldn't), and checks that the seed data exists.
-5. **Execute:** runs every case without stopping. For each case it asserts from the page, checks console and network, captures screenshots on failure, and re-runs failures to separate flakes from real defects. It then runs time-boxed exploratory charters. Test data stays in place until step 7.
+   It writes `docs/qa/<id>/test-plan.md` with the test scope, the feature model, the shared data set, every case with where its expected result comes from, a screen by test type coverage grid, what it considered and skipped, exploratory charters and the cleanup plan.
+4. **Preflight and recon:** checks the environment is reachable, logs in each role, confirms the PR is in the deployed build (or flags that it couldn't), and checks that the seed data exists. Then it takes a short, read-only look at the touched screens and adds cases for anything the plan missed.
+5. **Execute:** runs every case without stopping. For each case it asserts from the page (control states from the accessibility tree), checks console and network, captures screenshots on failure, logs anything else it notices going wrong, and re-runs failures to separate flakes from real defects. It then runs time-boxed exploratory charters. Test data stays in place until step 7.
 6. **Report:** writes `docs/qa/<id>/test-report.md`, which contains:
-   - the verdict;
-   - an AC → case → result matrix;
+   - the verdict and the test types covered;
+   - an AC → case → result matrix, and results by test type;
    - the defects, with repro steps and evidence;
    - the discrepancies;
    - not-testable cases and what would unblock them;
@@ -88,7 +95,8 @@ Answers go to `.claude/qa-tester-policy.json`. It holds no secrets, so you can c
   },
   "default_env": "staging",
   "auth": { "method": "env-accounts", "roles": { "admin": { "user_env": "QA_ADMIN_USER", "pass_env": "QA_ADMIN_PASS" } } },
-  "coverage_extras": ["responsive", "accessibility"],
+  "coverage_extras": ["ui", "accessibility", "security"],
+  "ask_test_types": true,
   "mutations": "non-production",
   "viewports": { "desktop": "1440x900", "tablet": "768x1024", "mobile": "390x844" },
   "browser_provider": "auto",
@@ -96,6 +104,7 @@ Answers go to `.claude/qa-tester-policy.json`. It holds no secrets, so you can c
   "pause_before_execution": false,
   "rerun_failures": 1,
   "cross_check_provider_artifacts": true,
+  "recon_minutes": 5,
   "exploratory_minutes": 10,
   "test_data_prefix": "qa-{id}-",
   "cleanup_test_data": "ask",
@@ -112,12 +121,14 @@ Answers go to `.claude/qa-tester-policy.json`. It holds no secrets, so you can c
 | `environments` | asked | `production: true` environments never get mutating tests unless `allow_mutations` is set. `version_check` is a URL or CSS selector showing the deployed build. |
 | `default_env` | asked | Override per run with `--env <name>`. |
 | `auth` | asked | `browser-session`, `env-accounts` (env var **names** per role), `manual`, `none`. |
-| `coverage_extras` | `["accessibility"]` | `responsive`, `accessibility`, `lighthouse`, `permissions`. |
+| `coverage_extras` | `["ui", "accessibility"]` | Extra test types recommended on every run: `ui`, `accessibility`, `security`, `responsive`, `performance` (`lighthouse` still works), `permissions`, `resilience`. Functional and navigation always run. |
+| `ask_test_types` | `true` | `false` uses `coverage_extras` without asking. `--types` overrides both for one run. |
 | `mutations` | `non-production` | Seeds each environment's `allow_mutations`. |
 | `browser_provider` | `auto` | `chrome-devtools` or `claude-in-chrome` to force one. |
 | `pause_before_execution` | `false` | `true` adds one approve card between plan and execution. |
 | `rerun_failures` | `1` | Re-runs before a failure counts as a defect. |
 | `cross_check_provider_artifacts` | `true` | Re-runs suspected Claude in Chrome artifacts on chrome-devtools before filing them. |
+| `recon_minutes` | `5` | Read-only look at the real screens before execution. `0` turns it off. |
 | `exploratory_minutes` | `10` | `0` turns the exploratory pass off. |
 | `test_data_prefix` | `qa-{id}-` | Every created record starts with this. |
 | `cleanup_test_data` | `ask` | `ask`: non-production asks before deleting; production deletes automatically when every case passed cleanly and asks otherwise (any defect, or any blocked, not-testable or flaky case). `never` keeps everything. |
@@ -131,8 +142,8 @@ Answers go to `.claude/qa-tester-policy.json`. It holds no secrets, so you can c
 - **Agent:** `qa-tester`, with modes `run`, `plan` and `setup`.
 - **Skills:**
   - `source-reconciler`: gathers and cross-links sources, normalizes ACs, and lists discrepancies;
-  - `test-case-designer`: the UI heuristics, the minimal shared data set, and executable cases;
-  - `browser-test-executor`: provider detection, preflight, execution, evidence, defect recording and cleanup;
+  - `test-case-designer`: the feature model, functional, navigation and break-it heuristics, one section per optional test type, the minimal shared data set, executable cases, and the gap review;
+  - `browser-test-executor`: provider detection, preflight, read-only recon, execution, evidence, defect recording and cleanup;
   - `test-report-writer`: the plan, report, comment and bug text;
   - `evidence-attacher`: uploads videos, screenshots and logs to filed bugs (Azure DevOps, Jira).
 - **Reuses:**
@@ -144,7 +155,7 @@ Answers go to `.claude/qa-tester-policy.json`. It holds no secrets, so you can c
 ## Safety
 
 - It never writes credentials anywhere and never screenshots a filled password field.
-- It never mutates data on an environment that doesn't allow it.
+- It never mutates data on an environment that doesn't allow it. Security cases that send script or injection input, or get round a client-side check, count as data changes and run only on records the run created.
 - It never bypasses captcha, MFA or rate limits, and never enters real payment or personal data.
 - It only deletes records it created and recorded under the run's prefix, and only after you agree (or, on production, when every case passed).
 - It never records a login; recordings start after sign-in.

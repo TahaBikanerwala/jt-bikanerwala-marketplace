@@ -13,7 +13,7 @@
       "id": "test",
       "command": "qa-tester:run",
       "label": "Test it",
-      "description": "Runs it in a real browser like a senior QA: test plan, execution with evidence, a Go / No-go report. Offers to file the bugs it finds.",
+      "description": "Runs it in a real browser like a senior QA: asks which test types to add to functional and navigation, then an adversarial test plan, execution with evidence, a Go / No-go report. Offers to file the bugs it finds.",
       "accepts": ["ticket", "pr"],
       "intents": ["test", "qa", "verify", "check it works", "run the tests in the browser"],
       "next": [
@@ -99,7 +99,7 @@
       "id": "test-plan",
       "command": "qa-tester:plan",
       "label": "Draft a test plan",
-      "description": "Read-only. Reconciles the ticket and its pull requests and writes the edge-case test plan. Opens no browser.",
+      "description": "Read-only. Reconciles the ticket and its pull requests, asks which test types to add, and writes the edge-case test plan. Opens no browser.",
       "accepts": ["ticket", "pr"],
       "intents": ["test plan", "plan the testing", "plan only", "what would you test"],
       "next": [
