@@ -1,0 +1,63 @@
+{
+  "states": {
+    "investigating": null,
+    "waiting_reply": null,
+    "backlog": null
+  },
+  "severity_scheme": {
+    "sev1": { "due_offset_days": 1,  "escalate_immediately": true },
+    "sev2": { "due_offset_days": 3,  "escalate_immediately": true },
+    "sev3": { "due_offset_days": 7,  "escalate_immediately": false },
+    "sev4": { "due_offset_days": 30, "escalate_immediately": false }
+  },
+  "severity_label_map": {
+    "sev1": ["1 - Critical", "Sev-1", "Critical"],
+    "sev2": ["2 - High",     "Sev-2", "High"],
+    "sev3": ["3 - Medium",   "Sev-3", "Medium"],
+    "sev4": ["4 - Low",      "Sev-4", "Low"]
+  },
+  "escalation": {
+    "channel": null,
+    "primary_contact": null,
+    "fallback_contact": null
+  },
+  "skip_labels": ["triaged"],
+  "triaged_label": "triaged",
+  "output_directory": "./docs/postmortems/",
+  "archetype_assignment_after_triage": {
+    "Bug":       "unassign",
+    "Incident":  "self",
+    "Story":     "self",
+    "Feature":   "self",
+    "Task":      "self",
+    "Spike":     "self"
+  },
+  "state_categories": {
+    "done":        ["Done", "Closed", "Resolved"],
+    "in_progress": ["Active", "Committed", "In Progress", "Doing", "In Review"],
+    "todo":        ["New", "Approved", "To Do", "Open", "Backlog"]
+  },
+  "blocked_indicators": {
+    "labels":       ["blocked", "impediment"],
+    "states":       ["Blocked"],
+    "board_column": null
+  },
+  "stale_after_days": 3,
+  "points_field_name": null,
+  "story_work_item_type": { "azure-devops": "User Story", "jira": "Story" },
+  "feature_work_item_type": { "azure-devops": "Feature" },
+  "draft_label": "Draft",
+  "priority_label_map": { "P0": "Highest", "P1": "High", "P2": "Medium" },
+  "acceptance_criteria_field": null,
+  "bug_work_item_type": { "azure-devops": "Bug", "jira": "Bug" },
+  "reported_label": "needs-triage",
+  "bug_repro_steps_field": "Microsoft.VSTS.TCM.ReproSteps",
+  "bug_system_info_field": "Microsoft.VSTS.TCM.SystemInfo",
+  "default_project": null,
+  "default_team": null,
+  "postmortem_template": "google-sre",
+  "incident_identifier": { "tag": "incident", "work_item_types": ["Issue", "Bug", "Incident"] },
+  "datadog_default_service": null,
+  "include_action_items": true,
+  "include_timeline_evidence_links": true
+}

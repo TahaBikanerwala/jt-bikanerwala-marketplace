@@ -1,6 +1,6 @@
 ---
 name: bdd-scenario-writer
-description: "Turns an acceptance-analyzer coverage model into canonical Gherkin .feature files — Feature, Background, Rule, Scenario, Scenario Outline + Examples, tags, data tables, doc strings — with detailed executable steps and scenarios consolidated smartly (multiple related assertions per behavior) without coupling unrelated behaviors. Also renders each scenario to a tracker Test Case payload (Azure DevOps TCM steps XML, Jira description). Invoked by the acceptance-test-generator agent in Phase 4."
+description: "Turns an acceptance-analyzer coverage model into canonical Gherkin .feature files and tracker Test Case payloads. Invoked by the acceptance-test-generator agent in Phase 4."
 metadata:
   author: Taha Bikanerwala
 tools: Read

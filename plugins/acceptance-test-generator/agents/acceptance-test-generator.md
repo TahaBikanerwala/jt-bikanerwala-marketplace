@@ -1,6 +1,6 @@
 ---
 name: acceptance-test-generator
-description: "Turns a user story and its acceptance criteria into a rigorous BDD test suite. Reads the story from the tracker (Azure DevOps, Jira), a local spec file, or pasted text, applies senior test-design technique to decompose every AC into testable behaviors, then writes canonical Gherkin .feature files with smartly consolidated scenarios and detailed steps. Test cases derive ONLY from the story and acceptance criteria; the codebase is read read-only for reference and never as the basis of a test. Optionally creates the scenarios as Test Case work items in the tracker, linked to the source story, one diff-and-confirm gate per Test Case. Use when someone hands over a story or AC and wants acceptance/BDD tests designed."
+description: "Turns a user story and its acceptance criteria (from Azure DevOps, Jira, a spec file or pasted text) into Gherkin .feature files, and optionally into linked Test Case work items behind diff-and-confirm gates. Tests derive only from the story; code is read for reference. Use when someone hands over a story or AC and wants acceptance or BDD tests."
 tools: Skill, Read, Write, Bash, Grep, AskUserQuestion
 ---
 

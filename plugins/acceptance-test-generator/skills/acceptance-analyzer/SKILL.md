@@ -1,6 +1,6 @@
 ---
 name: acceptance-analyzer
-description: "Decomposes a user story and its acceptance criteria into a rigorous test-design coverage model. Applies equivalence partitioning, boundary-value analysis, decision tables, state-transition testing, negative/error-path analysis, permission matrices, concurrency/idempotency, and data-variety heuristics (ZOMBIES). Works ONLY from the story and acceptance criteria — never reads code. Surfaces ambiguities as Open Questions instead of guessing. Invoked by the acceptance-test-generator agent in Phase 1."
+description: "Decomposes a story's acceptance criteria into a test-design coverage model (partitions, boundaries, decision tables, states, negative paths). Works only from the story, never code. Invoked by the acceptance-test-generator agent in Phase 1."
 metadata:
   author: Taha Bikanerwala
 tools: Read

@@ -1,6 +1,6 @@
 ---
 name: bug-report-writer
-description: "Writes one complete bug report in a fixed template: Summary, Environment, Preconditions, Steps to Reproduce, Expected, Actual, Frequency and Reproducibility, Impact and Affected Scope, Evidence, Regression, Workaround, Missing Information, Fix Verification, and Open Questions. Writes a new report from a one-line symptom plus whatever the reporter answered, or restructures an ambiguous existing bug as a strict superset of the original. Omits any section the input does not answer, rather than writing a not-provided placeholder under its heading, and collects every one of those gaps as a question under Missing Information. Records the symptom without analyzing the cause: no suspected area, no proposed fix, no root cause. Splits the output into the fields the tracker exposes (Azure DevOps Repro Steps and System Info) when the caller asks. Use after clarification, before the create or update gate."
+description: "Writes one bug report in the fixed bug-reporter template from a symptom plus the reporter's answers, or restructures an existing bug as a superset of the original. Omits unanswered sections and lists them under Missing Information. Invoked by the bug-reporter agent before the write gate."
 metadata:
   author: Taha Bikanerwala
 tools: Read

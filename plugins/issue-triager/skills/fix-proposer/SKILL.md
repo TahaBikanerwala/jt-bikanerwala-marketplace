@@ -1,6 +1,6 @@
 ---
 name: fix-proposer
-description: "Reads the local checkout read-only to localize a reported defect and propose a fix, or to establish that the code does not support one. Searches the verbatim error string, finds the module that owns the behavior, opens the suspect code, and checks recent churn against the first-seen date. Emits a proposal only when the suspect code was actually read and explains the reported symptom at [VERIFIED] or [OBSERVED]; otherwise it returns suspected areas and where-to-look, or nothing at all. Never invents a path, symbol, or version, never asserts root cause, and never writes a patch. Use when triaging a Bug or Incident, to give the fixer a real starting point instead of a guess."
+description: "Reads the local checkout read-only to localize a Bug or Incident and propose a fix only when the suspect code was read and explains the symptom; otherwise returns where to look. Never invents paths or writes patches. Invoked by the issue-triager agent."
 metadata:
   author: Taha Bikanerwala
 tools: Read, Bash, Grep

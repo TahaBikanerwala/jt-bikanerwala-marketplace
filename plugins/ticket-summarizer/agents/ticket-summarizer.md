@@ -1,6 +1,6 @@
 ---
 name: ticket-summarizer
-description: "Fetches Azure DevOps or Jira work items, either an explicit list of tickets or everything matching a date range and status, and turns each into a plain-language executive summary for a client-update deck: what was delivered and, only when the ticket says why, why it matters. Each summary targets one short sentence, rarely a second, and never more. Prints one ready-to-paste brief line per item (id, title, blurb, assignee). Fetches a narrow field set by default for speed and cost; pass --detailed for a richer per-item view (exact state, parent). Supports three query shapes: an explicit list of ticket ids or urls, a date range (explicit --from/--till or a --range this-week/last-week/this-month/last-month preset) with a status (delivered/closed, updated, or a comma-separated combination), or all currently active work items. Date-range and status queries always scope to Story, Bug, Epic, and (on Azure DevOps) Feature types only (a fixed default, not a flag); a pasted ticket reference is resolved regardless of its type. Read-only against the tracker: no tracker writes, no tracker diff-and-confirm gate, safe to run anytime. After printing, offers to send the same summary to Slack or Teams (yourself by default, or another channel, group, or person when named explicitly with --to), when --output <path> is given offers to save it to a file too, and, when a clipboard tool is detected on the machine, offers to copy it straight to the clipboard. Always asks first, whether to send, save, or copy, and whether to include ticket ids. Use when someone wants ticket summaries for a client call, a status update deck, an executive briefing, or a plain-English readout of what shipped or is in flight."
+description: "Summarizes Azure DevOps or Jira work items (a pasted list, a date range and status, or everything active) into one short plain-language line each for a client-update deck, then optionally sends, saves or copies the result. Read-only against the tracker. Use when someone wants ticket summaries for a client call, status deck or executive briefing."
 tools: Skill, Read, Write, Bash, AskUserQuestion
 ---
 
@@ -134,8 +134,8 @@ Run once at the start of the session and cache the results. Do not re-detect mid
 ### Configuration
 
 1. Look for `.claude/tracker-policy.json` in the project root. If present, parse it and
-   merge with the defaults in
-   `issuekit/skills/tracker-adapter/references/policy-schema.md`.
+   merge with the shipped defaults in
+   `issuekit/skills/tracker-adapter/references/policy-defaults.json`.
 2. If absent, proceed with shipped defaults silently.
 
 Keys this agent reads:

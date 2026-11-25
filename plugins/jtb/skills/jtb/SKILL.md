@@ -1,6 +1,6 @@
 ---
 name: jtb
-description: "Front door to every agent in jt-bikanerwala-marketplace. Takes a ticket, a pull request, pasted notes or nothing, asks what to do with it (test it, triage it, clean it up, write acceptance tests, report a bug, and so on), runs the matching plugin command, then offers the step that naturally follows until the user says done. Use when the user types /jtb or asks for jtb by name."
+description: "Front door to every agent in jt-bikanerwala-marketplace. Takes a ticket, PR, pasted notes or nothing, asks what to do with it, runs the matching plugin command, then offers the natural next step. Use when the user types /jtb or asks for jtb by name."
 argument-hint: "[ticket URL/id | PR URL | #PR | pasted text | file path] [what to do with it]"
 allowed-tools: Skill, Read
 ---

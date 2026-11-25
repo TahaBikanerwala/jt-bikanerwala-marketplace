@@ -1,6 +1,6 @@
 ---
 name: issue-investigator
-description: "Investigates a Bug or Incident on any supported tracker (Azure DevOps, Jira) by searching chat (Slack/Teams), the issue and related issues, docs (Confluence/Wiki), Datadog, and the codebase, then writes an evidence-tagged report in the bug-archetype template. Use when a Bug or Incident needs an investigation report before triage decisions are made. For Feature, User Story, Task, or Spike, use `requirements-investigator` (lives in the issue-triager plugin)."
+description: "Investigates a Bug or Incident across chat, the tracker, docs, Datadog and the codebase, then writes an evidence-tagged report. For a Story, Feature, Task or Spike use issue-triager:requirements-investigator. Invoked by the issue-triager agent."
 metadata:
   author: Taha Bikanerwala
 tools: Read, Bash, Grep, Skill, AskUserQuestion

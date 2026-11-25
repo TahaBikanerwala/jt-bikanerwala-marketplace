@@ -1,6 +1,6 @@
 ---
 name: test-report-writer
-description: "Writes qa-tester's artifacts from the run state: the test plan file (phase=plan), the test report with verdict, AC traceability matrix, defects, ticket-vs-PR discrepancies, not-testable cases, test data ledger and open questions (phase=report), the tracker results comment (phase=comment), and one self-contained defect description per bug for bug-reporter (phase=bug). Invoked by the qa-tester agent in Phases 3, 6 and 8."
+description: "Writes qa-tester's test plan (phase=plan), report (phase=report), tracker comment (phase=comment) and per-defect bug text (phase=bug) from the run state. Invoked by the qa-tester agent in Phases 3, 6 and 8."
 metadata:
   author: Taha Bikanerwala
 ---

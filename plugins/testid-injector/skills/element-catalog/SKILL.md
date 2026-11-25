@@ -1,6 +1,6 @@
 ---
 name: element-catalog
-description: "Defines which web UI elements should carry a test id, how to recognize them in source, and how to read the signals (id, name, label, aria-label, placeholder, text, value) that name them. Covers form controls, native and component dropdowns plus their options, links, and any element made interactive by a handler or role. Use when scanning UI source to enumerate elements that need a data-testid."
+description: "Defines which UI elements need a test id, how to find them in source and which naming signals to read. Invoked by the testid-injector agent."
 metadata:
   author: Taha Bikanerwala
 tools: Read, Grep, Glob

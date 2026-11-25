@@ -1,6 +1,6 @@
 ---
 name: testid-namer
-description: "Turns the naming signals collected from a UI element (id, name, label, aria-label, placeholder, visible text, value, enclosing context) into a stable, human-readable test id. Default scheme is semantic kebab-case with a role suffix; also supports component-scoped (BEM-like) and camelCase. Handles dropdown options, dynamic list templates, deduplication, and length limits. Use when generating data-testid values for elements that lack one."
+description: "Turns an element's naming signals into a stable, readable test id, with dedup and length limits. Invoked by the testid-injector agent."
 metadata:
   author: Taha Bikanerwala
 tools: Read

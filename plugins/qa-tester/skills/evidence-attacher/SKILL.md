@@ -1,6 +1,6 @@
 ---
 name: evidence-attacher
-description: "Uploads a defect's evidence files (the mp4 reproduction video, screenshots, console and network logs) to a bug that was just filed, on Azure DevOps or Jira. Uses the tracker MCP's own upload tool when one exists, otherwise the tracker's REST API with credentials read from env vars named in .claude/qa-tester-policy.json, never printed or stored. Runs only after the bug was approved in bug-reporter's gate, which listed these files, so it asks nothing. A failed upload is reported and never undoes the bug. Invoked by the qa-tester agent in Phase 8."
+description: "Uploads a filed defect's video, screenshots and logs to the bug on Azure DevOps or Jira, after bug-reporter's gate approved them. Invoked by the qa-tester agent in Phase 8."
 metadata:
   author: Taha Bikanerwala
 ---

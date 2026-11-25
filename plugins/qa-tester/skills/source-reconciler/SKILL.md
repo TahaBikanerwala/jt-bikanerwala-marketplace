@@ -1,6 +1,6 @@
 ---
 name: source-reconciler
-description: "Gathers everything a tester needs about a change and decides what the truth is. Resolves a ticket (Azure DevOps, Jira), a pull request (Azure DevOps, GitHub), or pasted text; follows links both ways until the set stops growing (ticket to linked PRs, PR to referenced tickets, ticket to parent and related items); normalizes the acceptance criteria into AC-1..n including product-owner amendments made in comments; and lists every discrepancy between the ticket and the PR, with the ticket as source of truth. Also derives risk areas from the PR's changed files, used only to aim regression testing. Invoked by the qa-tester agent in Phases 1 and 2."
+description: "Resolves a ticket, PR or pasted text, follows links both ways, normalizes acceptance criteria into AC-1..n and lists every ticket-vs-PR discrepancy with the ticket as truth. Invoked by the qa-tester agent in Phases 1 and 2."
 metadata:
   author: Taha Bikanerwala
 ---

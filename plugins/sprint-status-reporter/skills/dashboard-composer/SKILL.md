@@ -1,6 +1,6 @@
 ---
 name: dashboard-composer
-description: "Composes a Pulse dashboard view payload from an already-computed sprint metrics model and an optional progress-delta model: one tile per ticket label (plus a reserved Untagged tile for tickets carrying none), each holding that tag's active and closed ticket lists and their counts, a new-since-the-baseline callout, and the same tiles rendered as paste-ready plain text for a deck. Applies the caller's date and status filter while it selects, so a date window bounds only the closed and new-since lists and never the active ones. Pure computation, no tracker access, no file writes, no publishing, no clock reads. Returns a JSON payload for the sprint-status-reporter agent to publish; the agent alone holds the Artifact capability. Invoked by the sprint-status-reporter agent in pulse mode after sprint-analyzer and delta-analyzer."
+description: "Composes the Pulse dashboard payload (one tile per tag with active and closed tickets, new-since callout, deck text) from the metrics and delta models. Pure computation. Invoked by the sprint-status-reporter agent in pulse mode."
 metadata:
   author: Taha Bikanerwala
 tools: Read

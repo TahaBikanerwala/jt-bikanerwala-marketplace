@@ -1,6 +1,6 @@
 ---
 name: requirements-investigator
-description: "Investigates a non-bug issue (Story, Feature, Task, Spike) on any supported tracker (Azure DevOps, Jira) by reading the issue and linked design or product docs, searching chat (Slack/Teams) and docs (Confluence/Wiki) for prior decisions, and producing an evidence-tagged orientation report. Use when a developer is about to pick up a Story, Feature, Task, or Spike and wants context before starting work. For Bug/Incident, use issuekit:issue-investigator instead."
+description: "Investigates a Story, Feature, Task or Spike (issue, linked docs, chat and wiki history) and writes an evidence-tagged orientation report. For a Bug or Incident use issuekit:issue-investigator. Invoked by the issue-triager agent."
 metadata:
   author: Taha Bikanerwala
 tools: Read, Bash, Grep, Skill

@@ -1,6 +1,6 @@
 ---
 name: issue-refiner
-description: "Restructures a poorly written tracker issue into a clear, self-contained document a stranger can open cold and act on. Works on any archetype (Bug, Incident, Story, Feature, Task, Spike) and any supported tracker (Azure DevOps, Jira). Returns the refined title and markdown body; the caller owns the write (issuekit:tracker-adapter projects markdown to the vendor's format)."
+description: "Restructures a poorly written tracker issue of any archetype into a clear, self-contained title and markdown body. The caller owns the write. Invoked by the issue-triager agent."
 metadata:
   author: Taha Bikanerwala
 tools: AskUserQuestion, Read, Skill

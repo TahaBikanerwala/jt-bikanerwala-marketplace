@@ -1,6 +1,6 @@
 ---
 name: sprint-status-reporter
-description: "Reads the current sprint from any supported tracker (Azure DevOps, Jira) and reports on it three ways. Status mode tallies work items by state (Done / In Progress / To Do), computes percent complete and remaining count, flags blocked and stale items, and emits a Marp deck. Delta mode compares the sprint now against an earlier snapshot (or reconstructed history) and reports what shipped, what newly started, scope added or dropped, new risk, and how progress moved. Pulse mode publishes the same metrics and delta into a private, always-current Claude Artifact dashboard (one tile per ticket tag, each holding that tag's active and closed tickets, plus a paste-ready 'Copy for deck' view) and refreshes that same dashboard on every later run. Every run writes a snapshot so deltas accumulate. Read-only: no tracker writes, no confirmation gate, safe to run anytime. Use when someone wants a sprint status report, a weekly delivery update, a stand-up snapshot, a status deck, a what-changed / progress-delta readout, or a live sprint dashboard."
+description: "Reports on the current Azure DevOps or Jira sprint: a Marp status deck, a what-changed delta deck, or a live Pulse Artifact dashboard. Read-only and safe to run anytime. Use when someone wants a sprint status, weekly update, stand-up snapshot, progress delta or sprint dashboard."
 tools: Skill, Read, Write, Bash, AskUserQuestion, Artifact, ArtifactData
 ---
 
@@ -108,8 +108,8 @@ Run once at the start and cache the results. Do not re-detect mid-run.
 ### Configuration
 
 1. Look for `.claude/tracker-policy.json` in the project root. If present, parse it and
-   merge with the defaults in
-   `issuekit/skills/tracker-adapter/references/policy-schema.md`.
+   merge with the shipped defaults in
+   `issuekit/skills/tracker-adapter/references/policy-defaults.json`.
 2. If absent, proceed with shipped defaults silently. This agent never prompts for a policy
    key: `output_directory` falls back to `./sprint-reports/`, and a state the vendor category
    cannot classify is counted as To Do with a warning that names `state_categories`. The only

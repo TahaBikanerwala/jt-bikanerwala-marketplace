@@ -1,6 +1,6 @@
 ---
 name: tracker-adapter
-description: "Auto-detects the active issue-tracker MCP and exposes an abstract verb surface that works across Azure DevOps and Jira. Routes reads (getIssue, searchIssues, ...) and writes (addComment, transition, updateFields, ...) through the vendor adapter resolved at session start. Loads policy from .claude/tracker-policy.json with lazy-prompt fallback. Owns the diff-and-confirm gate that every write batch must pass."
+description: "Tracker-agnostic verb surface over the active Azure DevOps or Jira MCP: detection, policy, reads, writes and the diff-and-confirm gate every write batch passes. Invoked by the tracker-backed agents in this marketplace."
 metadata:
   author: Taha Bikanerwala
 tools: Read, AskUserQuestion
@@ -25,8 +25,8 @@ Before serving any verb call, the caller must run the bootstrap sequence below a
    - URL containing `dev.azure.com` or `visualstudio.com` → azure-devops
    - Key matching `[A-Z][A-Z0-9_]+-\d+` (e.g. `PROJ-123`) → jira
    - Numeric-only ID with no URL, or no issue reference at all (a create flow) → ask once via `AskUserQuestion`, cache for the session only (do not persist).
-3. **Load policy.** Read `.claude/tracker-policy.json` if it exists. Merge with shipped defaults from `references/policy-schema.md`. Track which keys are unset; do not lazy-prompt yet. Runs before step 4: `policy.default_project`/`policy.default_team` is the first precedence tier in that step's `defaultProject`/`defaultTeam` resolution.
-4. **Bootstrap identity.** Call `whoAmI()` (see `references/verbs.md`). The adapter implementations are in `adapters/<tracker>/`. Cache `{trackerUser, defaultProject, defaultTeam, email}`. On AzDO, `defaultProject`/`defaultTeam` are not a bare tool-call result — resolve them per `references/verbs.md`'s "Resolving AzDO's `defaultProject`/`defaultTeam`" precedence (policy override from step 3, then the AzDO MCP server's own `ado_mcp_project`/`ado_mcp_team` config in `.mcp.json`, then single-project auto-resolve, then lazy-prompt). If a chat backend was detected and `email` is non-null, call `resolveChatUser({ email })` (see `references/verbs.md`'s "Chat" section) and cache the result as the running user's chat identity — `null` if the lookup misses. This is the default `sendMessage` target for a caller that wants to message "yourself"; when `email` is `null` or the lookup misses, that default is unavailable for the session.
+3. **Load policy.** Read `.claude/tracker-policy.json` if it exists. Merge with shipped defaults from `references/policy-defaults.json` (a `null` means no shipped value). Do not read `references/policy-schema.md` at bootstrap; open it only when a key needs its full rules (a lazy prompt, validation, or legacy migration). Track which keys are unset; do not lazy-prompt yet. Runs before step 4: `policy.default_project`/`policy.default_team` is the first precedence tier in that step's `defaultProject`/`defaultTeam` resolution.
+4. **Bootstrap identity.** Call `whoAmI()` (read `references/verbs/identity.md` only; do not read the other verb files at bootstrap). The adapter implementations are in `adapters/<tracker>/`. Cache `{trackerUser, defaultProject, defaultTeam, email}`. On AzDO, `defaultProject`/`defaultTeam` are not a bare tool-call result — resolve them per `references/verbs/identity.md`'s "Resolving AzDO's `defaultProject`/`defaultTeam`" precedence (policy override from step 3, then the AzDO MCP server's own `ado_mcp_project`/`ado_mcp_team` config in `.mcp.json`, then single-project auto-resolve, then lazy-prompt). If a chat backend was detected and `email` is non-null, call `resolveChatUser({ email })` (see `references/verbs/chat.md`) and cache the result as the running user's chat identity — `null` if the lookup misses. This is the default `sendMessage` target for a caller that wants to message "yourself"; when `email` is `null` or the lookup misses, that default is unavailable for the session.
 5. **Legacy config migration warning.** If any of the legacy paths exists and no `.claude/tracker-policy.json` is present, read it forward once and print a one-time warning:
    - `.claude/azure-incident-postmortem.config.json`
    - `.claude/azure-issue-triage.config.json`
@@ -49,7 +49,7 @@ tracker=<tracker> chat=<chat> doc=<doc> log=<log>
 
 The caller invokes verbs by name; this skill routes the call to the resolved adapter.
 
-- Verb contracts live in `references/verbs.md`. Each verb declares input, output, and which adapter file implements it.
+- Verb contracts: `references/verbs.md` holds the shared types and a table of which `references/verbs/<group>.md` file defines each verb. Read only the group file for the verb you are about to call. Each verb declares input, output, and which adapter file implements it.
 - Adapter implementations live in `adapters/<tracker>/{tools, search, sprint, writes, body-format, states, mentions}.md`. The adapter file names map 1:1 to the verb categories.
 - Reads chain freely. Writes must pass through the diff-and-confirm gate (see below).
 - Markdown body input is normalized through `references/body-format.md` and the per-adapter `body-format.md` before any write call.
@@ -82,13 +82,13 @@ The gate is a hard boundary. Writes cannot bypass it, even for "small" updates l
 
 ## Verb surface (summary)
 
-See `references/verbs.md` for the full schemas. Quick reference:
+Full schemas are in the `references/verbs/` group files (index: `references/verbs.md`). Quick reference:
 
 **Reads:** `getIssue`, `getIssueHistory`, `getIssueComments`, `getIssuesBatch`, `searchIssues`, `getIssueTypeSchema`, `linkedPullRequests`, `getPullRequest`, `getCurrentSprint`, `findSprint`, `getSprintItems`, `getTeamCapacity`, `whoAmI`, `resolveUser`, `mention`.
 
 **Writes:** `createIssue`, `assign`, `transition`, `updateFields`, `addComment`, `addLabel`, `removeLabel`, `linkIssue`, `linkPullRequest`.
 
-**Chat (ungated, not tracker writes):** `resolveChatUser`, `sendMessage`. See `references/verbs.md`'s "Chat" section — these resolve and message a **chat-platform** identity (Slack/Teams), distinct from `resolveUser`'s tracker identity, and never touch the tracker or its diff-and-confirm gate.
+**Chat (ungated, not tracker writes):** `resolveChatUser`, `sendMessage`. See `references/verbs/chat.md` — these resolve and message a **chat-platform** identity (Slack/Teams), distinct from `resolveUser`'s tracker identity, and never touch the tracker or its diff-and-confirm gate.
 
 ## Adapter file map
 

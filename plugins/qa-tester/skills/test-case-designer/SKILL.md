@@ -1,6 +1,6 @@
 ---
 name: test-case-designer
-description: "Turns the acceptance-analyzer coverage model into an executable browser test plan. Layers UI and browser heuristics (validation, navigation, session, permissions, state, responsive, accessibility, console and network health, regression of PR-touched areas) on top of the formal test design, designs one minimal shared test data set that many cases reuse so cleanup is trivial, orders cases so records flow through their lifecycle, and writes each case with an AC trace, preconditions, data reference, concrete steps and an observable expected result. Adds exploratory charters and a cleanup plan. Invoked by the qa-tester agent in Phase 3."
+description: "Turns an acceptance-analyzer coverage model into an executable browser test plan on one minimal shared data set, with exploratory charters and a cleanup plan. Invoked by the qa-tester agent in Phase 3."
 metadata:
   author: Taha Bikanerwala
 ---

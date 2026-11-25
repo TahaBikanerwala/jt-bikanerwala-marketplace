@@ -1,7 +1,6 @@
 # Teams — tool allowlist
 
-The adapter calls the tools below for the two chat verbs (`references/verbs.md`'s
-"Chat" section). Suffix-match against the available tool surface; prefix varies by
+The adapter calls the tools below for the two chat verbs (`references/verbs/chat.md`). Suffix-match against the available tool surface; prefix varies by
 which Microsoft 365/Graph MCP is installed.
 
 This file covers `resolveChatUser` and `sendMessage` only. Detecting *whether* Teams
@@ -29,7 +28,7 @@ to every other verb.
 
 If a future Teams/Graph MCP registration exposes an actual send-message tool, add its
 suffix to the table above and update `sendMessage`'s implementation note in
-`references/verbs.md` — do not call it ad hoc from a verb-plugin prompt first.
+`references/verbs/chat.md` — do not call it ad hoc from a verb-plugin prompt first.
 
 ## Known prefix variants
 

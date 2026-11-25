@@ -1,6 +1,6 @@
 ---
 name: deck-composer
-description: "Renders a sprint metrics model into a Marp markdown deck (title, summary with a Mermaid pie chart, completed, in-progress, blocked/at-risk, up-next, and an optional capacity slide) and writes it to the configured output directory. Pure rendering, no tracker access. Invoked by the sprint-status-reporter agent after sprint-analyzer."
+description: "Renders a sprint metrics model into a Marp status deck. Pure rendering. Invoked by the sprint-status-reporter agent after sprint-analyzer."
 metadata:
   author: Taha Bikanerwala
 tools: Read, Write

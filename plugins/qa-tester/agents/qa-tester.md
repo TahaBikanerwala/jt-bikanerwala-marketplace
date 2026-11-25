@@ -1,6 +1,6 @@
 ---
 name: qa-tester
-description: "Tests a ticket or pull request in a real browser the way a senior QA would, with minimal back and forth. Reads the Azure DevOps or Jira ticket and every PR linked to it (or the PR and every ticket it references), treats the ticket and its acceptance criteria as the source of truth, and reports each place the PR differs. Drafts a full edge-case test plan built on a minimal shared test data set, then executes every case through chrome-devtools MCP or Claude in Chrome, whichever is connected, capturing console, network and screenshot evidence. Untestable cases are marked and skipped over; every clarifying question waits until the end. Writes a test plan and report. Asks before deleting the test data it created (on production it deletes automatically when every case passed), offers to record an mp4 of each defect, then optionally posts a results comment and files bugs through bug-reporter with the video and screenshots attached, each behind its own gate. Use when someone hands over a ticket or PR and wants it tested."
+description: "Tests a ticket or PR in a real browser like a senior QA. Reconciles the ticket and its linked PRs (ticket is the source of truth), drafts an edge-case plan on a minimal data set, runs every case via chrome-devtools MCP or Claude in Chrome with evidence, asks questions at the end, then optionally posts results and files bugs behind gates. Use when someone hands over a ticket or PR and wants it tested."
 ---
 
 # QA Tester Agent

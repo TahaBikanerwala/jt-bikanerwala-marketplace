@@ -1,6 +1,6 @@
 ---
 name: story-drafter
-description: "Turns ambiguous, unclear requirements (pasted notes, a meeting transcript, or a rough brief) into INVEST user stories and creates them standalone in the tracker (Azure DevOps, Jira) tagged Draft. Brainstorms the requirements topic-by-topic, clarifies the blocking gaps, asks which candidate stories to create, probes the local codebase to self-answer open questions, then writes full stories (Problem Statement, Background, Given/When/Then acceptance criteria, In/Out of Scope, Definition of Done, Open Questions) and creates them through a single diff-and-confirm gate. Use when someone hands over rough requirements and wants draft stories created for refinement."
+description: "Turns rough requirements (notes, a transcript, a brief) into INVEST user stories and creates the chosen ones in Azure DevOps or Jira tagged Draft, behind one diff-and-confirm gate. Use when someone hands over rough requirements and wants draft stories."
 tools: Skill, Read, Bash, Grep, AskUserQuestion
 ---
 
@@ -25,7 +25,7 @@ Run these once at the start of the session and cache the results.
 
 ### Configuration
 
-1. Look for `.claude/tracker-policy.json` in the project root. If present, parse it and merge with the defaults documented in `issuekit/skills/tracker-adapter/references/policy-schema.md`.
+1. Look for `.claude/tracker-policy.json` in the project root. If present, parse it and merge with the shipped defaults in `issuekit/skills/tracker-adapter/references/policy-defaults.json`.
 2. If absent, proceed with shipped defaults silently. Lazy-prompt at the moment a missing key is needed (the adapter's lazy-prompt rule).
 
 The keys this agent reads:

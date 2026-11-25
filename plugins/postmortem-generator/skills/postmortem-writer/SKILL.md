@@ -1,6 +1,6 @@
 ---
 name: postmortem-writer
-description: "Generates a full incident postmortem markdown document from a cached timeline (built by incident-timeline-builder) and the source materials gathered during investigation. Uses a Google-SRE-style blameless template by default. Produces the postmortem as plain markdown text for the caller to render or save; the skill itself never writes to disk or posts anywhere. Use when the postmortem-generator agent reaches Phase 4, or when a user has a structured timeline and wants the full document."
+description: "Renders a blameless postmortem markdown document from a cached timeline and gathered sources; never writes to disk or posts. Invoked by the postmortem-generator agent in Phase 4."
 metadata:
   author: Taha Bikanerwala
 tools: Read
