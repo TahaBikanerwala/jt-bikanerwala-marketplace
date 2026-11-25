@@ -10,7 +10,7 @@ Load: query `chrome-devtools` (or `select:` the full names once known) for `new_
 |---|---|---|
 | open a dedicated tab | `__new_page` | keep its page id; `__select_page` to return to it |
 | signed-out or second-user session | `__new_page` with `isolatedContext: "<name>"` | its own cookies and storage. Use it for signed-out deep links, a second role, and two-session conflict cases |
-| navigate, reload, back, forward | `__navigate_page` | `type: url \| back \| forward \| reload`. `type: reload` is a real reload. `handleBeforeUnload: accept \| dismiss` answers the browser's unsaved-changes prompt; `dismiss` tests the guard's cancel path. A form resubmission prompt on reload is answered with `__handle_dialog` |
+| navigate, reload, back, forward | `__navigate_page` | `type: url \| back \| forward \| reload`. `type: reload` is a real reload. `handleBeforeUnload: accept \| dismiss` answers the browser's unsaved-changes prompt. It defaults to `accept`, which looks the same as no prompt, so guard cases start with `dismiss` (see the executor's guard rule). The resubmit prompt on reloading a form POST result is browser UI that `__handle_dialog` cannot see; the executor never reloads such a page |
 | read the page | `__take_snapshot` | accessibility tree with element uids; use uids for interactions |
 | click | `__click` | by uid from the latest snapshot; re-snapshot after DOM changes |
 | type into one field | `__fill` | |
@@ -41,7 +41,7 @@ Call `tabs_context_mcp` first in every session, then create a new tab. Never reu
 | open a dedicated tab | `tabs_create_mcp` | |
 | navigate | `navigate` | |
 | back, forward | `navigate` with `url: "back"` or `"forward"` | `tabId` is required |
-| reload | `javascript_tool` with `location.reload()` | a real reload. Never navigate to the current URL instead: that is a fresh GET, which never resubmits a form and keeps no history state, so refresh cases would pass falsely. When the page was reached by a native form POST, the browser shows a resubmit prompt that cannot be stubbed; run that case on chrome-devtools, or plan it `Not testable` |
+| reload | `javascript_tool` with `location.reload()` | a real reload. Never navigate to the current URL instead: that is a fresh GET, which never resubmits a form and keeps no history state, so refresh cases would pass falsely. When the page was reached by a native form POST, the browser shows a resubmit prompt that cannot be stubbed; the executor checks for this first and never reloads such a page |
 | read the page | `read_page`, `get_page_text`, `find` | `find` locates an element by description |
 | click, type, keys, scroll, screenshot | `computer` | actions: `left_click`, `type`, `key`, `scroll`, `screenshot` |
 | fill form fields | `form_input` | by element ref from `read_page` / `find` |

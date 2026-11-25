@@ -7,9 +7,9 @@ metadata:
 
 # Test Case Designer
 
-**Input, `phase=design` (default):** the `acceptance-analyzer` coverage model, the normalized `acceptance_criteria`, `business_rules`, `discrepancies`, `risk_areas`, the PR's changed files, `test_types` (always `functional` and `navigation`, plus whichever types the run chose), the environment (`production`, `allow_mutations`), `auth.roles`, `viewports`, `test_data_prefix`, the provider, and `missing_capabilities` (what the provider cannot do; plan those cases as `Not testable (provider lacks <capability>)`).
+**Input, `phase=design` (default):** the `acceptance-analyzer` coverage model, the normalized `acceptance_criteria`, `business_rules`, `discrepancies`, `risk_areas`, the PR's changed files, `test_types` (always `functional` and `navigation`, plus whichever types the run chose), the environment (`production`, `allow_mutations`), `auth.method`, `auth.roles`, `viewports`, `test_data_prefix`, the provider, `cross_check_provider`, and `missing_capabilities` (what the provider cannot do; plan those cases as `Not testable (provider lacks <capability>)`).
 
-**Input, `phase=refine`:** the current `test_plan` and the `recon` inventory from the executor. See the last section.
+**Input, `phase=refine`:** the current `test_plan` and the `recon` inventory from the executor, plus the same `acceptance_criteria`, `business_rules`, `test_types`, environment, `auth.method`, `auth.roles`, provider, `cross_check_provider` and `missing_capabilities` as `phase=design`, because refine designs with the same rules. See the last section.
 
 Output: `test_plan` (shape at the end). Load `references/ui-qa-heuristics.md` before designing.
 
@@ -66,7 +66,7 @@ Every case records where its expected result comes from:
 
 Never take an expected result from the PR or the code. When the AC is silent on the exact outcome (error text, redirect target), write the expected result at the level the AC supports ("an error explains the email is invalid and the form is not submitted") and add a non-blocking question asking for the exact text.
 
-A `convention` case runs and can fail like any other. The report files its failure as a defect one priority lower and asks whether the behavior is intended, except for `security` cases and S1 defects: script execution, data exposure or a server accepting what the UI forbids is never "intended", so those keep their priority and raise no question.
+A `convention` case runs and can fail like any other. The report files its failure as a defect one priority lower and asks whether the behavior is intended, except for S1 defects: script execution, exposed data, or a server accepting an action that crosses a permission or data rule the ticket names is never "intended", so those keep their priority and raise no question.
 
 ## 7. Design the minimal shared test data set
 

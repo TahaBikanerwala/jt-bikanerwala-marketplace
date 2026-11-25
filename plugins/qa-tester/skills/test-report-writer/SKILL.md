@@ -27,6 +27,8 @@ Write `test-report.md` from the report template (same no-overwrite rule).
 - `Go with risks`: open S2 or S3 defects not covered by No-go; or any P1/P2 case `Not testable`, `Blocked`, `Skipped` or `Pass (flaky ...)`; or `deployment: unverified`; or open `contradicts-ac` discrepancies; or any defect whose `cross_check` says it was not cross-checked (name that in the reasoning sentence, since the defect may be a Claude in Chrome artifact); or a `provider_artifacts` entry on a P1 case.
 - `Go`: every P1 and P2 case passed and none of the above.
 
+**Planned limits do not count against the verdict.** A case the plan already set to `Skipped (mutation guard)` or `Not testable` at design time, whose oracle is `convention`, is a limit of this environment, login method or provider, not a risk the run found. Leave it out of the `Go with risks` rule and list it under Not covered with its reason. Without this, choosing Security on a read-only environment or with a browser-session login could never reach `Go`. Planned skips of `ac` or `implied` cases still count, because an untested acceptance criterion is a real risk.
+
 A case that failed only on Claude in Chrome and passed on chrome-devtools counts as `Pass` in the counts, and is also listed under Claude in Chrome artifacts.
 
 The verdict rules use severity whatever the oracle. A defect whose oracle is `convention` says so in its Oracle line, so a reader can see the ticket never stated that behavior. The Coverage by test type table lists every type in `test_types`. Not covered names every type that was not selected for this run.
