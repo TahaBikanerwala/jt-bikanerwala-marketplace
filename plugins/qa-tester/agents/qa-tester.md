@@ -96,6 +96,7 @@ Calling-context convention for every `Skill` call: the first line is `Calling co
 | `test_types` | 3 | `functional` and `navigation`, plus the extra types chosen for this run |
 | `test_plan` | 3, 4b | feature model, cases, data set, execution order, exploratory charters, coverage grid |
 | `plan_path` | 3 | the plan file this run wrote; Phase 4b rewrites this file, never an earlier run's |
+| `report_path` | 6 | the report file this run wrote; every later report rewrite (Phase 7 re-run, recording, cleanup) passes it, so an earlier run's report is never touched |
 | `recon` | 4b | the real screens' controls, text and navigation, and `recon_delta` (cases added) |
 | `data_ledger` | 4b, 5 | every record the agent created, including anything recon created by accident: `{ ref, kind, identifier, created_in, status: in-place \| cleaned \| kept (user choice) \| left behind, note }` |
 | `results` | 5 | per case: status, actual, evidence paths, console and network findings, attempts |
@@ -171,7 +172,7 @@ Same skill, `Calling context: phase=2.` Returns `acceptance_criteria`, `business
 
 `mode=plan` stops here, with no reconnaissance, so the plan says it was not checked against the live screens. Print the plan path, the test types, the case count by priority and by category, the data set summary, the discrepancies, and the open questions. With `pause_before_execution: true`, show the same digest and ask once: Execute / Edit then execute (free-form notes) / Stop.
 
-If a `mode=run` run ends before Phase 4b (Stop at that card or at the preflight question) after writing the plan with `recon=planned`, have `test-report-writer` (`Calling context: phase=plan, rewrite=true, recon=off.`) rewrite `plan_path` so its Reconnaissance section says recon did not run and why.
+If a `mode=run` run ends before Phase 4b (Stop at that card or at the preflight question) after writing the plan with `recon=planned`, have `test-report-writer` (`Calling context: phase=plan, rewrite=true, recon=off.`) rewrite `plan_path` with the reason `stopped before recon (<at the pause card | at the preflight question>)`, so its Reconnaissance section says recon did not run and why.
 
 ### Phase 4: Preflight
 
@@ -184,7 +185,7 @@ If the deployed build cannot be confirmed to contain the PR, do not stop. Record
 
 ### Phase 4b: Reconnaissance
 
-Skip when `recon_minutes` is `0`. Invoke `browser-test-executor` with `Calling context: phase=recon, provider=<provider>, env=<env name>.` and the plan's `model.screens` plus the risk areas' routes. It looks at the real screens without submitting anything and returns `recon`, plus a `data_ledger` entry for anything a click created despite that. Then invoke `test-case-designer` with `Calling context: phase=refine, provider=<provider>, env=<env name>.`, the `test_plan`, `recon`, and the same `acceptance_criteria`, `business_rules`, `test_types`, `env`, `auth.method`, `auth.roles`, `cross_check_provider` and `missing_capabilities` it had in Phase 3. It adds the controls, routes and states the plan missed, and returns the updated plan with `recon_delta`. Always have `test-report-writer` (`Calling context: phase=plan, rewrite=true.`) rewrite the file at `plan_path`, even when no case was added, so its Reconnaissance section records what recon did. Announce one line: `Recon: <n> screens, <n> controls, <n> cases added`, plus anything recon created. Ask nothing here.
+Skip when `recon_minutes` is `0`. Invoke `browser-test-executor` with `Calling context: phase=recon, provider=<provider>, env=<env name>.` and the plan's `model.screens` plus the risk areas' routes. It looks at the real screens without submitting anything and returns `recon`, plus a `data_ledger` entry for anything a click created despite that. Then invoke `test-case-designer` with `Calling context: phase=refine, provider=<provider>, env=<env name>.`, the `test_plan`, `recon`, and the full Phase 3 design payload (coverage model, ACs, business rules, discrepancies, risk areas, changed files, test types, env, auth, viewports, `test_data_prefix`, `cross_check_provider`, `missing_capabilities`). It adds the controls, routes and states the plan missed, and returns the updated plan with `recon_delta`. Always have `test-report-writer` (`Calling context: phase=plan, rewrite=true.`) rewrite the file at `plan_path`, even when no case was added, so its Reconnaissance section records what recon did. Announce one line: `Recon: <n> screens, <n> controls, <n> cases added`, plus anything recon created. Ask nothing here.
 
 ### Phase 5: Execute
 
@@ -194,7 +195,9 @@ The executor never pauses. If the browser session dies, it reconnects once; if t
 
 ### Phase 6: Report
 
-Invoke `test-report-writer` with `Calling context: phase=report.` and everything gathered. It writes `<output_dir>/<run_id>/test-report.md`, runs `issuekit:prose-style` on its prose, and returns the inline summary. Print that summary: the verdict (`Go` / `Go with risks` / `No-go`), the test types covered, the pass/fail/blocked/not-testable/skipped counts, each defect in one line, the discrepancy count, the number of Claude in Chrome artifacts that passed on chrome-devtools, the test data still in place, and the report path.
+Before invoking the writer, settle anything recon created on an environment that does not allow mutations: set those `data_ledger` entries (`created_in: recon`) to `left behind (recon, mutations not allowed; remove by hand)`. They are never deleted and no card asks about them, so this report and the printed summary are where people learn about them.
+
+Invoke `test-report-writer` with `Calling context: phase=report.` and everything gathered. It writes `<output_dir>/<run_id>/test-report.md` (or a timestamped name when an earlier run's report exists), runs `issuekit:prose-style` on its prose, and returns the path it wrote, which you keep as `report_path`, plus the inline summary. Print that summary: the verdict (`Go` / `Go with risks` / `No-go`), the test types covered, the pass/fail/blocked/not-testable/skipped counts, each defect in one line, the discrepancy count, the number of Claude in Chrome artifacts that passed on chrome-devtools, the test data still in place, and the report path.
 
 ### Phase 7: End-of-run questions, recording and cleanup
 
@@ -206,12 +209,12 @@ The same card carries two run decisions when they apply. They take the first slo
 2. **Cleanup.** Applies when `data_ledger` has entries a case has not already deleted and the environment allows mutations. With `cleanup_test_data == "never"`, set `keep` and do not ask. With `"ask"`:
    - **Non-production:** always ask. "The run created <n> records (list the first three identifiers). Delete them now?" Options: `Delete all (Recommended)`, `Keep records tied to defects` (so the developer can debug on them), `Keep everything`.
    - **Production, every case passed cleanly and no defects:** do not ask. Set `cleanup_decision = delete-auto`. "Cleanly" means every case is a plain `Pass`. `Skipped (mutation guard)` cases, and `Not testable` cases the plan set at design time on a `convention` oracle, are ignored.
-   - **Records recon created** (`created_in: recon`) are included in the count and the question; cleanup deletes them by their recorded identifier. On an environment that does not allow mutations, never delete them: there is no card for them, so print them in the Phase 6 summary and list them in the report as `left behind (recon, mutations not allowed)` for removal by hand.
+   - **Records recon created** (`created_in: recon`) are included in the count and the question. Cleanup deletes only those confirmed by a creation response. On an environment that does not allow mutations, they were already marked left behind before Phase 6.
    - **Production, anything else** (a defect, or any case that is `Blocked`, `Not testable`, `Pass (flaky ...)`, or a pass that only held on chrome-devtools): ask the same question, noting that data left in production is visible to real users.
 
 Skip the card when there is nothing to ask.
 
-If the answers make cases runnable, or change an expected result, re-run only those cases (Phase 5 scoped to them, reusing the data set where it still exists), update `results` and `defects`, and rewrite the report. Do this once; never loop back to another question card.
+If the answers make cases runnable, or change an expected result, re-run only those cases (Phase 5 scoped to them, reusing the data set where it still exists), update `results` and `defects`, and have `test-report-writer` rewrite the report at `report_path`. Do this once; never loop back to another question card.
 
 **After the re-run, re-check both run decisions against the updated `results` and `defects`**, because they were made before it:
 
@@ -220,7 +223,7 @@ If the answers make cases runnable, or change an expected result, re-run only th
 
 **7b. Recording.** For each defect selected for recording, invoke `browser-test-executor` with `Calling context: phase=record, provider=<provider>, env=<env name>.` and the selected defects. It replays each defect's repro steps from its preconditions while recording, and saves `<output_dir>/<run_id>/evidence/<BUG-n>.mp4`. It returns `recordings`, including each defect it could not record and why. A defect that does not reproduce during the replay keeps its status but gets the note `did not reproduce on recording replay`. Add the recordings to each defect's evidence and to the report.
 
-**7c. Cleanup.** When `cleanup_decision` is `delete`, `delete-auto` or `keep-defect-data`, invoke `browser-test-executor` with `Calling context: phase=cleanup, provider=<provider>, env=<env name>.` and the ledger plus the refs to keep (the records the defects' cases used, for `keep-defect-data`). Print one line: `Cleaned <n> records`, adding `automatically, because every case passed on production` for `delete-auto`, plus anything left behind and why. For `keep`, do not invoke cleanup: set every `in-place` ledger entry to `kept (user choice)` and list the kept records in one line. Then have `test-report-writer` (`Calling context: phase=report.`) rewrite the report so the Video lines and the Test data section are current.
+**7c. Cleanup.** When `cleanup_decision` is `delete`, `delete-auto` or `keep-defect-data`, invoke `browser-test-executor` with `Calling context: phase=cleanup, provider=<provider>, env=<env name>.` and the ledger plus the refs to keep (the records the defects' cases used, for `keep-defect-data`). Print one line: `Cleaned <n> records`, adding `automatically, because every case passed on production` for `delete-auto`, plus anything left behind and why. For `keep`, do not invoke cleanup: set every `in-place` ledger entry to `kept (user choice)` and list the kept records in one line. Then have `test-report-writer` (`Calling context: phase=report.`) rewrite the report at `report_path` so the Video lines and the Test data section are current.
 
 ### Phase 8: Tracker writes (gated)
 

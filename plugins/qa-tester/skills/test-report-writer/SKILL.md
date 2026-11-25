@@ -13,21 +13,21 @@ Templates are in `references/report-template.md`. Load it first. Files go under 
 
 Write `test-plan.md` from the plan template: the test scope, sources, ACs with origins, discrepancies, the feature model (screens and routes, control rules, states), the shared data set table, the cases (grouped by priority, each with category, oracle, steps and expected), charters, cleanup plan, the AC coverage table, the screen by test type grid, what was considered and skipped, and design-time questions. If the file exists from an earlier run, write `test-plan-<yyyymmdd-hhmm>.md` instead of overwriting it, and return the path you wrote.
 
-The Reconnaissance section follows the `recon` key in the calling context. With `recon=off`, it says recon will not run and why (plan mode, no browser, or `recon_minutes` is 0), so the plan was not checked against the live screens. With `recon=planned`, it says recon runs after preflight and this section is updated then.
+The Reconnaissance section follows the `recon` key in the calling context, and `recon=off` always takes precedence. With `recon=off`, it says recon did not or will not run and gives the reason the agent passes: plan mode, no browser, `recon_minutes` is 0, or "stopped before recon (<where>)". So the plan was not checked against the live screens. With `recon=planned`, it says recon runs after preflight and this section is updated then.
 
-With `rewrite=true` (after reconnaissance), rewrite the file the agent passes as `plan_path` in place. Mark each case added after recon with `(added after recon)` in its heading. Fill the Reconnaissance section with what recon actually did: screens visited, controls found, cases added (or "none"), screens not reached, and anything a click created.
+`rewrite=true` rewrites the file the agent passes as `plan_path` in place. After reconnaissance (no `recon=off`), mark each case added after recon with `(added after recon)` in its heading, and fill the Reconnaissance section with what recon actually did: screens visited, controls found, cases added (or "none"), screens not reached, and anything a click created. With `rewrite=true, recon=off` (the run stopped before recon), change only the Reconnaissance section, to the not-run text with the reason.
 
 ## phase=report
 
-Write `test-report.md` from the report template (same no-overwrite rule).
+Write `test-report.md` from the report template (same no-overwrite rule), and return the path you wrote. Every later rewrite (after a re-run, recording or cleanup) rewrites the file the agent passes as `report_path`, never a file found by name, so an earlier run's report is never touched.
 
 **Verdict.**
 - `Not run`: no case was executed (`provider == none`). Never `Go`. The Results by case table doubles as the manual checklist.
 - `No-go`: any open S1 defect, or any S2 defect on a P1 case, or any P1 case `Blocked` with no workaround.
 - `Go with risks`: open S2 or S3 defects not covered by No-go; or any P1/P2 case `Not testable`, `Blocked`, `Skipped` or `Pass (flaky ...)`; or `deployment: unverified`; or open `contradicts-ac` discrepancies; or any defect whose `cross_check` says it was not cross-checked (name that in the reasoning sentence, since the defect may be a Claude in Chrome artifact); or a `provider_artifacts` entry on a P1 case.
-- `Go`: every P1 and P2 case passed and none of the above.
+- `Go`: every P1 and P2 case passed, apart from the planned limits below, and none of the above.
 
-**Planned limits do not count against the verdict.** A case the plan already set to `Skipped (mutation guard)` or `Not testable` at design time, whose oracle is `convention`, is a limit of this environment, login method or provider, not a risk the run found. Leave it out of the `Go with risks` rule and list it under Not covered with its reason. Without this, choosing Security on a read-only environment or with a browser-session login could never reach `Go`. Planned skips of `ac` or `implied` cases still count, because an untested acceptance criterion is a real risk.
+**Planned limits do not count against the verdict.** A case the plan already set to `Skipped (mutation guard)` or `Not testable` at design time, whose oracle is `convention`, is a limit of this environment, login method or provider, not a risk the run found. Leave it out of both the `Go with risks` and the `Go` rules, and list it under Not covered with its reason. Without this, choosing Security on a read-only environment or with a browser-session login could never reach `Go`. Planned skips of `ac` or `implied` cases still count, because an untested acceptance criterion is a real risk.
 
 A case that failed only on Claude in Chrome and passed on chrome-devtools counts as `Pass` in the counts, and is also listed under Claude in Chrome artifacts.
 

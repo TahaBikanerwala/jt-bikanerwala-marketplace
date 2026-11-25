@@ -76,7 +76,7 @@ Placeholders are in `<angle brackets>`. Drop any section that would be empty, ex
 - **<category>:** <heuristic> (<reason>); <heuristic> (<reason>)
 
 ## Reconnaissance
-<after recon: screens visited, controls found, cases added (ids, or "none"), screens not reached, anything a click created. Before recon: "Runs after preflight; this section is updated then." When off: "Not run: <plan mode | no browser | recon_minutes is 0>. The plan was not checked against the live screens.">
+<after recon: screens visited, controls found, cases added (ids, or "none"), screens not reached, anything a click created. Before recon: "Runs after preflight; this section is updated then." When off: "Not run: <plan mode | no browser | recon_minutes is 0 | stopped before recon (<where>)>. The plan was not checked against the live screens.">
 
 ## Open questions (design time)
 - <question> (unblocks <cases>)
@@ -199,7 +199,7 @@ Full report: `<output_dir>/<run_id>/test-report.md`
 ```text
 <Symptom title in one line>
 
-Found while testing <ticket id> "<ticket title>" (<ticket url>), acceptance criterion <AC-n>: "<AC text>".
+Found while testing <ticket id> "<ticket title>" (<ticket url>). <One of, by oracle: ac: acceptance criterion <AC-n>: "<AC text>". implied: not stated in the ticket; follows from acceptance criterion <AC-n>: "<AC text>". convention: not stated in the ticket; common convention: <behavior>. Never cite an AC that does not cover the behavior.>
 
 Environment: <env name> <url>, build <build or "unverified">, <browser> <version if known>, viewport <WxH>, role <role>.
 

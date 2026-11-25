@@ -9,7 +9,7 @@ metadata:
 
 **Input, `phase=design` (default):** the `acceptance-analyzer` coverage model, the normalized `acceptance_criteria`, `business_rules`, `discrepancies`, `risk_areas`, the PR's changed files, `test_types` (always `functional` and `navigation`, plus whichever types the run chose), the environment (`production`, `allow_mutations`), `auth.method`, `auth.roles`, `viewports`, `test_data_prefix`, the provider, `cross_check_provider`, and `missing_capabilities` (what the provider cannot do; plan those cases as `Not testable (provider lacks <capability>)`).
 
-**Input, `phase=refine`:** the current `test_plan` and the `recon` inventory from the executor, plus the same `acceptance_criteria`, `business_rules`, `test_types`, environment, `auth.method`, `auth.roles`, provider, `cross_check_provider` and `missing_capabilities` as `phase=design`, because refine designs with the same rules. See the last section.
+**Input, `phase=refine`:** the current `test_plan` and the `recon` inventory from the executor, plus every `phase=design` input listed above (the coverage model, ACs, business rules, discrepancies, risk areas, changed files, test types, environment, auth, viewports, `test_data_prefix`, provider, `cross_check_provider`, `missing_capabilities`), because refine designs with the same rules. See the last section.
 
 Output: `test_plan` (shape at the end). Load `references/ui-qa-heuristics.md` before designing.
 
@@ -54,7 +54,7 @@ Thorough is the goal. Padding is not. A case that could not reveal a defect this
 
 For each type in `test_types` beyond `functional` and `navigation`, walk its section of the heuristics against each screen and AC. Types not chosen get no cases. They are listed in the plan's scope as not selected, so the report can say they were not covered.
 
-`missing_capabilities` applies to every category, including the always-on ones. A Lighthouse audit on Claude in Chrome is planned as `Not testable (provider lacks Lighthouse)`. So is a browser-level unsaved-changes case (Back, refresh or closing the tab with unsaved edits) when `beforeunload handling` is missing, because the browser's own prompt would freeze the run.
+`missing_capabilities` applies to every category, including the always-on ones. A Lighthouse audit on Claude in Chrome is planned as `Not testable (provider lacks Lighthouse)`. So is a browser-level unsaved-changes case (Back or refresh with unsaved edits) when `beforeunload handling` is missing, because the browser's own prompt would freeze the run. The "closing the tab" half of that guard is `Not testable (no provider can observe the close prompt)` on every provider, because closing a page through the tools skips the prompt.
 
 ## 6. Expected results and their oracle
 
@@ -66,7 +66,7 @@ Every case records where its expected result comes from:
 
 Never take an expected result from the PR or the code. When the AC is silent on the exact outcome (error text, redirect target), write the expected result at the level the AC supports ("an error explains the email is invalid and the form is not submitted") and add a non-blocking question asking for the exact text.
 
-A `convention` case runs and can fail like any other. The report files its failure as a defect one priority lower and asks whether the behavior is intended, except for S1 defects: script execution, exposed data, or a server accepting an action that crosses a permission or data rule the ticket names is never "intended", so those keep their priority and raise no question.
+A `convention` case runs and can fail like any other. The report files its failure as a defect one priority lower and asks whether the behavior is intended, except for S1 defects: script execution, exposed data, or a server accepting an action that crosses an ownership or permission boundary (whether or not the ticket mentions it) or a data rule the ticket names is never "intended", so those keep their priority and raise no question.
 
 ## 7. Design the minimal shared test data set
 
