@@ -76,10 +76,16 @@ Every acceptance criterion is run through the techniques a seasoned QA reaches f
 - **Equivalence partitioning** — one representative per class, each invalid class kept separate.
 - **Boundary-value analysis** — `min-1, min, min+1 … max-1, max, max+1`, plus zero/empty.
 - **Decision tables** — combinatorial rules (role × state × flag) enumerated, not sampled.
-- **State-transition testing** — valid transitions *and* the invalid ones teams forget.
+- **State-transition testing** — valid transitions, the invalid ones teams forget, and the backward ones: editing after a step completed, cancelling half way, retrying after an error.
+- **The second half of every rule.** When an AC says something becomes available once X holds, it also tests that it becomes unavailable again the moment X stops holding. If editing a validated query should disable **Run** again, that is a scenario. Whatever a step produced (validated, previewed, calculated) is checked for invalidation when its inputs change.
+- **Break-it questions on every AC** — twice, out of order, change it after it worked, undo, abandon, fail then recover, round the guard, and what else should and must not change (tagged `@adversarial`).
+- **Navigation and flow** when the story has screens — Back after a submit, refresh mid-flow, unsaved changes, deep links, the landing page (tagged `@navigation`).
 - **Negative / error paths** — the failure the AC names, plus the ones it implies (flagged `@inferred`).
 - **Permission matrices, concurrency, idempotency, data variety** — pulled in where the domain warrants.
 - **ZOMBIES** as the closing sweep — Zero, One, Many, Boundaries, Interfaces, Exceptions, Simple.
+- **A gap review** before the model is returned: every rule tested both ways, every produced result invalidated, every AC with a negative or adversarial case.
+
+Every behavior records where its expected result comes from: stated by an AC, implied by one, or a near-universal convention (a disabled control cannot be triggered, Back does not resubmit). Implied and convention scenarios are tagged `@inferred`, carry a one-line note saying what they follow from, and are listed at the end for the author to confirm.
 
 ## Smart scenarios, not coupled ones
 

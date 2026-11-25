@@ -91,6 +91,46 @@ Notes on what makes this good:
 - Two invalid dimensions (format/existence, and length) are two outlines, not one muddle — a failure points to the right rule.
 - The stacking edge case is standalone because it's a distinct behavior.
 
+## Rules, inverses and invalidation
+
+The second half of an enabling rule, written out. The story says only that validation enables **Run**; the inverse and the invalidation are `@inferred` and say so.
+
+```gherkin
+  Rule: A query can be run only after it is validated
+
+    @smoke @AC-2
+    Scenario: Validating a query enables Run
+      Given an analyst has entered the query "SELECT 1"
+      When the analyst validates the query
+      Then the query is marked valid
+      And "Run" is enabled
+
+    @inferred @AC-2
+    Scenario: Run is disabled before the query is validated
+      Not stated in the story; follows from AC-2's enabling condition.
+      When an analyst enters the query "SELECT 1"
+      Then "Run" is disabled
+
+    @inferred @adversarial @AC-2
+    Scenario Outline: Changing a validated query disables Run until it is validated again
+      Not stated in the story; follows from AC-2's enabling condition.
+      Given an analyst has validated the query "SELECT 1"
+      When the analyst <change>
+      Then "Run" is disabled
+      And the query is no longer marked valid
+
+      Examples:
+        | change                                   |
+        | changes the query to "SELECT 2"          |
+        | clears the query                         |
+        | changes the query to the invalid "SELEC" |
+```
+
+Notes:
+- The invalidation outline starts from the validated state in its `Given`; the only `When` is the change.
+- Three triggers with one outcome are one outline, not three scenarios.
+- The description line under each `@inferred` scenario tells the author exactly what to confirm.
+
 ## Backgrounds
 
 - `Given`-only. Never put a `When` or `Then` in a `Background` — a background that asserts hides failures across every scenario.
@@ -145,7 +185,9 @@ Then the response status is 201
 | `@security` | input-safety / auth scenario |
 | `@i18n` | locale/timezone/encoding scenario |
 | `@edge` | rare-but-specified case |
-| `@inferred` | behavior implied by the AC, not stated — confirm with author |
+| `@adversarial` | break-it behavior: twice, out of order, change after success, undo, abandon, fail then recover, round the guard |
+| `@navigation` | Back, refresh, deep link, unsaved changes, landing page after an action |
+| `@inferred` | behavior implied by the AC, or a common convention, not stated: confirm with author |
 | `@manual` | not automatable yet; filter out of automated runs |
 
 Adopt the project's existing tags where `code_refs` reported them, rather than inventing parallel ones.

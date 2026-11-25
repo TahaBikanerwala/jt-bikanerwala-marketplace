@@ -58,6 +58,57 @@ For a lifecycle, test valid transitions, invalid transitions, and guards.
 
 Each invalid transition is its own negative scenario — the ones teams forget are exactly the "you can't do that from here" cases.
 
+**Backward transitions** on the same lifecycle, the other set teams forget:
+
+- Recall, then resubmit: Submitted→Draft→Submitted works, and the approver sees the latest version (`implied`).
+- Cancel half way through editing a Draft: the saved Draft is unchanged (`convention`).
+- A submit that fails validation: the expense stays Draft with the input kept, and fixing it and submitting again works once (`implied`).
+- Edit a field, then restore its original value: is the form clean again or still unsaved? The AC is silent, so this is an Open Question.
+
+## Rules, inverses and invalidation
+
+An AC usually states only the condition that turns something on. Write it as a rule and test both halves.
+
+> AC: "The **Export** button is enabled once at least one row is selected and a format is chosen."
+
+Rule CR-1: Export is enabled when 1+ rows are selected **and** a format is chosen.
+
+| # | Rows selected | Format chosen | Export |
+|---|---|---|---|
+| 1 | none | no | disabled (`implied`) |
+| 2 | 1+ | no | disabled (`implied`) |
+| 3 | none | yes | disabled (`implied`) |
+| 4 | 1+ | yes | enabled (`ac`) |
+
+Then the moments the condition **stops** holding after Export was enabled: the last row is deselected, the format is cleared. Both make Export disabled again, so they fold into one outline with a `change` column (`implied`). Pressing the export keyboard shortcut while Export is disabled does nothing (`convention`). Does a selection survive filtering the list? The AC does not say, so that is an Open Question.
+
+> AC: "After the address is verified, the customer can place the order."
+
+Verification produces something ("verified") that depends on the address. Changing the postcode after verification, or picking a different saved address, makes the address unverified and disables **Place order** until it is verified again (`implied`). That is one outline with two triggers. This invalidation case is the one suites most often miss.
+
+## Break it
+
+The adversarial sweep, asked of every AC and every rule: do it **twice**; do it **out of order**; **change it after it worked**; **undo** it; **abandon** it half way; **fail, then recover**; **get round the guard** by another route; **two at once**; and list **what else should change and what must not**. Each answer that could reveal a defect is a behavior of type `adversarial`.
+
+> AC: "A shopper can apply one discount code to the cart."
+
+- Twice: applying the same code again does not apply the discount twice.
+- Out of order: applying a code to an empty cart (Open Question if the AC is silent on the outcome).
+- Change it after it worked: removing an item so the cart drops below the code's minimum spend; the discount is removed or recalculated (`implied` if the AC states a minimum).
+- Undo: removing the code restores the original total.
+- What must not change: applying a code does not change item quantities or the shipping address.
+
+## Navigation and flow
+
+When the story describes screens or a flow.
+
+> AC: "After submitting the expense, the user sees a confirmation page."
+
+- Back from the confirmation page does not submit a second expense (`convention`).
+- Refreshing the confirmation page does not submit again (`convention`).
+- The confirmation URL for an expense that does not exist shows a not-found state (`convention`).
+- Opening the confirmation URL signed out leads to sign-in, then back to the confirmation (`convention`).
+
 ## Negative / Error-path Analysis
 
 For every input and action, ask what breaks. A checklist to run per field/action:

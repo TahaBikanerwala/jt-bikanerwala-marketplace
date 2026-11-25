@@ -14,7 +14,7 @@
     { "name": "qa-tester", "version": "^0.3.0" },
     { "name": "issue-triager", "version": "^2.1.2" },
     { "name": "bug-reporter", "version": "^0.2.3" },
-    { "name": "acceptance-test-generator", "version": "^0.1.3" },
+    { "name": "acceptance-test-generator", "version": "^0.2.0" },
     { "name": "story-drafter", "version": "^1.0.3" },
     { "name": "postmortem-generator", "version": "^2.0.2" },
     { "name": "ticket-summarizer", "version": "^0.2.2" },

@@ -53,6 +53,7 @@ Each step is `<step type="ActionStep">` with two `<parameterizedString>` cells: 
 - `step id` values start at 2 and increment (1 is reserved by the tool); `last` = the final id used. `id="0"` on the root is fixed.
 - **`Given`** → an Action step; Expected Result empty (setup, nothing to assert yet). Multiple `Given/And` may each be their own action step or be joined into one setup step — prefer one step per `Given` line for clarity.
 - **`When`** → an Action step; Expected Result empty (the trigger).
+- **A scenario description line** (the source note on an `@inferred` scenario, such as `Not stated in the story; follows from AC-2's enabling condition.`) is not a step. Put it on the first line of the Test Case body, above the fenced Gherkin, so the tester sees it before running the case.
 - **`Then` (+ its `And`/`But`)** → fold into the *preceding* `When` step's Expected Result, or emit a dedicated "Verify" action step whose Expected Result lists every `Then`/`And` assertion. One `Then`-group = one expected-result cell so the tester sees all postconditions of the action together.
 - Escape `<`, `>`, `&`, `"` in cell text. Wrap each cell's content in `<DIV>…</DIV>`.
 

@@ -64,11 +64,21 @@ Make each scenario test a lot about **one** behavior; never fold in a second, un
 - **Journeys where ACs genuinely chain.** A create→list→edit→verify flow is legitimately one scenario when the ACs describe a continuous user path and each step's outcome is a precondition of the next.
 - **Do not couple.** The moment a scenario needs a second unrelated `When`/`Then` pair, split it. A scenario that can fail for six unrelated reasons is a debugging tax, not a smart test. Keep negatives and permission cases standalone — they must pinpoint.
 
+## Inverse, invalidation, adversarial and navigation scenarios
+
+The model carries rules (`CR-n`) and behaviors whose oracle is `implied` or `convention`. Write them with the same care as the stated ones, because they are where suites usually fall short.
+
+- **The setup is the state after success.** An invalidation scenario's `Given` puts the actor in the state the earlier step produced ("Given an analyst has validated the query "SELECT 1""). Its `When` is the change, and its `Then` asserts that the dependent outcome is gone ("Then "Run" is disabled" / "And the query is no longer marked valid"). Do not replay the whole earlier step as a second `When`.
+- **Several triggers, one outcome, one outline.** Edit, clear and make invalid all disabling **Run** is one `Scenario Outline` with a `change` column, not three scenarios.
+- **Say where the expectation comes from.** Under the `Scenario:` line of every `implied` or `convention` scenario, add one description line naming its source: `Not stated in the story; follows from AC-2's enabling condition.` or `Not stated in the story; common convention: Back does not resubmit a form.`. The author sees exactly what to confirm.
+- **Control state is behavior here.** A step such as `Then "Run" is disabled` is fine even though it names a control, because the control's state is what the rule promises.
+- **Keep them standalone.** Never fold an inverse, invalidation, adversarial or navigation scenario into a journey, where a failure would be lost among the journey's other assertions.
+
 ## Tags
 
 - **Traceability:** `@AC-<n>` on each scenario (or on the `Rule:`) when `traceability_tags` is on — the durable link back to the criterion.
-- **Suite/risk:** `@smoke` (critical path), `@regression`, `@negative`, `@boundary`, `@permissions`, `@edge`, `@security`, `@i18n`.
-- **Inferred:** `@inferred` on any scenario covering a behavior the AC implied but didn't state — signals the author should confirm it.
+- **Suite/risk:** `@smoke` (critical path), `@regression`, `@negative`, `@boundary`, `@permissions`, `@edge`, `@security`, `@i18n`, `@adversarial` (a break-it behavior: twice, out of order, change after success, undo, abandon, fail then recover, round the guard), `@navigation` (Back, refresh, deep link, unsaved changes, landing page).
+- **Inferred:** `@inferred` on any scenario whose oracle is `implied` or `convention`, a behavior the AC implied or users expect but the story didn't state. It signals the author should confirm it.
 - **Manual:** `@manual` on a scenario that can't currently be automated (needs tooling/environment), so runners can filter it out.
 - Match the project's existing tag vocabulary when `code_refs` reported one.
 
@@ -83,6 +93,7 @@ Make each scenario test a lot about **one** behavior; never fold in a second, un
 - Every in-scope behavior appears as a scenario or an Examples row; every scenario carries its `@AC-<n>` (or sits under the right `Rule:`).
 - Every AC that has scenarios is represented; any AC with none is reported back to the agent as a gap (do not fabricate a scenario to fill it).
 - Negative and boundary scenarios are present, not just the happy path.
+- Every rule `CR-n` in the selected slice has scenarios for both directions, including the invalidation case, and every `implied` or `convention` scenario carries `@inferred` and its source description line.
 - No scenario couples unrelated behaviors. No Background carries an assertion. No hardcoded data that belongs in Examples.
 - Gherkin parses (correct keyword order, `Examples` columns match `<placeholders>`, tables well-formed). See the checklist in `references/gherkin-style.md`.
 

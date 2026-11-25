@@ -13,7 +13,7 @@ metadata:
 
 Output: `test_plan` (shape at the end). Load `references/ui-qa-heuristics.md` before designing.
 
-The analyzer's model is the floor, not the plan. It reads only the ACs, so it misses what a QA finds by looking at the screen: controls whose state depends on other input, the path back after a step succeeded, browser navigation, and everything the AC author took for granted. This skill adds those, and it thinks like someone trying to break the feature, not someone confirming it works.
+The analyzer's model is the floor, not the plan. It reads only the ACs, so it derives the rules, inverses and break-it behaviors the AC text supports, but it misses what a QA finds by looking at the screen: controls the ACs never mention, their states, the routes and dialogs around them, and everything the AC author took for granted. This skill adds those, and it thinks like someone trying to break the feature, not someone confirming it works.
 
 ## 1. Model the feature
 
@@ -26,7 +26,7 @@ Before writing any case, build a model of what the user will touch. Sources:
 Build four parts:
 
 1. **Screens and routes.** Every page, route, tab, dialog, drawer and wizard step the change adds or touches, with each way in and each way out.
-2. **Control rules.** For every interactive control on those screens, write when it is visible, enabled, read-only, selected or loading as one-line rules (`CR-1`, `CR-2`, ...). Where an AC states the rule, cite it (`oracle: ac`). Where it does not, write the rule the AC implies and mark it `implied`. For example, "**Run** is enabled once the query is valid" implies "**Run** is disabled whenever the query is not valid, including straight after the query is edited".
+2. **Control rules.** Start from the analyzer's `Rules` (keep their `CR-n` ids and their inverse behaviors). Then, for every interactive control on those screens, add the rules the analyzer could not see: when the control is visible, enabled, read-only, selected or loading, as one-line rules numbered after the analyzer's. Where an AC states the rule, cite it (`oracle: ac`). Where it does not, write the rule the AC implies and mark it `implied`. For example, "**Run** is enabled once the query is valid" implies "**Run** is disabled whenever the query is not valid, including straight after the query is edited".
 3. **States and transitions.** The UI states (pristine, dirty, invalid, valid, saving, saved, stale, error) and the record's lifecycle states, with every transition between them. Include the backward transitions: editing after a save, re-entering a completed step, cancelling half way, retrying after an error.
 4. **Data flow.** Where each input goes and everywhere it shows up again (list, detail, header, other pages, exports), so every write gets a "shows up everywhere, survives a reload" check.
 
@@ -34,7 +34,7 @@ The model goes into the plan so a reviewer can see what was considered.
 
 ## 2. Start from the coverage model
 
-Every analyzer behavior becomes one or more cases. Keep the analyzer's technique, priority and classes. An Outline-style behavior (several values over one action) becomes **one case with a data table**, executed row by row, with each row reported separately inside that case. Do not explode it into separate cases.
+Every analyzer behavior becomes one or more cases. Keep the analyzer's technique, priority, classes and oracle. Its `adversarial` and navigation behaviors become cases of the same type; the break-it pass in step 4 adds only what they lack. An Outline-style behavior (several values over one action) becomes **one case with a data table**, executed row by row, with each row reported separately inside that case. Do not explode it into separate cases.
 
 ## 3. Derive cases from the model (always)
 
