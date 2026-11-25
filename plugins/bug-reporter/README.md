@@ -56,6 +56,8 @@ The argument picks the mode:
 
 `/bug-reporter:draft` takes the same arguments and prints the whole report without writing anything.
 
+Every `:run` ends with one `Result:` line (`created`, `updated`, `duplicate-of` or `not-filed`) carrying the bug's id and url, so a calling plugin such as `jtb` or `qa-tester` can tell a new bug from an existing one.
+
 ## What it does
 
 1. **Bootstrap.** Detects the tracker via `issuekit` and resolves your identity and default project.

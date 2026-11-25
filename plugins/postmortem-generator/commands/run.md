@@ -6,36 +6,13 @@ allowed-tools: Skill
 
 # /postmortem-generator:run
 
-Entry point for the `postmortem-generator` agent. Pass the incident's tracker URL or ID as the argument.
+Dispatch to the `postmortem-generator` agent with the incident URL or ID verbatim.
 
 ## Examples
 
 ```
-/postmortem-generator:run https://dev.azure.com/contoso/payments/_workitems/edit/12345
 /postmortem-generator:run https://contoso.atlassian.net/browse/INC-456
-/postmortem-generator:run INC-456
 /postmortem-generator:run 12345
 ```
 
-## Behavior
-
-This command is a thin shell. It dispatches to the `postmortem-generator` agent with the URL/ID as the input. The agent runs the full six-phase workflow:
-
-1. Identify the incident from the URL/ID; resolve which tracker via `issuekit:tracker-adapter`.
-2. Gather evidence in parallel (tracker history, related issues, chat threads, deploys, Datadog logs).
-3. Build the timeline via `incident-timeline-builder`.
-4. Pause for the user to confirm scope.
-5. Generate the postmortem via `postmortem-writer`; clean via `issuekit:prose-style`.
-6. Render inline; optionally save to the configured `output_directory`.
-
-The agent is read-only on the tracker. It never modifies the incident, comments on it, or transitions it. See the agent prompt (`agents/postmortem-generator.md`) for the detailed contract.
-
-## Configuration
-
-Reads `.claude/tracker-policy.json` if present. Falls back to defaults when missing:
-
-- `output_directory: "./docs/postmortems/"`
-- `postmortem_template: "google-sre"`
-- `incident_identifier: { tag: "incident", work_item_types: ["Issue", "Bug", "Incident"] }`
-
-Every key has a default, so nothing is prompted. Set them in `.claude/tracker-policy.json` to override.
+Usage, configuration and behavior: this plugin's `README.md`.

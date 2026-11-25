@@ -36,6 +36,7 @@ You also need:
 /qa-tester:run PROJ-456                     # ticket; linked PRs are found automatically
 /qa-tester:run https://dev.azure.com/org/proj/_workitems/edit/1234 --env staging
 /qa-tester:run https://github.com/org/app/pull/321   # PR; referenced tickets are found automatically
+/qa-tester:run #321                         # PR on this repo's GitHub remote
 /qa-tester:plan PROJ-456                    # draft the plan only, no browser
 /qa-tester:setup                            # change saved environments and preferences
 ```
