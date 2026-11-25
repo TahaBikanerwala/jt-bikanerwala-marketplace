@@ -162,12 +162,12 @@ Azure DevOps only. The field environment detail is written to on a Bug (environm
 ### `default_project` (string)
 
 Overrides `whoAmI()`'s live-lookup resolution of the tracker's default project (see
-`references/verbs.md`'s "Resolving AzDO's `defaultProject`/`defaultTeam`" for the
+`references/verbs/identity.md`'s "Resolving AzDO's `defaultProject`/`defaultTeam`" for the
 full precedence — this key is checked first, ahead of the AzDO MCP server's own
 `ado_mcp_project` config and the single-project auto-resolve). Works on both
 trackers: the AzDO project name, or the Jira project key.
 
-**Default if unset:** resolved live per the precedence in `verbs.md`. AzDO: server
+**Default if unset:** resolved live per the precedence in `verbs/identity.md`. AzDO: server
 config, then single-project auto-resolve, then lazy-prompt. Jira: the project prefix of
 the issue key in hand, then lazy-prompt. The lazy-prompt path writes its answer here so
 the question is never asked twice.

@@ -1,7 +1,6 @@
 # Slack — tool allowlist
 
-The adapter calls the tools below for the two chat verbs (`references/verbs.md`'s
-"Chat" section). Suffix-match against the available tool surface; prefix varies by
+The adapter calls the tools below for the two chat verbs (`references/verbs/chat.md`). Suffix-match against the available tool surface; prefix varies by
 which Slack MCP is installed. This marketplace's default is the claude.ai Slack
 connector, `mcp__claude_ai_Slack__*`.
 

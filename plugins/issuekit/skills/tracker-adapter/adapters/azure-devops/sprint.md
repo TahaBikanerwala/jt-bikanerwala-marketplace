@@ -1,6 +1,6 @@
 # Azure DevOps — `getSprintItems` and `getTeamCapacity`
 
-Implements the two sprint-read verbs from `references/verbs.md`. Each step below
+Implements the two sprint-read verbs from `references/verbs/sprint.md`. Each step below
 lists the classic tool first, then the consolidated equivalent — resolved once at
 detection time (see `references/detection.md` § Resolving which tool-name shape to
 call); never call both in the same session.

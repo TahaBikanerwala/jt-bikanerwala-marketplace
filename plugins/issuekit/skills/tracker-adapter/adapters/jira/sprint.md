@@ -1,6 +1,6 @@
 # Jira — `getSprintItems` and `getTeamCapacity`
 
-Implements the two sprint-read verbs from `references/verbs.md`.
+Implements the two sprint-read verbs from `references/verbs/sprint.md`.
 
 ## `Sprint` on Jira
 

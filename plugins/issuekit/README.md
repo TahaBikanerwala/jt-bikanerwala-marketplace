@@ -53,7 +53,7 @@ Multi-tracker tiebreak: infer from the issue reference. `PROJ-123` → Jira; `de
 
 ## Verb reference
 
-See [`skills/tracker-adapter/references/verbs.md`](skills/tracker-adapter/references/verbs.md) for the full input/output schemas.
+See [`skills/tracker-adapter/references/verbs.md`](skills/tracker-adapter/references/verbs.md) for the shared types and the index of per-group verb files (`references/verbs/`) with the full input/output schemas.
 
 ## Supported adapters
 
